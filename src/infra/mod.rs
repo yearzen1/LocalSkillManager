@@ -2,4 +2,6 @@
 
 pub mod env;
 pub mod frontmatter;
+pub mod fsops;
 pub mod paths;
+pub mod scan;

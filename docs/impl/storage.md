@@ -241,6 +241,7 @@ JSON 输出：
 ```
 
 - 非法项追加 `"error": "..."` 字段。
+- `error` 固定英文、不参与 i18n，取值仅有：`missing SKILL.md`、`unreadable SKILL.md`、`SKILL.md is not valid UTF-8`、`missing frontmatter`、`missing <field>`、`invalid YAML frontmatter`、`invalid name`、`invalid description`、`invalid directory name`、`name mismatch: <dir> vs <name>`。
 - JSON 直接 `println!` 到 stdout，不带任何日志或提示语。
 
 ### 3.3 copy
@@ -281,8 +282,22 @@ copy 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）�
 // src/infra/fsops.rs
 pub fn copy_recursive(src: &Path, dst: &Path) -> Result<(), FsError>;
 pub fn contains_path(src: &Path, dst: &Path) -> Result<bool, FsError>;
-pub fn install_skill_dir(src: &Path, dst: &Path, force: bool) -> Result<(), FsError>;
-pub fn install_skill_file(src: &Path, dst: &Path, force: bool) -> Result<(), FsError>;
+pub fn contains_git_dir(src: &Path) -> bool;
+pub fn install_skill_dir(src: &Path, dst: &Path, force: bool) -> Result<InstallReport, FsError>;
+pub fn install_skill_file(src: &Path, dst: &Path, force: bool) -> Result<InstallReport, FsError>;
+
+/// 备份删除失败时把路径交回命令层，由命令层打 warning 并仍以 0 退出。
+pub struct InstallReport {
+    pub leftover_backup: Option<PathBuf>,
+}
+
+pub enum FsError {
+    Io { path: PathBuf, source: anyhow::Error },
+    SymlinkUnsupported { path: PathBuf },
+    AlreadyExists { path: PathBuf },
+    SourceMissing { path: PathBuf },
+    SourceNotExpectedType { path: PathBuf },
+}
 
 // src/domain/entry.rs
 pub struct SkillEntry {
@@ -304,7 +319,7 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError>;
 - **符号链接**：不跳过、不跟随，遇到即报错 `error: symbolic links are not supported: <path>`。
 - **权限**：Unix 上沿用 `fs::copy` 保留的源文件模式；Windows 不处理 ACL。
 - **临时目录**：`.tmp-<name>-<pid>`，与目标同卷，保证 `rename` 原子性。
-- **备份目录**：`.bak-<name>-<pid>`，成功后递归删除；删除失败打印 warning，退出码仍为 0。
+- **备份目录**：`.bak-<name>-<pid>`，成功后递归删除；删除失败时把路径放进 `InstallReport::leftover_backup`，由命令层打印 warning，退出码仍为 0。
 - **崩溃残留**：临时/备份目录以 `.` 开头，`lsm list` 自动跳过；不自动清理其他进程的残留。
 - **自包含检测**：源路径 `canonicalize`，目标取「cwd 规范化 + 相对后缀」，用 `starts_with` 判断；目标尚不存在也能判断。
 - 所有错误都带路径上下文：底层 I/O 错误用 `anyhow::Context` 包装后挂在 `FsError` 变体里，再由 `error::mapping` 转成 `AppError.source`；`infra` 内不构造 `AppError`。
