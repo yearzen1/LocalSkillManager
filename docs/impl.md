@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：设计已定稿（29 项决策），待实现
+> 状态：v0.1.0 已实现（Windows 实测；Linux/macOS 未实测）
 > 最后更新：2026-10-29
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。
@@ -283,23 +283,25 @@ pub struct Ctx {
 
 ## 8. 验收标准
 
-- [ ] 三平台编译通过，`lsm --version`、`lsm --help` 正常。
-- [ ] 需求中的 5 条完整命令、2 条 `config` 命令与 5 个短选项全部可用。
-- [ ] `.md` 与目录两种输入都能安装；目录不做任何排除，`.git` 完整复制并告警。
-- [ ] 目标位于源目录内时硬报错，不发生递归复制。
-- [ ] 非法 SKILL.md 被拦截：格式、64 / 1024 长度限制全部生效。
-- [ ] 重复安装默认失败，`--force` 原子覆盖且不残留临时目录。
-- [ ] `copy` 能把全局 skill 复制到当前项目，冲突处理与 add 一致。
-- [ ] `list` 文本与 JSON 输出稳定；空 JSON 为 `[]`；非法项不导致崩溃。
-- [ ] help、错误、成功提示支持 en/zh，`--lang` / `LSM_LANG` / 配置文件 / 默认值的四级优先级正确。
-- [ ] `lsm config set lang zh` 后新进程默认输出中文；`get` 输出裸值且缺省为 `en`。
-- [ ] 配置文件损坏时 `--lang` / `LSM_LANG` 仍可用，裸调用退 1 并给出路径；配置目录可用 `LSM_CONFIG_DIR` 重定向。
-- [ ] `README.md`（英文）与 `README.zh-CN.md`（中文）互相链接。
-- [ ] 目录名与 frontmatter `name` 不一致时，`list` 标 `[invalid]`，`copy` 拒绝。
-- [ ] `copy` 的 name 校验能阻止路径穿越（`..`、`/`、`\`）与 Windows 保留设备名。
-- [ ] 无子命令 → help 到 stderr + 退出码 2；显式 `--help` → stdout + 退出码 0。
-- [ ] `main.rs` 仅做接线；`domain` 零 I/O、零文案；`domain`/`infra` 不构造 `AppError`；`i18n` 不读环境与文件；`paths` 不读进程环境；`commands` 不直接调用 `std::fs`（代码审查）。
-- [ ] 模块树与本文"模块划分"一致，`lib.rs` 暴露核心逻辑。
-- [ ] `LICENSE` 为 MIT，`Cargo.toml` 与两份 README 均标注。
-- [ ] `docs/impl.md`、`docs/impl/*.md`、`docs/decisions.md` 的相对链接全部有效，规则无重复。
-- [ ] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿。
+验收范围：第 1 条的三平台只在 Windows 实测，其余条目均在本机通过。
+
+- [x] `lsm --version`、`lsm --help` 正常（Windows 实测；Linux/macOS 未实测）。
+- [x] 需求中的 5 条完整命令、2 条 `config` 命令与 5 个短选项全部可用。
+- [x] `.md` 与目录两种输入都能安装；目录不做任何排除，`.git` 完整复制并告警。
+- [x] 目标位于源目录内时硬报错，不发生递归复制。
+- [x] 非法 SKILL.md 被拦截：格式、64 / 1024 长度限制全部生效。
+- [x] 重复安装默认失败，`--force` 原子覆盖且不残留临时目录。
+- [x] `copy` 能把全局 skill 复制到当前项目，冲突处理与 add 一致。
+- [x] `list` 文本与 JSON 输出稳定；空 JSON 为 `[]`；非法项不导致崩溃。
+- [x] help、错误、成功提示支持 en/zh，`--lang` / `LSM_LANG` / 配置文件 / 默认值的四级优先级正确。
+- [x] `lsm config set lang zh` 后新进程默认输出中文；`get` 输出裸值且缺省为 `en`。
+- [x] 配置文件损坏时 `--lang` / `LSM_LANG` 仍可用，裸调用退 1 并给出路径；配置目录可用 `LSM_CONFIG_DIR` 重定向。
+- [x] `README.md`（英文）与 `README.zh-CN.md`（中文）互相链接。
+- [x] 目录名与 frontmatter `name` 不一致时，`list` 标 `[invalid]`，`copy` 拒绝。
+- [x] `copy` 的 name 校验能阻止路径穿越（`..`、`/`、`\`）与 Windows 保留设备名。
+- [x] 无子命令 → help 到 stderr + 退出码 2；显式 `--help` → stdout + 退出码 0。
+- [x] `main.rs` 仅做接线；`domain` 零 I/O、零文案；`domain`/`infra` 不构造 `AppError`；`i18n` 不读环境与文件；`paths` 不读进程环境；`commands` 不直接调用 `std::fs`（代码审查）。
+- [x] 模块树与本文"模块划分"一致，`lib.rs` 暴露核心逻辑。
+- [x] `LICENSE` 为 MIT，`Cargo.toml` 与两份 README 均标注。
+- [x] `docs/impl.md`、`docs/impl/*.md`、`docs/decisions.md` 的相对链接全部有效，规则无重复。
+- [x] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿。

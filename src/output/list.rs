@@ -16,15 +16,15 @@ const INVALID_MARKER: &str = "[invalid]";
 pub fn render_text(lang: Lang, entries: &[SkillEntry]) -> String {
     let name_width = entries
         .iter()
-        .map(|entry| entry.name.chars().count())
+        .map(|entry| display_width(&entry.name))
         .max()
         .unwrap_or(0)
         .max(10);
 
     let mut text = String::new();
     text.push_str(&format!(
-        "{:<name_width$}  {}\n",
-        tr(lang, MsgKey::ListHeaderName),
+        "{}  {}\n",
+        pad_to(tr(lang, MsgKey::ListHeaderName), name_width),
         tr(lang, MsgKey::ListHeaderDescription),
     ));
     text.push_str(&format!("{}  {}\n", "-".repeat(name_width), "-".repeat(42)));
@@ -34,10 +34,45 @@ pub fn render_text(lang: Lang, entries: &[SkillEntry]) -> String {
             Some(error) => format!("{INVALID_MARKER} {error}"),
             None => summarize(&entry.description),
         };
-        text.push_str(&format!("{:<name_width$}  {}\n", entry.name, description));
+        text.push_str(&format!(
+            "{}  {}\n",
+            pad_to(&entry.name, name_width),
+            description
+        ));
     }
 
     text
+}
+
+/// 右侧补空格到指定显示宽度（CJK 字符按 2 列计）。
+fn pad_to(text: &str, width: usize) -> String {
+    let mut padded = text.to_string();
+    for _ in display_width(text)..width {
+        padded.push(' ');
+    }
+    padded
+}
+
+/// 终端显示宽度：宽字符（CJK、全角标点等）占两列。
+fn display_width(text: &str) -> usize {
+    text.chars()
+        .map(|character| if is_wide(character) { 2 } else { 1 })
+        .sum()
+}
+
+fn is_wide(character: char) -> bool {
+    matches!(
+        character as u32,
+        0x1100..=0x115F
+            | 0x2E80..=0xA4CF
+            | 0xAC00..=0xD7A3
+            | 0xF900..=0xFAFF
+            | 0xFE30..=0xFE4F
+            | 0xFF00..=0xFF60
+            | 0xFFE0..=0xFFE6
+            | 0x1F300..=0x1F64F
+            | 0x20000..=0x3FFFD
+    )
 }
 
 /// 渲染 JSON 数组；空列表输出 `[]`。
@@ -131,6 +166,18 @@ mod tests {
         let text = render_text(Lang::Zh, &[entry("my-skill", "一句话说明。")]);
         assert!(text.contains("名称"));
         assert!(text.contains("描述"));
+    }
+
+    #[test]
+    fn aligns_columns_with_wide_characters() {
+        let text = render_text(Lang::Zh, &[entry("my-skill", "一句话说明。")]);
+        let header = text.lines().next().unwrap();
+        let row = text.lines().nth(2).unwrap();
+
+        let header_prefix = &header[..header.find('描').unwrap()];
+        let row_prefix = &row[..row.find('一').unwrap()];
+
+        assert_eq!(display_width(header_prefix), display_width(row_prefix));
     }
 
     #[test]
