@@ -176,7 +176,7 @@ LocalSkillManager/
 | `infra::scan` | 扫描目录、标记非法项 | `scan_skills(&Path) -> Result<Vec<SkillEntry>, FsError>` |
 | `cli::lang` | `--lang` 预扫描 + 语言决策表 | `prescan(&[OsString]) -> Option<String>`、`decide(cli, env) -> Decision` |
 | `cli::normalize` | `-a/-l/-c/-g/-p` 归一化 | `normalize(Vec<OsString>) -> Result<Vec<OsString>, NormalizeError>` |
-| `cli::spec` / `help` | 双语 CLI 与 help | `build(Lang) -> Command`、`render(...)` |
+| `cli::spec` / `help` | 双语 CLI 与 help | `build(Lang) -> Command`、`localize(&str, Lang) -> String` |
 | `error::mapping` | 各层错误 → `AppError` | `impl From<NameError/MetaError/...> for AppError` |
 | `output::error` | 错误体渲染 | `render(&AppError, Lang) -> String` |
 | `output::list` | 文本表格 / JSON | `render_text`、`render_json` |

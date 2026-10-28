@@ -42,8 +42,8 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 ### 1.3 help 与参数错误
 
 - clap 用 builder API 构建，`about`、子命令 `about`、参数 `help`、`--lang` 说明全部按当前语言注入。
-- clap 内置 help 的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）与结尾提示，在渲染后按语言替换为 `用法：`、`命令：`、`选项：`、`参数：` 等。
-- 参数解析错误按 `clap::error::ErrorKind` 映射常用类型：缺参数、非法值、未知参数、多余参数、缺子命令、非法子命令；未覆盖的类型回退英文原文。
+- clap 自带的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）与结尾提示，在渲染后按语言替换为 `用法:`、`命令:`、`选项:`、`参数:` 等；自带的 `-h/--help` 与 `-V/--version` 说明同样是英文，因此改为自建参数注入本地化文案。
+- 参数解析错误按 `clap::error::ErrorKind` 映射常用类型：缺参数、非法值、未知参数、多余参数、缺子命令、非法子命令，并带上 clap 记录的出错参数名；未覆盖的类型回退英文原文。
 - `DisplayHelp` / `DisplayVersion` 直接输出并退出 0。
 - 目标效果：
 
@@ -114,27 +114,12 @@ lsm --lang <en|zh> <command> ...
 
 ### 2.3 clap 结构
 
-```rust
-pub struct CliSpec {
-    pub about: String,
-    pub subcommands: Vec<SubSpec>,
-}
-
-pub struct SubSpec {
-    pub name: &'static str,
-    pub about: String,
-    pub args: Vec<ArgSpec>,
-}
-
-pub fn build(lang: Lang) -> clap::Command;
-```
-
-- 用同一份 `CliSpec` 同时构建 clap Command 与本地化 help 文本，避免两套文案漂移。
-- `--lang` 在根命令上定义为全局参数。
-- 作用域用 `ValueEnum`（`global` / `project`），大小写敏感，错误时提示合法值。
-- `config` 子命令的 `get`/`set` 是嵌套子命令，键用 `ValueEnum`（v1 只有 `lang`），未知键由 clap 报用法错误。
+- 直接用 builder API 构建 `clap::Command`，所有 about / 参数说明 / `--lang` 说明都从消息表按语言注入（`cli/spec.rs::build(lang)`）。
+- 作用域参数用 `value_parser(["global", "project"])` 限定合法值，大小写敏感，错误时由 clap 报用法错误。
+- `config` 子命令的 `get`/`set` 是嵌套子命令，键用 `value_parser(["lang"])`（v1 只有 `lang`），未知键由 clap 报用法错误。
+- clap 自带的 `-h` / `-V` 说明是英文，因此根命令与各子命令都 `disable_help_flag(true)` 后自建 `-h/--help`，根命令另外自建 `-V/--version`，说明文案来自消息表。
 - 参数校验错误统一由 `cli::parse` 转成 `AppError`，在 `lib::run` 边界渲染。
-- 代码落点：`cli/spec.rs`（构建 Command）、`cli/help.rs`（渲染）、`cli/lang.rs`（预扫描 + 决策表）、`cli/mod.rs`（解析为 `Action`）；`Action` 定义在 `domain/action.rs`，配置键定义在 `domain/config.rs`。
+- 代码落点：`cli/spec.rs`（构建 Command）、`cli/help.rs`（结构标题本地化）、`cli/lang.rs`（预扫描 + 决策表）、`cli/mod.rs`（解析为 `Action`）；`Action` 定义在 `domain/action.rs`，配置键定义在 `domain/config.rs`。
 
 ### 2.4 无参数与帮助行为
 
@@ -207,7 +192,7 @@ impl AppError {
 
 - `lsm::run(args: impl Iterator<Item = OsString>) -> ExitCode`：只接参数迭代器（`main` 已 `skip(1)` 去掉程序名），`run` 自己不再读 `std::env::args()`，便于单测注入参数。
 
-- 用法错误由归一化阶段 / clap 错误映射统一 `exit(2)`；`copy` 的 name 由 clap `value_parser` 校验，同样返回 2。
+- 用法错误由归一化阶段 / clap 错误映射统一 `exit(2)`；`copy` 的 name 在 `cli::parse` 构造 `Action` 时用 `SkillName::parse` 校验，同样返回 2，且绝不先拼路径再校验。
 - `--json` 模式下 stdout 只允许 JSON；warning 仍然只走 stderr。
 
 ## 4. 相关决策

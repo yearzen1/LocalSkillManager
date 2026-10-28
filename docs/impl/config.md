@@ -100,7 +100,7 @@ pub enum Decision { Cli(Lang), Env(Lang), NeedFile }
 pub fn decide(cli: Option<&str>, env: Option<&str>) -> Result<Decision, LangError>;
 
 // src/lib.rs
-pub fn run(argv: Vec<OsString>) -> u8;
+pub fn run(args: impl Iterator<Item = OsString>) -> ExitCode;
 ```
 
 1. `cli::lang::prescan` 命中 `--lang`：`Lang::parse` 失败 → 用法错误退出 2；成功即返回 `Decision::Cli`，**不读环境与文件**。
