@@ -225,6 +225,7 @@ broken      [invalid] missing SKILL.md
 ```
 
 - 固定 60 字符上限，不做终端宽度探测，保证脚本输出稳定。
+- name 列宽取 `max(10, 最长名称字符数)`，分隔线随列宽生成。
 - 非法项标记 `[invalid]`，不中断整体输出。
 
 JSON 输出：
@@ -242,6 +243,7 @@ JSON 输出：
 
 - 非法项追加 `"error": "..."` 字段。
 - `error` 固定英文、不参与 i18n，取值仅有：`missing SKILL.md`、`unreadable SKILL.md`、`SKILL.md is not valid UTF-8`、`missing frontmatter`、`missing <field>`、`invalid YAML frontmatter`、`invalid name`、`invalid description`、`invalid directory name`、`name mismatch: <dir> vs <name>`。
+- JSON 为 2 空格缩进的 pretty 输出，末尾带一个换行；空列表输出 `[]\n`。
 - JSON 直接 `println!` 到 stdout，不带任何日志或提示语。
 
 ### 3.3 copy

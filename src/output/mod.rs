@@ -1,6 +1,7 @@
 //! 唯一的排版出口：成功、警告、信息、错误与列表都在这里成文。
 
 pub mod error;
+pub mod list;
 
 use std::io::Write;
 

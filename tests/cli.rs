@@ -443,3 +443,232 @@ fn short_flags_work_for_add() {
 
     assert!(home.path().join("skills/my-skill/SKILL.md").exists());
 }
+
+// ---------- list ----------
+
+#[test]
+fn list_empty_global_prints_hint_with_path() {
+    let home = home_dir();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No skills found in"))
+        .stdout(predicate::str::contains(
+            home.path().join("skills").display().to_string(),
+        ));
+}
+
+#[test]
+fn list_empty_global_json_prints_empty_array() {
+    let home = home_dir();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global", "--json"])
+        .assert()
+        .success()
+        .stdout("[]\n");
+}
+
+#[test]
+fn list_renders_installed_skill() {
+    let home = home_dir();
+    let work = TempDir::new().unwrap();
+    let source = work.path().join("my-skill.md");
+    write_skill_md(&source, "my-skill", "Does one thing.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["add", source.to_str().unwrap(), "global"])
+        .assert()
+        .success();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("NAME"))
+        .stdout(predicate::str::contains("my-skill"))
+        .stdout(predicate::str::contains("Does one thing."));
+}
+
+#[test]
+fn list_json_exposes_documented_fields() {
+    let home = home_dir();
+    let work = TempDir::new().unwrap();
+    let source = work.path().join("my-skill.md");
+    write_skill_md(&source, "my-skill", "Does one thing.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["add", source.to_str().unwrap(), "global"])
+        .assert()
+        .success();
+
+    let output = lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+
+    let first = &value[0];
+    assert_eq!(first["name"], "my-skill");
+    assert_eq!(first["description"], "Does one thing.");
+    assert_eq!(first["valid"], true);
+    assert_eq!(
+        first["path"],
+        home.path()
+            .join("skills")
+            .join("my-skill")
+            .display()
+            .to_string()
+    );
+    assert!(first.get("error").is_none());
+}
+
+#[test]
+fn list_marks_invalid_skill_directories() {
+    let home = home_dir();
+    let skills = home.path().join("skills");
+    fs::create_dir_all(skills.join("broken")).unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[invalid]"))
+        .stdout(predicate::str::contains("missing SKILL.md"));
+
+    let output = lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(value[0]["name"], "broken");
+    assert_eq!(value[0]["valid"], false);
+    assert_eq!(value[0]["error"], "missing SKILL.md");
+}
+
+#[test]
+fn list_marks_name_mismatch() {
+    let home = home_dir();
+    let skills = home.path().join("skills");
+    write_skill_md(&skills.join("dir-name/SKILL.md"), "other-name", "Mismatch.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "name mismatch: dir-name vs other-name",
+        ));
+}
+
+#[test]
+fn list_sorts_by_name_and_truncates_long_descriptions() {
+    let home = home_dir();
+    let skills = home.path().join("skills");
+    write_skill_md(&skills.join("zeta/SKILL.md"), "zeta", &"z".repeat(70));
+    write_skill_md(&skills.join("alpha/SKILL.md"), "alpha", "first");
+
+    let stdout = lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(stdout).unwrap();
+
+    let alpha_at = text.find("alpha").unwrap();
+    let zeta_at = text.find("zeta").unwrap();
+    assert!(alpha_at < zeta_at, "entries must be sorted by name");
+    assert!(text.contains(&format!("{}...", "z".repeat(60))));
+    assert!(!text.contains(&"z".repeat(61)));
+}
+
+#[test]
+fn list_project_reads_cwd_agents_skills() {
+    let project = TempDir::new().unwrap();
+    write_skill_md(
+        &project.path().join(".agents/skills/local-skill/SKILL.md"),
+        "local-skill",
+        "Project scope.",
+    );
+
+    lsm()
+        .current_dir(project.path())
+        .args(["list", "project"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("local-skill"));
+}
+
+#[test]
+fn list_short_flags_work() {
+    let home = home_dir();
+    let work = TempDir::new().unwrap();
+    let source = work.path().join("my-skill.md");
+    write_skill_md(&source, "my-skill", "Short flags.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["add", source.to_str().unwrap(), "global"])
+        .assert()
+        .success();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["-l", "-g"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-skill"));
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["-l", "-g", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("["));
+}
+
+#[test]
+fn list_json_stdout_contains_only_json() {
+    let home = home_dir();
+    let work = TempDir::new().unwrap();
+    let source = work.path().join("my-skill");
+    write_skill_md(&source.join("SKILL.md"), "my-skill", "With git.");
+    fs::create_dir_all(source.join(".git")).unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["add", source.to_str().unwrap(), "global"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("warning"));
+
+    let stdout = lsm()
+        .env("LSM_HOME", home.path())
+        .args(["list", "global", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert!(serde_json::from_slice::<serde_json::Value>(&stdout).is_ok());
+}
