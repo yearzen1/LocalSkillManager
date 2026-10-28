@@ -1,0 +1,91 @@
+//! 中文文案。
+
+use super::MsgKey;
+
+pub(super) fn text(key: MsgKey) -> &'static str {
+    match key {
+        MsgKey::ErrorPrefix => "错误:",
+        MsgKey::HintPrefix => "提示:",
+        MsgKey::WarningPrefix => "警告:",
+        MsgKey::HelpAbout => "在 .agents/skills 下安装与复制 agent skill",
+        MsgKey::HelpUsage => "用法:",
+        MsgKey::HelpCommands => "命令:",
+        MsgKey::HelpOptions => "选项:",
+        MsgKey::HelpArguments => "参数:",
+        MsgKey::LangHelp => "输出语言 [en, zh]",
+
+        MsgKey::UsageInvalidLanguage => "非法语言 '{0}'",
+        MsgKey::UsageInvalidLanguageHint => "可用值：en, zh",
+        MsgKey::UsageInvalidScope => "非法作用域 '{0}'",
+        MsgKey::UsageInvalidScopeHint => "可用值：global, project",
+        MsgKey::UsageMissingSubcommand => "缺少子命令",
+
+        MsgKey::AddAbout => "安装 skill 到 global 或 project",
+        MsgKey::AddSourceArg => "skill 目录或 .md 文件路径",
+        MsgKey::AddScopeArg => "安装位置：global 或 project",
+        MsgKey::AddForceFlag => "覆盖已存在的 skill",
+        MsgKey::AddInstalled => "已安装 {0} -> {1}",
+        MsgKey::AddNestedTarget => "目标目录位于源目录内部",
+        MsgKey::AddNestedTargetHint => "请选择 {0} 之外的源目录",
+        MsgKey::AddGitWarning => "源目录包含 .git 目录，将被完整复制",
+
+        MsgKey::ListAbout => "列出已安装的 skill",
+        MsgKey::ListScopeArg => "查找位置：global 或 project",
+        MsgKey::ListJsonFlag => "输出机器可读的 JSON",
+        MsgKey::ListEmpty => "{0} 中没有找到任何 skill",
+        MsgKey::ListHeaderName => "名称",
+        MsgKey::ListHeaderDescription => "描述",
+
+        MsgKey::CopyAbout => "把全局 skill 复制到当前项目",
+        MsgKey::CopyNameArg => "要复制的 skill 名称",
+        MsgKey::CopyForceFlag => "覆盖已存在的 skill",
+        MsgKey::CopyCopied => "已复制 {0} -> {1}",
+        MsgKey::CopyNotFound => "在 global 中找不到 skill '{0}'",
+        MsgKey::CopyNotFoundHint => "运行 `lsm list global` 查看可用 skill",
+        MsgKey::CopySourceInvalid => "全局 skill '{0}' 无效：{1}",
+        MsgKey::CopySourceInvalidHint => "修复源 skill 或重新安装",
+        MsgKey::CopySamePath => "源与目标是同一路径",
+        MsgKey::CopySamePathHint => "请在其它目录下运行该命令",
+
+        MsgKey::ConfigAbout => "查看或修改持久化配置",
+        MsgKey::ConfigGetAbout => "打印已保存的配置值",
+        MsgKey::ConfigSetAbout => "保存配置值",
+        MsgKey::ConfigKeyLangHelp => "输出语言",
+        MsgKey::ConfigValueArg => "语言值：en 或 zh",
+        MsgKey::ConfigSaved => "lang = {0}（已保存到 {1}）",
+        MsgKey::ConfigInvalidValue => "非法语言 '{0}'",
+        MsgKey::ConfigParseFailed => "无法解析配置文件：{0}",
+        MsgKey::ConfigWriteFailed => "写入配置文件失败：{0}",
+        MsgKey::ConfigUnknownKey => "未知配置键 '{0}'",
+        MsgKey::ConfigFixHint => "修复或删除 {0}",
+
+        MsgKey::SkillAlreadyExists => "skill '{0}' 已存在于 {1}",
+        MsgKey::SkillAlreadyExistsHint => "使用 --force 覆盖",
+        MsgKey::SkillNameInvalid => "非法的 skill 名称 '{0}'",
+        MsgKey::SkillNameInvalidHint => "skill 名称只能使用小写字母、数字和单个连字符",
+        MsgKey::SkillNameTooLong => "skill 名称过长：{0} > 64 个字符",
+        MsgKey::SkillNameReserved => "skill 名称 '{0}' 是 Windows 保留设备名",
+        MsgKey::SkillDescriptionEmpty => "skill 描述不能为空",
+        MsgKey::SkillDescriptionTooLong => "skill 描述过长：{0} > 1024 个字符",
+        MsgKey::SkillFrontmatterMissing => "{0}：缺少 frontmatter 块",
+        MsgKey::SkillFrontmatterMissingHint => {
+            "请在 SKILL.md 开头添加包含 name 和 description 的 '---' 块"
+        }
+        MsgKey::SkillFrontmatterUtf8 => "{0}：SKILL.md 不是合法的 UTF-8",
+        MsgKey::SkillFrontmatterYaml => "{0}：frontmatter 不是合法 YAML：{1}",
+        MsgKey::SkillFieldMissing => "{0}：缺少必需字段 '{1}'",
+        MsgKey::SkillDirMismatch => "目录名 '{0}' 与 frontmatter 中的 name '{1}' 不一致",
+        MsgKey::SkillDirMismatchHint => "请把目录名改为 '{0}'",
+
+        MsgKey::FsIo => "无法访问 {0}：{1}",
+        MsgKey::FsSymlink => "不支持符号链接：{0}",
+        MsgKey::FsSourceMissing => "源路径不存在：{0}",
+        MsgKey::FsSourceType => "源路径类型不正确：{0}",
+        MsgKey::FsBackupLeftover => "无法删除备份目录：{0}",
+
+        MsgKey::PathHomeUnavailable => "无法确定家目录",
+        MsgKey::PathHomeUnavailableHint => "请设置 LSM_HOME",
+        MsgKey::PathConfigDirUnavailable => "无法确定配置目录",
+        MsgKey::PathConfigDirUnavailableHint => "请设置 LSM_CONFIG_DIR",
+    }
+}

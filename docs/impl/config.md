@@ -193,23 +193,24 @@ lang = zh (saved to C:\Users\jiahui\AppData\Roaming\lsm\config.toml)
 
 ## 5. 消息键
 
-新增键（en/zh 各一份，命名与 `i18n/mod.rs` 一致）：
+键是 `MsgKey` 的枚举变体（定义在 `i18n/mod.rs`），文案在 `i18n/en.rs` / `i18n/zh.rs`，两边必须各一份：
 
 | Key | en | zh |
 |---|---|---|
-| `config.about` | Manage persistent settings | 查看或修改持久化配置 |
-| `config.get.about` | Print a saved setting | 打印已保存的配置值 |
-| `config.set.about` | Save a setting | 保存配置值 |
-| `config.key.lang.help` | Output language | 输出语言 |
-| `config.saved` | lang = {0} (saved to {1}) | lang = {0}（已保存到 {1}） |
-| `config.invalid_value` | invalid language '{0}' | 非法语言 '{0}' |
-| `config.parse_failed` | cannot parse config file: {0} | 无法解析配置文件：{0} |
-| `config.write_failed` | failed to write config file: {0} | 写入配置文件失败：{0} |
-| `config.unknown_key` | unknown config key '{0}' | 未知配置键 '{0}' |
-| `config.fix_hint` | fix or delete {0} | 修复或删除 {0} |
+| `ConfigAbout` | Manage persistent settings | 查看或修改持久化配置 |
+| `ConfigGetAbout` | Print a saved setting | 打印已保存的配置值 |
+| `ConfigSetAbout` | Save a setting | 保存配置值 |
+| `ConfigKeyLangHelp` | Output language | 输出语言 |
+| `ConfigValueArg` | Language value: en or zh | 语言值：en 或 zh |
+| `ConfigSaved` | lang = {0} (saved to {1}) | lang = {0}（已保存到 {1}） |
+| `ConfigInvalidValue` | invalid language '{0}' | 非法语言 '{0}' |
+| `ConfigParseFailed` | cannot parse config file: {0} | 无法解析配置文件：{0} |
+| `ConfigWriteFailed` | failed to write config file: {0} | 写入配置文件失败：{0} |
+| `ConfigUnknownKey` | unknown config key '{0}' | 未知配置键 '{0}' |
+| `ConfigFixHint` | fix or delete {0} | 修复或删除 {0} |
 
 - `config get` 的输出是裸值，不经过消息表。
-- 键名保留 `config.key.<name>` 层级，将来加键时直接追加。
+- 键名用 `Config` 前缀分组，将来加键时直接追加变体；`i18n::tests` 会遍历全部键，检查两种语言都有非空文案、占位符集合一致。
 
 ## 6. 相关决策
 
