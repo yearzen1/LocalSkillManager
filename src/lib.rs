@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::process::ExitCode;
 
 pub mod domain;
+pub mod infra;
 
 /// 临时入口：slice 7 会换成 `cli` 本地化解析器。
 pub fn run(args: impl Iterator<Item = OsString>) -> ExitCode {

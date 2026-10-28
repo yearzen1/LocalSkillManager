@@ -18,6 +18,8 @@
 - **配置文件不在 skills 目录下**：`config.toml` 位于 `dirs::config_dir()/lsm`（可用 `LSM_CONFIG_DIR` 覆盖），`LSM_HOME` 只影响 skills 根目录，两者互不影响；详见 [config.md](config.md)。
 - Windows 家目录由 `dirs::home_dir()` 得到，例如 `C:\Users\jiahui\.agents\skills`。
 - 所有路径使用 `PathBuf`，禁止硬编码 `/` 或 `\`。
+- `Env::read()` 一次读全三个变量，返回快照；空串按未设置处理，`LSM_LANG` 非 UTF-8 同样按未设置。
+- `home` / `config_dir` 无法确定时为 `None`，由 `paths` 返回 `HomeUnavailable` / `ConfigDirUnavailable`，不做猜测性回退。
 - 安装前按需 `create_dir_all`，不要求用户手工建目录。
 - cwd 由 `lib::run` 读取一次并显式传给 `infra::paths`，避免测试修改进程级 cwd。
 
@@ -31,9 +33,26 @@ impl Scope {
     pub fn label(self) -> &'static str;
 }
 
+// infra/env.rs —— 唯一读取进程环境的位置，返回一次性快照
+pub struct Env {
+    pub home: Option<PathBuf>,        // LSM_HOME，否则 ~/.agents
+    pub config_dir: Option<PathBuf>,  // LSM_CONFIG_DIR，否则 dirs::config_dir()/lsm
+    pub lang: Option<String>,         // LSM_LANG 原始值，空串视为未设置
+}
+
+impl Env {
+    pub fn read() -> Self;
+}
+
 // infra/paths.rs —— 纯函数，环境由 Env 传入
 pub fn skills_dir(env: &Env, scope: Scope, cwd: &Path) -> Result<PathBuf, PathError>;
 pub fn skill_dir(env: &Env, scope: Scope, cwd: &Path, name: &SkillName) -> Result<PathBuf, PathError>;
+pub fn config_file(env: &Env) -> Result<PathBuf, PathError>;
+
+pub enum PathError {
+    HomeUnavailable,      // 无 LSM_HOME 且无家目录
+    ConfigDirUnavailable, // 无 LSM_CONFIG_DIR 且无配置目录
+}
 ```
 
 ## 2. SKILL.md 规范
