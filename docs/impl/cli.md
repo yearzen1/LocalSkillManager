@@ -201,9 +201,11 @@ impl AppError {
 
   ```rust
   fn main() -> ExitCode {
-      ExitCode::from(lsm::run(std::env::args_os().collect()))
+      lsm::run(std::env::args_os().skip(1))
   }
   ```
+
+- `lsm::run(args: impl Iterator<Item = OsString>) -> ExitCode`：只接参数迭代器（`main` 已 `skip(1)` 去掉程序名），`run` 自己不再读 `std::env::args()`，便于单测注入参数。
 
 - 用法错误由归一化阶段 / clap 错误映射统一 `exit(2)`；`copy` 的 name 由 clap `value_parser` 校验，同样返回 2。
 - `--json` 模式下 stdout 只允许 JSON；warning 仍然只走 stderr。

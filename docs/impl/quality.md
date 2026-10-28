@@ -99,7 +99,7 @@ cd <demo-project> && lsm copy sample && lsm list project
 7. 语言持久化：`config set lang zh`、`config get lang`、配置文件路径（三平台）、四级优先级、`LSM_CONFIG_DIR`、坏配置会报错。
 8. 双语输出示例。
 9. 退出码与错误处理。
-10. 开发：`cargo test`、`cargo clippy -- -D warnings`、`cargo fmt --check`。
+10. 开发：`cargo test`、`cargo clippy --all-targets -- -D warnings`、`cargo fmt --check`。
 11. License：MIT，链接 `LICENSE`。
 
 ### 2.3 许可证

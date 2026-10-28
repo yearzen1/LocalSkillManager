@@ -28,7 +28,7 @@
 pub enum Scope { Global, Project }
 
 impl Scope {
-    pub fn label(&self) -> &'static str;
+    pub fn label(self) -> &'static str;
 }
 
 // infra/paths.rs —— 纯函数，环境由 Env 传入
@@ -69,6 +69,8 @@ description: 一句话说明这个 skill 做什么、什么时候用。
 | 目录安装时，目录名与 `name` 不一致 | 报错，要求先把目录名改成与 `name` 一致 |
 
 - 长度按 Unicode 字符计数（`chars().count()`），不按字节。
+- 上限以 `domain::name::MAX_NAME_LEN`（64）与 `domain::meta::MAX_DESCRIPTION_LEN`（1024）常量表达，代码不写字面量。
+- `SkillName::parse` 的校验顺序固定为：长度 → 格式 → Windows 保留名，只返回第一个命中的错误。
 - 超限一律报错，**不截断、不自动修复**。
 - 不做正则依赖：`name` 校验用字符遍历（首尾必须是字母/数字，中间允许单个连字符）。
 - Windows 保留设备名（大小写不敏感）：`con`、`prn`、`aux`、`nul`、`com1`~`com9`、`lpt1`~`lpt9`。提前拒绝，保证三平台行为一致。
@@ -82,7 +84,7 @@ description: 一句话说明这个 skill 做什么、什么时候用。
 pub struct SkillName(String);
 
 impl SkillName {
-    pub fn parse(input: &str) -> Result<Self>;
+    pub fn parse(input: &str) -> Result<Self, NameError>;
     pub fn as_str(&self) -> &str;
 }
 
@@ -93,11 +95,11 @@ pub struct SkillMeta {
 }
 
 impl SkillMeta {
-    pub fn validate(&self) -> Result<()>;
+    pub fn validate(&self) -> Result<(), MetaError>;
 }
 
 // infra/frontmatter.rs
-pub fn parse_skill_md(path: &Path) -> Result<SkillMeta>;
+pub fn parse_skill_md(path: &Path) -> Result<SkillMeta, FrontmatterError>;
 ```
 
 - `SkillName` 在构造时完成全部校验（格式、64 字符、Windows 保留名），后续代码拿到的都是已合法的值。

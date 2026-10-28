@@ -263,10 +263,10 @@ pub struct Ctx {
 |---|---|---|
 | 1 | 脚手架（Cargo、`lib.rs`、`main.rs`、测试依赖） | `chore: scaffold cargo project` |
 | 2 | `domain`（lang / name / meta / scope / config / action） | `feat(domain): add skill name and metadata rules` |
-| 3 | `i18n` 消息表 | `feat(i18n): add en/zh message catalog` |
-| 4 | `infra::env` + `infra::paths` 环境快照与路径解析 | `feat(paths): resolve global and project skill dirs` |
-| 5 | `infra::frontmatter` | `feat(frontmatter): parse SKILL.md` |
-| 6 | `infra::fsops` + `infra::scan` | `feat(fs): add atomic install and skill scanning` |
+| 3 | `infra::env` + `infra::paths` 环境快照与路径解析 | `feat(paths): resolve global and project skill dirs` |
+| 4 | `infra::frontmatter` | `feat(frontmatter): parse SKILL.md` |
+| 5 | `infra::fsops` + `infra::scan` | `feat(fs): add atomic install and skill scanning` |
+| 6 | `i18n` 消息表（error / help / warning 键定稿） | `feat(i18n): add en/zh message catalog` |
 | 7 | `cli` + `error::mapping` + `output::error`（normalize / lang / spec / help） | `feat(cli): add localized parser and short flags` |
 | 8 | `infra::config` + `commands::config` + 配置消息键 | `feat(config): persist language preference` |
 | 9 | `commands::add` | `feat(add): install markdown or directory skills` |
@@ -274,7 +274,9 @@ pub struct Ctx {
 | 11 | `commands::copy` | `feat(copy): copy global skill to project` |
 | 12 | 双语 README | `docs: add bilingual readme` |
 
-收尾检查：`cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test` 全绿。
+> i18n 排在 CLI 之前而非 `domain` 之后：消息 key 由 help / 错误 / 警告文案决定，等 `MetaError`、`FrontmatterError`、`FsError`、`ConfigError` 都定型后再定稿，可避免消息表返工；各命令的成功/警告提示在对应命令切片内增量追加 key。
+
+收尾检查：`cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿。
 
 ## 8. 验收标准
 
@@ -297,4 +299,4 @@ pub struct Ctx {
 - [ ] 模块树与本文"模块划分"一致，`lib.rs` 暴露核心逻辑。
 - [ ] `LICENSE` 为 MIT，`Cargo.toml` 与两份 README 均标注。
 - [ ] `docs/impl.md`、`docs/impl/*.md`、`docs/decisions.md` 的相对链接全部有效，规则无重复。
-- [ ] `cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test` 全绿。
+- [ ] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿。
