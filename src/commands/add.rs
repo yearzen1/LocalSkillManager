@@ -28,7 +28,7 @@ pub fn run(ctx: &Ctx, source: PathBuf, scope: Scope, force: bool) -> Result<(), 
     }
 
     if kind == SourceKind::Directory && fsops::contains_git_dir(&source) {
-        warn(ctx, Msg::new(MsgKey::AddGitWarning));
+        output::warn(ctx.lang, &Msg::new(MsgKey::AddGitWarning));
     }
 
     let report = match kind {
@@ -37,9 +37,9 @@ pub fn run(ctx: &Ctx, source: PathBuf, scope: Scope, force: bool) -> Result<(), 
     };
 
     if let Some(backup) = report.leftover_backup {
-        warn(
-            ctx,
-            Msg::with_args(MsgKey::FsBackupLeftover, [backup.display().to_string()]),
+        output::warn(
+            ctx.lang,
+            &Msg::with_args(MsgKey::FsBackupLeftover, [backup.display().to_string()]),
         );
     }
 
@@ -98,13 +98,6 @@ fn reject_nested(source: &Path, destination: &Path) -> Result<(), AppError> {
 
     Err(AppError::runtime(MsgKey::AddNestedTarget)
         .with_hint_args(MsgKey::AddNestedTargetHint, [scope_dir]))
-}
-
-fn warn(ctx: &Ctx, message: Msg) {
-    output::emit_stderr(&format!(
-        "{}\n",
-        output::prefixed_line(ctx.lang, MsgKey::WarningPrefix, &message)
-    ));
 }
 
 fn absolute(cwd: &Path, source: PathBuf) -> PathBuf {

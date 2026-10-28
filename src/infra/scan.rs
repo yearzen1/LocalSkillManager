@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::domain::entry::SkillEntry;
 use crate::domain::name::SkillName;
 
-use super::frontmatter::{self, FrontmatterError};
+use super::frontmatter;
 use super::fsops::FsError;
 
 /// 扫描 `dir` 的直接子目录。目录不存在视为空。
@@ -63,23 +63,7 @@ fn build_entry(name: &str, path: &Path) -> SkillEntry {
             error: None,
         },
         Ok(meta) => invalid(format!("name mismatch: {name} vs {}", meta.name.as_str())),
-        Err(err) => invalid(describe(&err)),
-    }
-}
-
-/// JSON 里的 `error` 字段：固定英文，不参与 i18n。
-fn describe(err: &FrontmatterError) -> String {
-    match err {
-        FrontmatterError::Io { source, .. } => match source.downcast_ref::<std::io::Error>() {
-            Some(io) if io.kind() == std::io::ErrorKind::NotFound => "missing SKILL.md".to_string(),
-            _ => "unreadable SKILL.md".to_string(),
-        },
-        FrontmatterError::InvalidUtf8 { .. } => "SKILL.md is not valid UTF-8".to_string(),
-        FrontmatterError::MissingFrontmatter { .. } => "missing frontmatter".to_string(),
-        FrontmatterError::MissingField { field, .. } => format!("missing {field}"),
-        FrontmatterError::InvalidYaml { .. } => "invalid YAML frontmatter".to_string(),
-        FrontmatterError::InvalidName { .. } => "invalid name".to_string(),
-        FrontmatterError::InvalidMeta { .. } => "invalid description".to_string(),
+        Err(err) => invalid(frontmatter::describe(&err)),
     }
 }
 

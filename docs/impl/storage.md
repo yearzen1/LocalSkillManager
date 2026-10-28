@@ -254,7 +254,7 @@ lsm copy <name> [--force]
 
 流程：
 
-1. **先校验 `name`**（不拼路径）：同一套 name 规则 + 拒绝 `/`、`\`、`.`、`..`。校验通过 clap 的 `value_parser` 执行，保证在命令逻辑之前失败，退出码 2：
+1. **先校验 `name`**（不拼路径）：同一套 name 规则 + 拒绝 `/`、`\`、`.`、`..`。校验在 `cli::parse` 构造 `Action` 时执行，保证在命令逻辑之前失败，退出码 2：
    ```
    error: invalid skill name '..'
    hint: skill names use lowercase letters, digits and single hyphens
@@ -286,6 +286,7 @@ pub fn copy_recursive(src: &Path, dst: &Path) -> Result<(), FsError>;
 pub fn contains_path(src: &Path, dst: &Path) -> Result<bool, FsError>;
 pub fn contains_git_dir(src: &Path) -> bool;
 pub fn is_present(path: &Path) -> bool;
+pub fn is_same_path(left: &Path, right: &Path) -> Result<bool, FsError>;
 pub fn inspect_source(src: &Path) -> Result<SourceKind, FsError>;
 pub fn install_skill_dir(src: &Path, dst: &Path, force: bool) -> Result<InstallReport, FsError>;
 pub fn install_skill_file(src: &Path, dst: &Path, force: bool) -> Result<InstallReport, FsError>;

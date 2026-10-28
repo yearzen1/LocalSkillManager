@@ -672,3 +672,169 @@ fn list_json_stdout_contains_only_json() {
         .clone();
     assert!(serde_json::from_slice::<serde_json::Value>(&stdout).is_ok());
 }
+
+// ---------- copy ----------
+
+fn install_global(home: &TempDir, name: &str, description: &str) {
+    let work = TempDir::new().unwrap();
+    let source = work.path().join(format!("{name}.md"));
+    write_skill_md(&source, name, description);
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["add", source.to_str().unwrap(), "global"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn copy_moves_global_skill_into_project() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "my-skill", "Copy me.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "my-skill"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("copied my-skill"));
+
+    let copied = project.path().join(".agents/skills/my-skill/SKILL.md");
+    assert!(copied.exists());
+    assert!(fs::read_to_string(copied).unwrap().contains("Copy me."));
+}
+
+#[test]
+fn copy_short_flag_works() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "my-skill", "Copy me.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["-c", "my-skill"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("copied my-skill"));
+}
+
+#[test]
+fn copy_missing_skill_points_at_list() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "nope"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("not found in global"))
+        .stderr(predicate::str::contains("lsm list global"));
+}
+
+#[test]
+fn copy_rejects_invalid_source_skill() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    fs::create_dir_all(home.path().join("skills/broken")).unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "broken"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("is invalid"))
+        .stderr(predicate::str::contains("missing SKILL.md"));
+}
+
+#[test]
+fn copy_rejects_source_name_mismatch() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    write_skill_md(
+        &home.path().join("skills/dir-name/SKILL.md"),
+        "other-name",
+        "Mismatch.",
+    );
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "dir-name"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("name mismatch"));
+}
+
+#[test]
+fn copy_refuses_existing_target_unless_forced() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "my-skill", "First.");
+    write_skill_md(
+        &project.path().join(".agents/skills/my-skill/SKILL.md"),
+        "my-skill",
+        "Local version.",
+    );
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "my-skill"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("already exists"));
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "my-skill", "--force"])
+        .assert()
+        .success();
+
+    let copied = project.path().join(".agents/skills/my-skill/SKILL.md");
+    assert!(fs::read_to_string(copied).unwrap().contains("First."));
+}
+
+#[test]
+fn copy_rejects_same_source_and_destination() {
+    let root = TempDir::new().unwrap();
+    let project = root.path().join("demo-project");
+    let home = project.join(".agents");
+    write_skill_md(&home.join("skills/my-skill/SKILL.md"), "my-skill", "Self.");
+
+    lsm()
+        .env("LSM_HOME", &home)
+        .current_dir(&project)
+        .args(["copy", "my-skill"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("same path"));
+}
+
+#[test]
+fn copy_warns_about_git_directories() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    let skill = home.path().join("skills/my-skill");
+    write_skill_md(&skill.join("SKILL.md"), "my-skill", "With git.");
+    fs::create_dir_all(skill.join(".git")).unwrap();
+    fs::write(skill.join(".git/HEAD"), "ref").unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "my-skill"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("warning"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/my-skill/.git/HEAD")
+        .exists());
+}

@@ -2,6 +2,7 @@
 
 pub mod add;
 pub mod config;
+pub mod copy;
 pub mod list;
 
 use crate::domain::action::Action;
@@ -18,7 +19,6 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
         } => add::run(ctx, source, scope, force),
         Action::Config(command) => config::run(ctx, command),
         Action::List { scope, json } => list::run(ctx, scope, json),
-        // copy 在下一片接入。
-        Action::Copy { .. } => Ok(()),
+        Action::Copy { name, force } => copy::run(ctx, name, force),
     }
 }

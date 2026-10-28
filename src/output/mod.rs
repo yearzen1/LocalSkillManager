@@ -24,6 +24,14 @@ pub fn emit_line(lang: Lang, msg: &Msg) {
     emit_stdout(&format!("{}\n", line(lang, msg)));
 }
 
+/// 警告一律走 stderr，不污染 `--json` 的 stdout。
+pub fn warn(lang: Lang, msg: &Msg) {
+    emit_stderr(&format!(
+        "{}\n",
+        prefixed_line(lang, MsgKey::WarningPrefix, msg)
+    ));
+}
+
 /// 原样写 stdout（用于 `list --json` 与裸值）。
 pub fn emit_stdout(text: &str) {
     print!("{text}");
