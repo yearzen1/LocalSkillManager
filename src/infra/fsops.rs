@@ -26,6 +26,39 @@ pub struct InstallReport {
     pub leftover_backup: Option<PathBuf>,
 }
 
+/// 源路径的类型。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceKind {
+    Directory,
+    File,
+}
+
+/// 路径是否已存在（不跟随符号链接）。
+pub fn is_present(path: &Path) -> bool {
+    path.symlink_metadata().is_ok()
+}
+
+/// 判定源类型：符号链接直接拒绝，其它非常规类型也拒绝。
+pub fn inspect_source(src: &Path) -> Result<SourceKind, FsError> {
+    let meta = std::fs::symlink_metadata(src).map_err(|err| source_error(src, err))?;
+
+    if meta.file_type().is_symlink() {
+        return Err(FsError::SymlinkUnsupported {
+            path: src.to_path_buf(),
+        });
+    }
+
+    if meta.is_dir() {
+        Ok(SourceKind::Directory)
+    } else if meta.is_file() {
+        Ok(SourceKind::File)
+    } else {
+        Err(FsError::SourceNotExpectedType {
+            path: src.to_path_buf(),
+        })
+    }
+}
+
 /// 递归复制，保留相对结构，不做任何排除。
 pub fn copy_recursive(src: &Path, dst: &Path) -> Result<(), FsError> {
     let meta = std::fs::symlink_metadata(src).map_err(|err| source_error(src, err))?;

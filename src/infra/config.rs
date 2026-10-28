@@ -122,7 +122,10 @@ fn read_document(path: &std::path::Path) -> Result<(toml_edit::DocumentMut, bool
     }
 }
 
-fn parse_document(path: &std::path::Path, text: &str) -> Result<toml_edit::DocumentMut, ConfigError> {
+fn parse_document(
+    path: &std::path::Path,
+    text: &str,
+) -> Result<toml_edit::DocumentMut, ConfigError> {
     text.parse::<toml_edit::DocumentMut>()
         .map_err(|err| ConfigError::Parse {
             path: path.to_path_buf(),
@@ -277,4 +280,3 @@ mod tests {
         assert!(leftovers.is_empty(), "leftovers: {leftovers:?}");
     }
 }
-

@@ -45,6 +45,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::AddNestedTarget => "destination is inside source directory",
         MsgKey::AddNestedTargetHint => "choose a source directory outside {0}",
         MsgKey::AddGitWarning => "source contains .git directory, it will be copied",
+        MsgKey::AddUnsupportedSource => "source must be a skill directory or a .md file: {0}",
 
         MsgKey::ListAbout => "List installed skills",
         MsgKey::ListScopeArg => "Where to look: global or project",

@@ -45,6 +45,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::AddNestedTarget => "目标目录位于源目录内部",
         MsgKey::AddNestedTargetHint => "请选择 {0} 之外的源目录",
         MsgKey::AddGitWarning => "源目录包含 .git 目录，将被完整复制",
+        MsgKey::AddUnsupportedSource => "源必须是 skill 目录或 .md 文件：{0}",
 
         MsgKey::ListAbout => "列出已安装的 skill",
         MsgKey::ListScopeArg => "查找位置：global 或 project",

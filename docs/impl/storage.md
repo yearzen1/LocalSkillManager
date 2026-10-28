@@ -283,8 +283,15 @@ copy 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）�
 pub fn copy_recursive(src: &Path, dst: &Path) -> Result<(), FsError>;
 pub fn contains_path(src: &Path, dst: &Path) -> Result<bool, FsError>;
 pub fn contains_git_dir(src: &Path) -> bool;
+pub fn is_present(path: &Path) -> bool;
+pub fn inspect_source(src: &Path) -> Result<SourceKind, FsError>;
 pub fn install_skill_dir(src: &Path, dst: &Path, force: bool) -> Result<InstallReport, FsError>;
 pub fn install_skill_file(src: &Path, dst: &Path, force: bool) -> Result<InstallReport, FsError>;
+
+pub enum SourceKind {
+    Directory,
+    File,
+}
 
 /// 备份删除失败时把路径交回命令层，由命令层打 warning 并仍以 0 退出。
 pub struct InstallReport {

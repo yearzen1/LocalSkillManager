@@ -64,6 +64,7 @@ keys!(
     AddNestedTarget,
     AddNestedTargetHint,
     AddGitWarning,
+    AddUnsupportedSource,
     // list
     ListAbout,
     ListScopeArg,
