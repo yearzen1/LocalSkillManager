@@ -70,7 +70,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::ConfigKeyLangHelp => "Output language",
         MsgKey::ConfigValueArg => "Language value: en or zh",
         MsgKey::ConfigSaved => "lang = {0} (saved to {1})",
-        MsgKey::ConfigInvalidValue => "invalid language '{0}'",
+        MsgKey::ConfigInvalidValue => "invalid language '{0}' (allowed: en, zh)",
         MsgKey::ConfigParseFailed => "cannot parse config file: {0}",
         MsgKey::ConfigWriteFailed => "failed to write config file: {0}",
         MsgKey::ConfigUnknownKey => "unknown config key '{0}'",

@@ -2,6 +2,8 @@
 
 pub mod error;
 
+use std::io::Write;
+
 use crate::domain::lang::Lang;
 use crate::error::Msg;
 use crate::i18n::{tr, tr_args, MsgKey};
@@ -14,6 +16,22 @@ pub fn line(lang: Lang, msg: &Msg) -> String {
 /// 渲染带前缀的消息，如 `warning: ...`。
 pub fn prefixed_line(lang: Lang, prefix: MsgKey, msg: &Msg) -> String {
     format!("{} {}", tr(lang, prefix), line(lang, msg))
+}
+
+/// 把一条消息连同换行写到 stdout。
+pub fn emit_line(lang: Lang, msg: &Msg) {
+    emit_stdout(&format!("{}\n", line(lang, msg)));
+}
+
+/// 原样写 stdout（用于 `list --json` 与裸值）。
+pub fn emit_stdout(text: &str) {
+    print!("{text}");
+    let _ = std::io::stdout().flush();
+}
+
+pub fn emit_stderr(text: &str) {
+    eprint!("{text}");
+    let _ = std::io::stderr().flush();
 }
 
 pub(crate) fn arg_refs(msg: &Msg) -> Vec<&str> {

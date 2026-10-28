@@ -70,7 +70,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::ConfigKeyLangHelp => "输出语言",
         MsgKey::ConfigValueArg => "语言值：en 或 zh",
         MsgKey::ConfigSaved => "lang = {0}（已保存到 {1}）",
-        MsgKey::ConfigInvalidValue => "非法语言 '{0}'",
+        MsgKey::ConfigInvalidValue => "非法语言 '{0}'（允许：en, zh）",
         MsgKey::ConfigParseFailed => "无法解析配置文件：{0}",
         MsgKey::ConfigWriteFailed => "写入配置文件失败：{0}",
         MsgKey::ConfigUnknownKey => "未知配置键 '{0}'",

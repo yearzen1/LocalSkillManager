@@ -4,6 +4,7 @@ use crate::domain::lang::LangError;
 use crate::domain::meta::MetaError;
 use crate::domain::name::NameError;
 use crate::i18n::MsgKey;
+use crate::infra::config::ConfigError;
 use crate::infra::frontmatter::FrontmatterError;
 use crate::infra::fsops::FsError;
 use crate::infra::paths::PathError;
@@ -135,6 +136,39 @@ impl From<PathError> for AppError {
                 .with_hint(MsgKey::PathHomeUnavailableHint),
             PathError::ConfigDirUnavailable => AppError::runtime(MsgKey::PathConfigDirUnavailable)
                 .with_hint(MsgKey::PathConfigDirUnavailableHint),
+        }
+    }
+}
+
+impl From<ConfigError> for AppError {
+    fn from(err: ConfigError) -> Self {
+        match err {
+            ConfigError::Path(path_error) => path_error.into(),
+            ConfigError::Io { path, source } => {
+                let detail = source.to_string();
+                AppError::runtime(MsgKey::FsIo)
+                    .with_args([path.display().to_string(), detail])
+                    .with_source(source)
+            }
+            ConfigError::Write { path, source } => {
+                let detail = source.to_string();
+                AppError::runtime(MsgKey::ConfigWriteFailed)
+                    .with_args([format!("{}: {detail}", path.display())])
+                    .with_source(source)
+            }
+            ConfigError::Parse { path, source } => {
+                let shown = path.display().to_string();
+                AppError::runtime(MsgKey::ConfigParseFailed)
+                    .with_args([shown.clone()])
+                    .with_hint_args(MsgKey::ConfigFixHint, [shown])
+                    .with_source(source)
+            }
+            ConfigError::InvalidValue { path, raw } => {
+                let shown = path.display().to_string();
+                AppError::runtime(MsgKey::ConfigInvalidValue)
+                    .with_args([raw])
+                    .with_hint_args(MsgKey::ConfigFixHint, [shown])
+            }
         }
     }
 }

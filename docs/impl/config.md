@@ -32,7 +32,7 @@
 TOML，v1 只有一个键：
 
 ```toml
-# 输出语言：en | zh
+# Output language: en | zh
 lang = "zh"
 ```
 
@@ -53,10 +53,16 @@ pub fn parse(raw: &str) -> Result<Lang, LangError>;
 pub enum ConfigKey { Lang }          // 将来加 default_scope 时追加变体
 
 // src/infra/config.rs
-pub enum ConfigError { Io, Parse, InvalidValue }
+pub enum ConfigError {
+    Path(PathError),                 // 配置目录无法确定
+    Io { path, source },             // 读取失败
+    Write { path, source },          // 建目录 / 临时文件 / rename 失败
+    Parse { path, source },          // TOML 语法非法
+    InvalidValue { path, raw },      // lang 值不受支持
+}
 
-pub fn load() -> Result<Option<Lang>, ConfigError>;
-pub fn set_lang(value: Lang) -> Result<PathBuf, ConfigError>; // 返回写入路径
+pub fn load(env: &Env) -> Result<Option<Lang>, ConfigError>;
+pub fn set_lang(env: &Env, value: Lang) -> Result<PathBuf, ConfigError>; // 返回写入路径
 ```
 
 - `ConfigError` 定义在 `infra::config`；`error::mapping` 把它转成 `AppError { kind: Runtime }`，不在 infra 内构造 `AppError`。

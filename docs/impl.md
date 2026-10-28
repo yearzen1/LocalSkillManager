@@ -210,15 +210,18 @@ infra ─────────→ domain
 - 所有用户可见文案来自 `i18n`，业务代码禁止硬编码。
 - 模块对外接口用 `pub(crate)`，`lib.rs` 只导出未来确实需要复用的类型。
 
-`Ctx` 定义在 `lib.rs`（组合根），字段固定为三项：
+`Ctx` 定义在 `lib.rs`（组合根），字段固定为四项：
 
 ```rust
 pub struct Ctx {
     pub env: infra::env::Env,   // 进程环境快照
     pub lang: domain::lang::Lang,
     pub cwd: PathBuf,           // 本次调用的工作目录，由 lib::run 读一次
+    pub lang_explicit: bool,    // 语言是否来自 --lang / LSM_LANG
 }
 ```
+
+`lang_explicit` 只服务于 `config set`：显式指定语言时用该语言确认，否则用刚写入的值确认（见 [config.md](impl/config.md)「`config` 命令」）。
 
 ### 4.3 数据流
 
