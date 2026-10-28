@@ -132,6 +132,20 @@ pub fn parse_skill_md(path: &Path) -> Result<SkillMeta, FrontmatterError>;
 4. YAML 反序列化为 `serde_yaml_ng::Value`，读取 `name` / `description`。
 5. 校验格式与长度。
 
+`FrontmatterError` 变体（每个都带 `path`，便于上层提示定位）：
+
+```rust
+pub enum FrontmatterError {
+    Io { path: PathBuf, source: anyhow::Error },
+    InvalidUtf8 { path: PathBuf },
+    MissingFrontmatter { path: PathBuf },
+    MissingField { path: PathBuf, field: &'static str },
+    InvalidYaml { path: PathBuf, source: anyhow::Error },
+    InvalidName { path: PathBuf, source: NameError },
+    InvalidMeta { path: PathBuf, source: MetaError },
+}
+```
+
 ### 2.4 list 展示规则
 
 - 文本输出前把 description 的 `\r`、`\n`、连续空白压成单个空格。
