@@ -55,10 +55,11 @@ Local Skill Manager
   lsm <COMMAND>
 
 命令:
-  add     安装 skill 到 global 或 project
-  list    列出已安装的 skill
-  copy    把全局 skill 复制到当前项目
-  config  查看或修改持久化配置
+  add      安装 skill 到 global 或 project
+  list     列出已安装的 skill
+  copy     把全局 skill 复制到当前项目
+  upgrade  更新 lsm 自身（不改文件名）
+  config   查看或修改持久化配置
 
 选项:
   --lang <LANG>  输出语言 [en, zh]
@@ -77,6 +78,7 @@ Local Skill Manager
 lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
 lsm copy <name> [--force]
+lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
@@ -111,12 +113,14 @@ lsm --lang <en|zh> <command> ...
    - 混用形式（如 `lsm add foo.md -g`）。
 5. `-h`、`-V` 不参与归一化，交给 clap。
 6. `config` 子命令不参与短选项归一化，永远原样交给 clap。
+7. `upgrade` 没有短选项，也不参与归一化：`lsm -u` 按未知参数退出 2；`upgrade` 与 `-g` / `-p` 同现视为未知参数，不解释为升级某个作用域。
 
 ### 2.3 clap 结构
 
 - 直接用 builder API 构建 `clap::Command`，所有 about / 参数说明 / `--lang` 说明都从消息表按语言注入（`cli/spec.rs::build(lang)`）。
 - 作用域参数用 `value_parser(["global", "project"])` 限定合法值，大小写敏感，错误时由 clap 报用法错误。
 - `config` 子命令的 `get`/`set` 是嵌套子命令，键用 `value_parser(["lang"])`（v1 只有 `lang`），未知键由 clap 报用法错误。
+- `upgrade` 只有两个布尔 flag：`--check`、`--force`，不带位置参数；行为与文案见 [upgrade.md](upgrade.md)。
 - clap 自带的 `-h` / `-V` 说明是英文，因此根命令与各子命令都 `disable_help_flag(true)` 后自建 `-h/--help`，根命令另外自建 `-V/--version`，说明文案来自消息表。
 - 参数校验错误统一由 `cli::parse` 转成 `AppError`，在 `lib::run` 边界渲染。
 - 代码落点：`cli/spec.rs`（构建 Command）、`cli/help.rs`（结构标题本地化）、`cli/lang.rs`（预扫描 + 决策表）、`cli/mod.rs`（解析为 `Action`）；`Action` 定义在 `domain/action.rs`，配置键定义在 `domain/config.rs`。
@@ -127,17 +131,19 @@ lsm --lang <en|zh> <command> ...
 - `lsm --version` / `-V`：输出 `lsm 0.1.1` 到 stdout，退出码 0。
 - `lsm` 无子命令，或只有全局参数（如 `lsm --lang zh`）：本地化 help 输出到 **stderr**，退出码 2。
 - 嵌套子命令沿用同一规则：`lsm config` 无子命令 → help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
+- `lsm upgrade --help` 与 `lsm upgrade --check --help` 同样走 stdout、退出码 0，且不联网、不写盘。
 - 实现方式：clap 解析到 `ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand` 时，按上述规则选择流；不要依赖 clap 默认行为。
 
 ## 3. 输出、错误与退出码
 
 | 退出码 | 含义 | 例子 |
 |---|---|---|
-| 0 | 成功 | `list` 为空也算成功 |
-| 1 | 运行时错误 | 文件不存在、frontmatter 非法、目标冲突、配置文件损坏 |
-| 2 | 用法错误 | 参数缺失、`-g` 与 `-p` 互斥、非法 `--lang`、非法 `copy` name、非法 `config` 键/值、无子命令 |
+| 0 | 成功 | `list` 为空、`upgrade --check` 发现新版本、`upgrade` 已是最新 |
+| 1 | 运行时错误 | 文件不存在、frontmatter 非法、目标冲突、配置文件损坏、`upgrade` 网络/资产/校验/替换失败 |
+| 2 | 用法错误 | 参数缺失、`-g` 与 `-p` 互斥、非法 `--lang`、非法 `copy` name、非法 `config` 键/值、`upgrade` 未知参数、无子命令 |
 
 - 正常结果、显式 help、version 走 stdout；错误、warning、无子命令时的 help 走 stderr。
+- `upgrade` 的成功/警告/错误同样全部来自消息表；具体文案、`--check` 不写盘的约束与替换规则见 [upgrade.md](upgrade.md)「输出与退出码」。
 - 显式 `--help` / `-h` / `--version` / `-V` → 退出码 0；无子命令 → 退出码 2。
 - 错误格式：
 
@@ -203,6 +209,7 @@ impl AppError {
 - Q26：结构化 `AppError`。
 - Q27 / Q28：语言持久化、配置加载与失效策略（见 [config.md](config.md)）。
 - Q29：分层收敛与错误映射（错误枚举在 `domain`/`infra`，`AppError` 只在边界构造，渲染归 `output`）。
+- Q30 / Q31 / Q32：`upgrade` 的命令形态、原地替换（文件名不变）、网络与资产契约（见 [upgrade.md](upgrade.md)）。
 
 完整决策见 [decisions.md](../decisions.md)。
 

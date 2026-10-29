@@ -2,7 +2,7 @@
 
 > 上级：[实现方案索引](impl.md) ｜ 相关：[测试与交付](impl/quality.md) ｜ [决策记录](decisions.md)
 >
-> 本文拥有以下规则的完整定义：Release 资产命名、tag 约定、上传与改名流程、未来 CI 矩阵。`quality.md` 只保留摘要并链接到本文。
+> 本文拥有以下规则的完整定义：Release 资产命名、tag 约定、上传与改名流程、升级契约、未来 CI 矩阵。`quality.md` 只保留摘要并链接到本文。
 
 ## 1. 资产命名
 
@@ -22,6 +22,7 @@
 4. **同一 Release 内资产名必须唯一**：GitHub 以 `name` 作为唯一键，重名上传会被拒绝（422）。
 5. **不使用 `label`**：平台与架构只体现在 `name` 上。`label` 仅影响页面展示，既不进下载 URL，也解决不了重名。
 6. 因此禁止「三个平台都叫 `lsm.exe`，只用 label 区分」：同 Release 下无法共存，用户下载后也会互相覆盖。
+7. **资产名同时是 `lsm upgrade` 的查找键**：改名等于让老版本升不动，规则见本文「升级契约」。
 
 正确与错误示例：
 
@@ -33,6 +34,7 @@
 ## 2. Tag 约定
 
 - 格式 `vMAJOR.MINOR.PATCH`，与 `Cargo.toml` 的 `version` 一致。
+- `lsm upgrade` 只认这一种 tag 形式并据此比较版本：不能省段、不能带预发布后缀。
 - 用 annotated tag：`git tag -a v0.1.1 -m "v0.1.1: <一句话说明>"`。
 - 版本号只改 `Cargo.toml`（`Cargo.lock` 随之更新），文档里的版本示例同一次提交内同步。
 - 新 Release 使用 `--latest`；旧 Release 会自动变为非 Latest，不删除。
@@ -89,17 +91,30 @@ Remove-Item .\asset.json
 
 改名后必须重新校验下载 URL——旧链接会失效，这属于可接受的代价，但要在改名时确认没有外部依赖旧链接。
 
-## 5. 未来 CI 矩阵
+## 5. 升级契约
+
+`lsm upgrade` 把 release 资产名当作唯一查找键，所以发布动作直接决定老用户能不能升级。
+
+1. 资产名必须与本文「资产命名」一致：`lsm-windows-x64.exe`、`lsm-linux-x64`、`lsm-macos-arm64`。改名、加版本号、改成压缩包、删除资产，都会让对应平台的 `upgrade` 找不到目标。
+2. tag 必须是 `vMAJOR.MINOR.PATCH` 且与 `Cargo.toml` 的 `version` 相同；升级端的版本比较只接受这一种形式，其余一律报错。
+3. 资产名只决定下载哪个文件，**不决定用户本地文件名**：升级后 exe 仍是原来的路径与名字（`lsm`、`lsm.exe`，或用户自己改过的名字）。
+4. `browser_download_url` 必须指向可直接下载的二进制本体，不能是 HTML 页面或压缩包。
+5. 发布后必做两步验证：用上一版二进制执行 `upgrade --check`，确认能查到新 tag 与当前平台资产；再执行一次 `upgrade --force`，确认替换后 `--version` 正常且目录里没有 `.old-*` 残留。
+6. v1 不发布 `.sha256`，升级端用「下载后执行 `--version`」兜底。将来补 checksum 时，必须同时改发布流程与 [upgrade.md](impl/upgrade.md)「下载与校验」，并新增决策。
+7. 不改名已发布资产：旧链接会失效，老版本升级会直接失败。确需改名时按本文「资产改名」执行，并在 release notes 里说明需要手动重新下载。
+
+## 6. 未来 CI 矩阵
 
 - 第二阶段的 GitHub Actions 产物**直接产出规范文件名**，不再事后改名。
 - 矩阵：`windows-latest` / `ubuntu-latest` / `macos-latest`；首期只出 `x64`，`arm64` 作为增量。
 - 压缩包仅在需要时使用，且仍以平台命名：`lsm-linux-x64.tar.gz`；Windows 直接给 `.exe`，不额外打包。
 - CI 与手工发布的文件名规则必须一致，便于脚本替换。
 
-## 6. 相关决策
+## 7. 相关决策
 
 - Q6 / Q13：v1 只做本地构建，CI 后置。
 - Q23：MIT 许可证。
+- Q30 / Q31 / Q32：`upgrade` 的范围、原地替换与校验、资产名与端点契约。
 
 完整决策见 [decisions.md](decisions.md)。
 

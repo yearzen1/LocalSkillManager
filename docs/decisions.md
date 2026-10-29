@@ -2,7 +2,7 @@
 
 > 上级：[实现方案索引](impl.md) ｜ 需求：[Requirements.md](Requirements.md)
 >
-> 本文是 29 项设计决策的唯一事实来源。新增决策时按顺序编号（Q30、Q31…）追加，并同步更新对应主题文档；主题文档只保留规则本身，不复制本表。
+> 本文是 32 项设计决策的唯一事实来源。新增决策时按顺序编号（Q33、Q34…）追加，并同步更新对应主题文档；主题文档只保留规则本身，不复制本表。
 
 | # | 决策 | 结论 |
 |---|---|---|
@@ -30,6 +30,9 @@
 | Q27 | 语言持久化 | 新增 `config.toml`（`dirs::config_dir()/lsm`，`LSM_CONFIG_DIR` 可覆盖）+ `lsm config get/set lang`；TOML 用 `toml_edit` 保留注释与未知键 |
 | Q28 | 配置加载与失效 | 优先级 `--lang` > `LSM_LANG` > 文件 > `en`；惰性读取（前两档命中不读文件）；坏配置退 1 且不静默忽略；不做项目级配置 |
 | Q29 | 分层收敛与错误映射 | `domain`/`infra` 返回自身错误枚举，`AppError` 只在边界构造；`i18n` 纯化（不读环境/文件，`Lang` 合并进 `domain::lang`）；`infra::env` 是唯一环境读取点；`paths` 收 `&Env` 的纯函数；排版统一到 `output`；`commands` 收 `Ctx` |
+| Q30 | 自更新范围 | 新增 `lsm upgrade [--check] [--force]`，只更新 lsm 自身二进制，不触碰 `.agents/skills`；不加短选项；`--check` 只查不装，发现新版本也退 0（查询失败仍退 1）；`--force` 允许同版本重装与降级回滚；不做自动/后台检查更新 |
+| Q31 | 升级的校验与替换 | HTTPS 下载后以 `<新文件> --version` 退出 0 且输出含 release tag 版本号才算校验通过；**原地替换：exe 路径与文件名保持不变**，禁止版本化文件名；备份只用 `<exe>.old-<pid>` 临时名，成功即删，删不掉留 warning 并在下次升级清理；任一步失败回滚且原文件可执行 |
+| Q32 | 升级的网络与资产契约 | 查询 `https://api.github.com/repos/yearzen1/LocalSkillManager/releases/latest`；`LSM_UPGRADE_API` 覆盖端点（镜像与测试）；资产名 `lsm-<os>-<arch>[.exe]` 是唯一查找键；tag 必须是 `vMAJOR.MINOR.PATCH`；不读 `GITHUB_TOKEN`，限流给可操作提示 |
 
 ## 维护规则
 

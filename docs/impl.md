@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.1.1 已实现（Windows 实测；Linux/macOS 未实测）
+> 状态：v0.1.1 已实现（Windows 实测；Linux/macOS 未实测）；`upgrade` 规则已定、代码未实现
 > 最后更新：2026-10-29
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。
@@ -14,11 +14,12 @@
 | [impl/cli.md](impl/cli.md) | i18n、CLI、help、输出与错误 | 实现命令行与输出 |
 | [impl/config.md](impl/config.md) | 配置文件路径、格式、语言持久化、`config` 命令 | 实现持久化语言 |
 | [impl/quality.md](impl/quality.md) | 测试计划、README、许可证、发布 | 测试与交付 |
+| [impl/upgrade.md](impl/upgrade.md) | 自更新：命令、版本比较、下载校验、原地替换 | 实现或排查 upgrade |
 | [release.md](release.md) | Release 资产命名、tag 约定、发布与改名流程 | 发布与改资产名 |
-| [decisions.md](decisions.md) | Q1–Q29 决策记录 | 查决策依据 |
+| [decisions.md](decisions.md) | Q1–Q32 决策记录 | 查决策依据 |
 | [Requirements.md](Requirements.md) | 原始需求 | 对齐范围 |
 
-推荐阅读顺序：本文 → `storage.md` → `cli.md` → `config.md` → `quality.md`。决策有疑问时查 `decisions.md`。
+推荐阅读顺序：本文 → `storage.md` → `cli.md` → `config.md` → `quality.md` → `upgrade.md`。决策有疑问时查 `decisions.md`。
 
 ## 2. 目标与范围
 
@@ -29,10 +30,11 @@
 1. `add`：把单个 `.md` 文件或完整 skill 目录安装到 `global` / `project`。
 2. `list`：列出指定作用域下已安装的 skill。
 3. `copy`：把全局 skill 复制到当前项目的 `.agents/skills/`。
+4. `upgrade`：从 GitHub Releases 取最新版本并原地替换 lsm 自身二进制，**不改变 exe 的路径与文件名**。
 
 非目标（本期不做）：
 
-- 不做 skill 的删除、卸载、更新检查。
+- 不做 skill 的删除、卸载；不做自动/后台检查更新（`upgrade` 只在显式调用时联网）。
 - 不做符号链接（Windows 上不可靠），一律物理复制。
 - 不做从 project 反向复制到 global。
 - 不代理任何 agent 私有目录（如 `.claude/skills`），只维护 `.agents/skills` 这一份事实来源。
@@ -48,6 +50,7 @@
 | 错误处理 | `anyhow` | 上下文链式错误，统一出口 |
 | 序列化 | `serde` + `serde_yaml_ng` | 解析 SKILL.md frontmatter |
 | JSON 输出 | `serde_json` | `list --json` |
+| HTTP 客户端 | `ureq`（rustls） | `upgrade` 下载 release；同步、纯 Rust，避免 reqwest 量级的依赖树 |
 | 主目录 | `dirs` 7 | Windows/Linux/macOS 家目录 |
 | 递归复制 | 自研（`std::fs`） | 约 40 行，避免额外依赖 |
 | 国际化 | 自研消息表 | 仅 en/zh，不引入 fluent 等重型方案 |
@@ -83,6 +86,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml_ng = "0.10"
 toml_edit = "0.22"
+ureq = "3"              # upgrade：下载 release（默认 rustls 后端）
 
 [dev-dependencies]
 assert_cmd = "2"
@@ -127,15 +131,18 @@ LocalSkillManager/
 │   │   ├── meta.rs        # SkillMeta 校验
 │   │   ├── scope.rs       # Scope 枚举
 │   │   ├── config.rs      # ConfigKey 枚举
-│   │   ├── action.rs      # Action：Add / List / Copy / Config
+│   │   ├── version.rs     # Version：升级用的版本解析与比较
+│   │   ├── release.rs     # Release / Asset / 平台资产名选择
+│   │   ├── action.rs      # Action：Add / List / Copy / Upgrade / Config
 │   │   └── entry.rs       # SkillEntry：list 展示数据
 │   ├── infra/             # 所有文件系统与环境访问
 │   │   ├── mod.rs
-│   │   ├── env.rs         # 环境快照：LSM_HOME / LSM_CONFIG_DIR / LSM_LANG
+│   │   ├── env.rs         # 环境快照：LSM_HOME / LSM_CONFIG_DIR / LSM_LANG / LSM_UPGRADE_API / current_exe
 │   │   ├── paths.rs       # 纯函数：skills_dir(&Env, ...)、config_file(&Env)
 │   │   ├── config.rs      # config.toml 读写与校验
 │   │   ├── frontmatter.rs # 解析 SKILL.md
-│   │   ├── fsops.rs       # 递归复制、原子安装、覆盖、自包含检测
+│   │   ├── fsops.rs       # 递归复制、原子安装、覆盖、自包含检测、原地替换自身
+│   │   ├── net.rs         # 取最新 release、下载资产（唯一网络访问点）
 │   │   └── scan.rs        # 扫描 skills 目录，产出 SkillEntry
 │   ├── cli/
 │   │   ├── mod.rs         # parse(ctx, argv) -> Action
@@ -152,6 +159,7 @@ LocalSkillManager/
 │       ├── add.rs
 │       ├── list.rs
 │       ├── copy.rs
+│       ├── upgrade.rs     # 自更新编排：查询 → 校验 → 替换 → 输出
 │       └── config.rs
 └── tests/
     ├── cli.rs
@@ -167,13 +175,16 @@ LocalSkillManager/
 | `domain::meta` | `name` / `description` 字段校验 | `SkillMeta::validate() -> Result<(), MetaError>` |
 | `domain::scope` | 作用域枚举 | `Scope::{Global, Project}` |
 | `domain::config` | 配置键枚举 | `ConfigKey::Lang` |
-| `domain::action` | 解析后的用户意图 | `Action::{Add, List, Copy, Config}` |
+| `domain::version` | 升级版本解析与比较 | `Version::parse(&str)`、`Ord` |
+| `domain::release` | release 元数据与平台资产名 | `Release::select_asset(Platform)`、`Platform::current()` |
+| `domain::action` | 解析后的用户意图 | `Action::{Add, List, Copy, Upgrade, Config}` |
 | `domain::entry` | list 的展示数据 | `SkillEntry`（name/description/path/valid/error） |
-| `infra::env` | 进程环境快照（唯一读环境点） | `Env::read() -> Env`、`Env::{home, config_dir, lang}` |
+| `infra::env` | 进程环境快照（唯一读环境点） | `Env::read() -> Env`、`Env::{home, config_dir, lang, upgrade_api, exe}` |
 | `infra::paths` | 纯函数路径解析 | `skills_dir(&Env, Scope, &Path) -> Result<PathBuf, PathError>`、`config_file(&Env) -> Result<PathBuf, PathError>` |
 | `infra::config` | 读写并校验 `config.toml` | `load() -> Result<Option<Lang>, ConfigError>`、`set_lang(Lang)` |
 | `infra::frontmatter` | 读取并解析 SKILL.md | `parse_skill_md(&Path) -> Result<SkillMeta, FrontmatterError>` |
-| `infra::fsops` | 复制、原子安装、覆盖、自包含 | `install_skill_dir/file`、`contains_path`（错误为 `FsError`） |
+| `infra::fsops` | 复制、原子安装、覆盖、自包含、原地替换自身 | `install_skill_dir/file`、`contains_path`、`replace_self`（错误为 `FsError`） |
+| `infra::net` | 取 release 元数据、下载资产（唯一网络点） | `fetch_latest_release(&str) -> Result<Release, NetError>`、`download(&str, &Path)` |
 | `infra::scan` | 扫描目录、标记非法项 | `scan_skills(&Path) -> Result<Vec<SkillEntry>, FsError>` |
 | `cli::lang` | `--lang` 预扫描 + 语言决策表 | `prescan(&[OsString]) -> Option<String>`、`decide(cli, env) -> Decision` |
 | `cli::normalize` | `-a/-l/-c/-g/-p` 归一化 | `normalize(Vec<OsString>) -> Result<Vec<OsString>, NormalizeError>` |
@@ -195,14 +206,15 @@ lib::run（main 只调用它；唯一组装 Ctx 的地方）
 error::mapping ──→ domain, infra, error, i18n   # 唯一的"各层错误 → AppError"适配点
 i18n ──────────→ domain（只取 `Lang`）
 domain ────────→ 无内部依赖（零 I/O、零文案）
-infra ─────────→ domain
+infra ─────────→ domain（`net` 另外依赖 ureq，`env` 另外依赖 dirs）
 ```
 
 硬规则：
 
 - `domain` 零 I/O、零 clap、零打印、零消息表：错误用自身枚举（`NameError` 等）表达，不引用 `MsgKey`。
-- `infra` 不构造 `AppError`、不写文案：错误用自身枚举（`FsError`、`FrontmatterError`、`ConfigError`），路径等上下文放在变体里。
-- `infra::env` 是**唯一**读取进程环境的位置；`paths` 收 `&Env` 后是纯函数，单测不需要改进程环境。
+- `infra` 不构造 `AppError`、不写文案：错误用自身枚举（`FsError`、`FrontmatterError`、`ConfigError`、`NetError`），路径等上下文放在变体里。
+- `infra::env` 是**唯一**读取进程环境的位置；`paths` 收 `&Env` 后是纯函数，单测不需要改进程环境。每次 `Env::read` 额外快照 `LSM_UPGRADE_API` 与 `current_exe()`。
+- `infra::net` 是**唯一**访问网络的位置；`cli`、`domain`、`output` 不出现 HTTP，`commands` 只调用 `infra::net`。
 - `i18n` 只依赖 `domain`，不读环境、不读文件、不依赖 `error`；`LangError` 由 `domain::lang` 定义。
 - `AppError` 只在边界（`cli`、`commands`、`lib::run`）构造，`From` 映射集中在 `error::mapping`，hint 在那里配。
 - `output` 是唯一排版出口（成功/警告/信息/错误/列表），`error::mod` 只存数据与 `exit_code()`。
@@ -229,6 +241,7 @@ pub struct Ctx {
 - **add**：`cli` → `Action::Add` → `paths::skills_dir(&ctx.env, ...)` → `frontmatter::parse_skill_md` → `meta::validate` → `fsops::install_skill_*` → `output`。
 - **list**：`cli` → `Action::List` → `paths::skills_dir` → `scan::scan_skills` → `output::list`（text/json）。
 - **copy**：`cli`（name 已由 value_parser 校验）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`。
+- **upgrade**：`cli` → `Action::Upgrade` → `env.exe` + 编译期版本 → `net::fetch_latest_release` → `release::select_asset` →（`--check` 到此结束）→ `net::download` → 冒烟校验 → `fsops::replace_self` → `output`。
 - **语言解析**：`lib::run` → `infra::env::read()` → `cli::lang::decide(--lang, env.lang)` →（`Decision::NeedFile` 时）`infra::config::load()` → `Lang` → `cli::spec::build(lang)`。
 - **config get**：`cli` → `Action::Config(Get(Lang))` → `infra::config::load` → 裸值到 stdout（缺省 `en`）。
 - **config set**：`cli` → `Action::Config(Set(Lang, Lang))` → `infra::config::set_lang` → 本地化成功提示。
@@ -249,7 +262,8 @@ pub struct Ctx {
 | 参数与 help | 仅分离短选项；无子命令 help 到 stderr + 2 | [cli.md](impl/cli.md)「CLI 设计」 |
 | 错误模型 | 结构化 `AppError`，`anyhow` 仅作 source | [cli.md](impl/cli.md)「输出、错误与退出码」 |
 | 分层边界 | `domain`/`infra` 自身错误枚举，映射与渲染在边界；`Ctx` 承载 env/lang/cwd | [impl.md](impl.md)「模块职责」「依赖方向」 |
-| 测试与交付 | 36 条集成用例；v1 不配 CI | [quality.md](impl/quality.md)「测试计划」「发布」 |
+| 自更新 | 原地替换，exe 路径与文件名不变；备份只用临时名 | [upgrade.md](impl/upgrade.md)「原地替换与回滚」 |
+| 测试与交付 | 36 条集成用例（upgrade 另有 8 条待实现）；v1 不配 CI | [quality.md](impl/quality.md)「测试计划」「发布」 |
 
 ## 6. 文档维护规则
 
@@ -277,8 +291,16 @@ pub struct Ctx {
 | 10 | `commands::list` + `output::list` | `feat(list): add text and json listing` |
 | 11 | `commands::copy` | `feat(copy): copy global skill to project` |
 | 12 | 双语 README | `docs: add bilingual readme` |
+| 13 | 决策 Q30–Q32 + `impl/upgrade.md` + 索引同步（已完成） | `docs: decide self-upgrade scope` |
+| 14 | `domain::version` + `domain::release`（版本比较、资产选择） | `feat(domain): add version comparison and asset selection` |
+| 15 | `infra::net`（元数据 + 下载，桩服务器用例） | `feat(net): fetch latest release over https` |
+| 16 | `infra::fsops::replace_self`（原地替换、回滚、备份清理） | `feat(fs): replace running binary atomically` |
+| 17 | `cli`（`Action::Upgrade`、`--check` / `--force`、i18n key） | `feat(cli): add upgrade command` |
+| 18 | `commands::upgrade` + 集成用例 + 文档收尾 | `feat(upgrade): self-update from github releases` |
 
 > i18n 排在 CLI 之前而非 `domain` 之后：消息 key 由 help / 错误 / 警告文案决定，等 `MetaError`、`FrontmatterError`、`FsError`、`ConfigError` 都定型后再定稿，可避免消息表返工；各命令的成功/警告提示在对应命令切片内增量追加 key。
+>
+> 第 13 片是文档先行：规则、文案与验收标准先落地，第 14–18 片按红 → 绿实现，每片一个原子提交。
 
 收尾检查：`cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿。
 
@@ -287,7 +309,7 @@ pub struct Ctx {
 验收范围：第 1 条的三平台只在 Windows 实测，其余条目均在本机通过。
 
 - [x] `lsm --version`、`lsm --help` 正常（Windows 实测；Linux/macOS 未实测）。
-- [x] 需求中的 5 条完整命令、2 条 `config` 命令与 5 个短选项全部可用。
+- [x] 需求中的前 5 条命令、2 条 `config` 命令与 5 个短选项全部可用（第 6 条 `upgrade` 见 8.1）。
 - [x] `.md` 与目录两种输入都能安装；目录不做任何排除，`.git` 完整复制并告警。
 - [x] 目标位于源目录内时硬报错，不发生递归复制。
 - [x] 非法 SKILL.md 被拦截：格式、64 / 1024 长度限制全部生效。
@@ -306,4 +328,11 @@ pub struct Ctx {
 - [x] `LICENSE` 为 MIT，`Cargo.toml` 与两份 README 均标注。
 - [x] `docs/impl.md`、`docs/impl/*.md`、`docs/decisions.md` 的相对链接全部有效，规则无重复。
 - [x] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿。
+
+### 8.1 upgrade（规则已定，代码未实现）
+
+- [ ] `lsm upgrade --check` 在「已最新」与「有新版本」两种情况下都退出 0，且不写盘。
+- [ ] `lsm upgrade` 成功后 exe 的路径与文件名不变，`.old-*` 不残留；失败路径上原 exe 仍可执行。
+- [ ] 当前平台无资产、网络失败、限流（403/429）、目录不可写均退出 1 并带 hint。
+- [ ] `upgrade` 的 en/zh 文案齐全，`upgrade --help` 两种语言正常，未知参数退出 2。
 

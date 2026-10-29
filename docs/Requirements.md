@@ -7,6 +7,7 @@ skill的目录还要所有agent都直接直接使用。
 ## 功能要求
 1. 创建skill安装到全局目录和项目目录，目录格式采用.agents格式
 2. 能将全局skill复制到项目目录中，项目目录格式也是.agents格式
+3. 能自更新（upgrade），升级后本地二进制的路径与文件名保持不变
 ## 产品形态和运行平台
 1. cli工具  
 2. 能运行在windows和linux和macos
@@ -19,6 +20,7 @@ skill的目录还要所有agent都直接直接使用。
 3. lsm list global
 4. lsm list project
 5. lsm copy <xxx>
+6. lsm upgrade [--check] [--force]
 ```
 
 ### 缩减版
@@ -29,3 +31,5 @@ skill的目录还要所有agent都直接直接使用。
 4.-l = list
 5.-c = copy
 ```
+
+`upgrade` 没有短选项，只能写完整子命令。

@@ -18,7 +18,7 @@
 - **配置文件不在 skills 目录下**：`config.toml` 位于 `dirs::config_dir()/lsm`（可用 `LSM_CONFIG_DIR` 覆盖），`LSM_HOME` 只影响 skills 根目录，两者互不影响；详见 [config.md](config.md)。
 - Windows 家目录由 `dirs::home_dir()` 得到，例如 `C:\Users\jiahui\.agents\skills`。
 - 所有路径使用 `PathBuf`，禁止硬编码 `/` 或 `\`。
-- `Env::read()` 一次读全三个变量，返回快照；空串按未设置处理，`LSM_LANG` 非 UTF-8 同样按未设置。
+- `Env::read()` 一次读全环境，返回快照；空串按未设置处理，`LSM_LANG` 非 UTF-8 同样按未设置。除 `LSM_HOME` / `LSM_CONFIG_DIR` / `LSM_LANG` 外还快照 `LSM_UPGRADE_API` 与 `current_exe()`（供 `upgrade` 使用，规则见 [upgrade.md](upgrade.md)）。
 - `home` / `config_dir` 无法确定时为 `None`，由 `paths` 返回 `HomeUnavailable` / `ConfigDirUnavailable`，不做猜测性回退。
 - 安装前按需 `create_dir_all`，不要求用户手工建目录。
 - cwd 由 `lib::run` 读取一次并显式传给 `infra::paths`，避免测试修改进程级 cwd。
@@ -35,9 +35,11 @@ impl Scope {
 
 // infra/env.rs —— 唯一读取进程环境的位置，返回一次性快照
 pub struct Env {
-    pub home: Option<PathBuf>,        // LSM_HOME，否则 ~/.agents
-    pub config_dir: Option<PathBuf>,  // LSM_CONFIG_DIR，否则 dirs::config_dir()/lsm
-    pub lang: Option<String>,         // LSM_LANG 原始值，空串视为未设置
+    pub home: Option<PathBuf>,         // LSM_HOME，否则 ~/.agents
+    pub config_dir: Option<PathBuf>,   // LSM_CONFIG_DIR，否则 dirs::config_dir()/lsm
+    pub lang: Option<String>,          // LSM_LANG 原始值，空串视为未设置
+    pub upgrade_api: Option<String>,   // LSM_UPGRADE_API，空串视为未设置
+    pub exe: Option<PathBuf>,          // current_exe()，供 upgrade 原地替换
 }
 
 impl Env {
@@ -291,6 +293,8 @@ pub fn is_same_path(left: &Path, right: &Path) -> Result<bool, FsError>;
 pub fn inspect_source(src: &Path) -> Result<SourceKind, FsError>;
 pub fn install_skill_dir(src: &Path, dst: &Path, force: bool) -> Result<InstallReport, FsError>;
 pub fn install_skill_file(src: &Path, dst: &Path, force: bool) -> Result<InstallReport, FsError>;
+/// 原地替换当前可执行文件；调用方先完成下载与冒烟校验（规则见 upgrade.md）。
+pub fn replace_self(new: &Path, exe: &Path) -> Result<ReplaceReport, FsError>;
 
 pub enum SourceKind {
     Directory,
@@ -299,6 +303,11 @@ pub enum SourceKind {
 
 /// 备份删除失败时把路径交回命令层，由命令层打 warning 并仍以 0 退出。
 pub struct InstallReport {
+    pub leftover_backup: Option<PathBuf>,
+}
+
+/// 旧 exe 删除失败时同样交回命令层，下次升级再清理。
+pub struct ReplaceReport {
     pub leftover_backup: Option<PathBuf>,
 }
 
@@ -332,6 +341,7 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError>;
 - **临时目录**：`.tmp-<name>-<pid>`，与目标同卷，保证 `rename` 原子性。
 - **备份目录**：`.bak-<name>-<pid>`，成功后递归删除；删除失败时把路径放进 `InstallReport::leftover_backup`，由命令层打印 warning，退出码仍为 0。
 - **崩溃残留**：临时/备份目录以 `.` 开头，`lsm list` 自动跳过；不自动清理其他进程的残留。
+- **自更新替换**：`replace_self` 只负责同卷 `rename` 与失败回滚，不下载、不校验、不判版本；`exe` 的路径与文件名必须保持不变，临时名只用 `.lsm-upgrade-<pid>` 与 `<exe>.old-<pid>`，完整规则见 [upgrade.md](upgrade.md)「原地替换与回滚」。
 - **自包含检测**：源路径 `canonicalize`，目标取「cwd 规范化 + 相对后缀」，用 `starts_with` 判断；目标尚不存在也能判断。
 - 所有错误都带路径上下文：底层 I/O 错误用 `anyhow::Context` 包装后挂在 `FsError` 变体里，再由 `error::mapping` 转成 `AppError.source`；`infra` 内不构造 `AppError`。
 
@@ -347,5 +357,6 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError>;
 - Q22：Windows 保留名提前拒绝。
 - Q27：配置文件独立于 `LSM_HOME`，不放进 `.agents` 目录。
 - Q29：`paths` 收 `&Env` 纯函数；`fsops`/`scan` 返回 `FsError`，不构造 `AppError`。
+- Q31：自更新用原地替换，`exe` 路径与文件名不变（`fsops::replace_self` 只实现替换与回滚）。
 
 完整决策见 [decisions.md](../decisions.md)。
