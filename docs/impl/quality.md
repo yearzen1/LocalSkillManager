@@ -66,14 +66,17 @@
 34. 手写注释与未知键（如 `theme = "dark"`）+ `config set lang zh` → 注释与未知键仍在，`lang` 被更新。
 35. `config set lang zh-CN` → 文件内落盘为 `zh`；`config set lang fr` → 退出码 2。
 36. `lsm config`（无子命令）→ help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
-37. `upgrade --check` 已最新 → 退出 0，stdout 含 `up to date`，磁盘无任何新文件。
-38. 桩返回更高 tag → `upgrade --check` 打印 `new version available`，退出 0，不下载、不写盘。
-39. `upgrade --force`（桩 tag = 当前版本）→ 二进制被替换，**路径与文件名不变**，内容等于下载载荷，`.old-*` 已清理。
-40. 当前平台资产缺失 → 退出 1，stderr 含期望资产名与 tag。
-41. 桩返回 404 / 非 JSON / 403 → 退出 1，hint 指向镜像或手动下载。
-42. exe 所在目录不可写 → 退出 1，原文件字节不变。
-43. `upgrade --help` 两种语言均输出到 stdout 且退出 0；`lsm -u`、`upgrade --bogus` → 退出 2。
-44. 升级成功后再次执行 `upgrade --check`（桩 tag 不变）→ 退出 0 且报告已最新。
+37. [planned] `upgrade --check` 已最新 → 退出 0，stdout 含 `up to date`，磁盘无任何新文件。
+38. [planned] 桩返回更高 tag → `upgrade --check` 打印 `new version available`，退出 0，不下载、不写盘。
+39. [planned] `upgrade --force`（桩 tag = 当前版本）→ 二进制被替换，**路径与文件名不变**，内容等于下载载荷，`.old-*` 已清理。
+40. [planned] 当前平台资产缺失 → 退出 1，stderr 含期望资产名与 tag。
+41. [planned] 桩返回 404 / 非 JSON / 403 → 退出 1，hint 指向镜像或手动下载。
+42. [planned] exe 所在目录不可写 → 退出 1，原文件字节不变。
+43. [planned] `upgrade --help` 两种语言均输出到 stdout 且退出 0；`lsm -u`、`upgrade --bogus` → 退出 2。
+44. [planned] 升级成功后再次执行 `upgrade --check`（桩 tag 不变）→ 退出 0 且报告已最新。
+45. 真源一致性：`docs/impl/cli.md` §2.1 表的 `implemented` 行必须 `lsm <command> --help` 退出 0，`planned` 行必须被视为未知子命令（退出 2）——由 `tests/cli.rs::cli_reference_table_matches_binary` 强制。
+
+`[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列。
 
 ### 1.3 手工验收（三平台）
 
@@ -88,13 +91,13 @@ lsm config get lang
 lsm list global          # 应为中文
 cd <demo-project> && lsm copy sample && lsm list project
 
-# upgrade 冒烟：复制一份再执行，确认替换的不是正在使用的二进制
-cp ./target/release/lsm /tmp/lsm-check
-/tmp/lsm-check upgrade --check          # 只查不装：打印已最新，或新版本提示（含当前版本）
-rm -f /tmp/lsm-check
+# [planned] upgrade 冒烟（`upgrade` 未实现前跳过）：复制一份再执行，确认替换的不是正在使用的二进制
+# cp ./target/release/lsm /tmp/lsm-check
+# /tmp/lsm-check upgrade --check          # 只查不装：打印已最新，或新版本提示（含当前版本）
+# rm -f /tmp/lsm-check
 ```
 
-`upgrade --check` 是这里唯一的联网步骤；不要对日常使用的 `lsm` 直接跑 `upgrade` 做验收。Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
+`[planned]`：`upgrade` 实现前跳过这一段；实现后它是这里唯一的联网步骤，不要对日常使用的 `lsm` 直接跑 `upgrade` 做验收。Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
 
 ## 2. README 与许可证
 
@@ -103,6 +106,7 @@ rm -f /tmp/lsm-check
 - `README.md`：英文，主文件，顶部放指向 `README.zh-CN.md` 的中文切换链接。
 - `README.zh-CN.md`：中文，顶部放指向 `README.md` 的英文切换链接。
 - 两份内容结构一致，命令示例、错误示例都覆盖两种语言输出。
+- 两份 README 只描述 `implemented` 命令；`planned` 命令只出现在 [`cli.md`](cli.md) §2.1 的状态列里。
 
 ### 2.2 内容大纲
 
@@ -113,7 +117,7 @@ rm -f /tmp/lsm-check
 3. 快速开始：写一个 `my-skill.md`，`lsm add my-skill.md global`，`lsm copy my-skill`。
 4. 目录约定：`~/.agents/skills`、`<project>/.agents/skills`；提示"在项目根目录执行"。
 5. SKILL.md 模板与字段校验规则（64 / 1024 上限）。
-6. 命令参考：完整版 + 缩减版对照表 + `upgrade` + `--lang` + `config get/set`。
+6. 命令参考：完整版 + 缩减版对照表 + `--lang` + `config get/set`，并注明命令与参数的唯一真源是 [`cli.md`](cli.md) §2.1。
 7. 语言持久化：`config set lang zh`、`config get lang`、配置文件路径（三平台）、四级优先级、`LSM_CONFIG_DIR`、坏配置会报错。
 8. 双语输出示例。
 9. 退出码与错误处理。

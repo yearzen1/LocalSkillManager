@@ -77,11 +77,12 @@ Limits are never truncated or auto-fixed: violating them is an error.
 lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
 lsm copy <name> [--force]
-lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
 ```
+
+Commands, arguments and exit codes are defined once in [`docs/impl/cli.md`](docs/impl/cli.md) (in Chinese). This README only documents what the current binary supports.
 
 Short forms (separate arguments only — `-lg` is not supported):
 
@@ -93,7 +94,7 @@ Short forms (separate arguments only — `-lg` is not supported):
 | `lsm -l -p --json` | `lsm list project --json` |
 | `lsm -c foo` | `lsm copy foo` |
 
-`-g`/`-p` may not be combined, may not be used with `copy`, and may not be mixed with the long subcommand form. `upgrade` has no short form.
+`-g`/`-p` may not be combined, may not be used with `copy`, and may not be mixed with the long subcommand form.
 
 ### add
 
@@ -121,16 +122,6 @@ broken      [invalid] missing SKILL.md
 - The source must be a valid global skill: `SKILL.md` present and its `name` must match the directory.
 - Copying onto the same path, or into the source itself, is refused; an existing target needs `--force`.
 - `name` is validated before any path is built, so `..`, `/`, `\` and reserved device names exit with code 2.
-
-### upgrade
-
-- Fetches the latest GitHub release and replaces the running binary **in place**. The executable keeps its path and file name — no `lsm-v0.2.0.exe`, no permanently renamed leftovers.
-- `--check` only reports: no download, no writes. A newer version still exits 0; a failed request exits 1.
-- `--force` reinstalls the current version, or installs an older release (rollback).
-- The download is smoke-tested with `--version` before replacing anything; a failed check leaves the current binary untouched and working.
-- If the binary lives in `~/.cargo/bin`, a warning suggests `cargo install --force local-skill-manager`, but the upgrade still proceeds.
-- Needs network access to `api.github.com`. Set `LSM_UPGRADE_API` to a mirror serving the same release JSON; no `GITHUB_TOKEN` is read.
-- Upgrading never touches `.agents/skills`.
 
 ## Language
 
@@ -174,9 +165,9 @@ $ lsm --lang zh list global
 
 | Code | Meaning | Examples |
 |---|---|---|
-| 0 | success | `list` on an empty directory, `upgrade --check`, explicit `--help` |
-| 1 | runtime error | missing source, invalid frontmatter, existing target, broken config, failed `upgrade` |
-| 2 | usage error | missing argument, `-g` with `-p`, invalid `--lang`, invalid skill name, unknown config key, unknown `upgrade` flag, no subcommand |
+| 0 | success | `list` on an empty directory, explicit `--help` |
+| 1 | runtime error | missing source, invalid frontmatter, existing target, broken config |
+| 2 | usage error | missing argument, `-g` with `-p`, invalid `--lang`, invalid skill name, unknown config key, no subcommand |
 
 `--help` / `--version` print to stdout and exit 0. Running `lsm` with no subcommand prints help to **stderr** and exits 2.
 

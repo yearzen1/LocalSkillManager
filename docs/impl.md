@@ -4,7 +4,7 @@
 > 状态：v0.1.1 已实现（Windows 实测；Linux/macOS 未实测）；`upgrade` 规则已定、代码未实现
 > 最后更新：2026-10-29
 >
-> 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。
+> 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
 
 ## 1. 文档地图
 
@@ -259,11 +259,11 @@ pub struct Ctx {
 | 原子覆盖 | 备份 → 安装 → 删备份，失败回滚 | [storage.md](impl/storage.md)「文件系统细节」 |
 | 语言选择 | `--lang` > `LSM_LANG` > `config.toml` > `en`，惰性读取 | [config.md](impl/config.md)「加载与优先级」 |
 | 语言持久化 | `config.toml` + `config get/set lang`，坏配置退 1 | [config.md](impl/config.md)「配置文件」「`config` 命令」 |
-| 参数与 help | 仅分离短选项；无子命令 help 到 stderr + 2 | [cli.md](impl/cli.md)「CLI 设计」 |
+| 参数与 help | 仅分离短选项；无子命令 help 到 stderr + 2；命令面真源见 cli.md §2.1 | [cli.md](impl/cli.md)「CLI 设计」 |
 | 错误模型 | 结构化 `AppError`，`anyhow` 仅作 source | [cli.md](impl/cli.md)「输出、错误与退出码」 |
 | 分层边界 | `domain`/`infra` 自身错误枚举，映射与渲染在边界；`Ctx` 承载 env/lang/cwd | [impl.md](impl.md)「模块职责」「依赖方向」 |
 | 自更新 | 原地替换，exe 路径与文件名不变；备份只用临时名 | [upgrade.md](impl/upgrade.md)「原地替换与回滚」 |
-| 测试与交付 | 36 条集成用例（upgrade 另有 8 条待实现）；v1 不配 CI | [quality.md](impl/quality.md)「测试计划」「发布」 |
+| 测试与交付 | 用例数不写死，以 `cargo test` 输出为准（`upgrade` 的 8 条在 quality.md 标记 `[planned]`）；v1 不配 CI | [quality.md](impl/quality.md)「测试计划」「发布」 |
 
 ## 6. 文档维护规则
 

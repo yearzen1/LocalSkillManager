@@ -43,10 +43,10 @@
 
 - **目标**：按仓库"决策先行"规则，先把范围写进 `decisions.md`，后面不再为"要不要做"返工。
 - **步骤**
-  1. `docs/decisions.md` 表尾追加 Q30：v0.2.0 只含 `copy --all` 与 `remove`；`symlink`、反向 copy、`update` 检查仍为非目标
-  2. 追加 Q31：CI 矩阵、预编译产物、Linux/macOS 实测**延后，等真实 issue 触发再立计划**（当前交付以 Windows 实测为准）
+  1. `docs/decisions.md` 表尾追加 Q34：v0.2.0 只含 `copy --all` 与 `remove`；`symlink`、反向 copy、`update` 检查仍为非目标
+  2. 追加 Q35：CI 矩阵、预编译产物、Linux/macOS 实测**延后，等真实 issue 触发再立计划**（当前交付以 Windows 实测为准）
   3. 同步 `docs/impl.md`「非目标」段与第 5 节约束表，只放摘要 + 链接
-- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q3[01] \|'` 命中 2 行；`docs/impl.md` 新增行能点回 `decisions.md`
+- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q3[45] \|'` 命中 2 行；`docs/impl.md` 新增行能点回 `decisions.md`
 - **提交信息**：`docs: record v0.2.0 scope decisions`
 - **卡住时**：Q31 的措辞拿不准就写"暂不做，触发条件=有用户 issue 提出平台相关问题"，不写时间点
 - [ ] 完成
@@ -129,10 +129,10 @@
 
 - **目标**：把"卸载"从非目标移出，并先用例钉住破坏性行为。
 - **步骤**
-  1. `docs/decisions.md` 追加 Q32：`remove <name> [global|project]` + `--force` 语义、原子删除方式
+  1. `docs/decisions.md` 追加 Q36：`remove <name> [global|project]` + `--force` 语义、原子删除方式
   2. 改写 `docs/impl.md`「非目标」段，删掉"不做删除、卸载"
   3. `tests/cli.rs` 加三条用例：正常删除、不存在时报错退 1、`--force` 才删非空
-- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q32 \|'` 命中 1 行；三条新用例红
+- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q36 \|'` 命中 1 行；三条新用例红
 - **提交信息**：`docs: decide skill removal scope`
 - **卡住时**：`--force` 语义拿不准就取"无 `--force` 只删由 `add` 创建的合法 skill 目录（含 SKILL.md 且目录名与 name 一致）"，其余必须显式 `--force`
 - [ ] 完成

@@ -77,11 +77,12 @@ description: 审查 diff 的正确性与风格。
 lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
 lsm copy <name> [--force]
-lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
 ```
+
+命令、参数与退出码只在 [`docs/impl/cli.md`](docs/impl/cli.md) 定义一次；本 README 只记录当前二进制支持的能力。
 
 缩减版只支持分离写法（不支持 `-lg` 这种合并写法）：
 
@@ -93,7 +94,7 @@ lsm --lang <en|zh> <command> ...
 | `lsm -l -p --json` | `lsm list project --json` |
 | `lsm -c foo` | `lsm copy foo` |
 
-`-g` 与 `-p` 不能同时使用、不能与 `copy` 一起用，也不能与完整子命令写法混用。`upgrade` 没有短选项。
+`-g` 与 `-p` 不能同时使用、不能与 `copy` 一起用，也不能与完整子命令写法混用。
 
 ### add
 
@@ -121,16 +122,6 @@ broken      [invalid] missing SKILL.md
 - 源必须是合法的全局 skill：存在 `SKILL.md` 且其 `name` 与目录名一致。
 - 源与目标相同、或目标位于源内部时拒绝；目标已存在需要 `--force`。
 - `name` 在拼任何路径之前完成校验，`..`、`/`、`\` 与保留设备名都以退出码 2 失败。
-
-### upgrade
-
-- 从 GitHub Releases 取最新版，**原地替换**正在运行的二进制。升级后 exe 的路径与文件名保持不变——不会出现 `lsm-v0.2.0.exe`，也不会长期留一个改名后的旧文件。
-- `--check` 只报告不安装：不下载、不写盘；发现新版本退出 0，查询失败退出 1。
-- `--force` 重装当前版本，或安装更旧的 release（回滚）。
-- 替换前会跑一次 `--version` 冒烟校验；校验失败时原二进制不动、仍可执行。
-- 二进制位于 `~/.cargo/bin` 时会给一条 `cargo install --force local-skill-manager` 的 warning，但升级照常进行。
-- 需要能访问 `api.github.com`；可用 `LSM_UPGRADE_API` 指向返回同样 release JSON 的镜像。不读 `GITHUB_TOKEN`。
-- 升级只动可执行文件，不触碰 `.agents/skills`。
 
 ## 语言
 
@@ -174,9 +165,9 @@ $ lsm --lang zh list global
 
 | 退出码 | 含义 | 例子 |
 |---|---|---|
-| 0 | 成功 | 空目录执行 `list`、`upgrade --check`、显式 `--help` |
-| 1 | 运行时错误 | 源不存在、frontmatter 非法、目标已存在、配置损坏、`upgrade` 失败 |
-| 2 | 用法错误 | 缺参数、`-g` 与 `-p` 同用、非法 `--lang`、非法 skill 名称、未知配置键、未知 `upgrade` 参数、无子命令 |
+| 0 | 成功 | 空目录执行 `list`、显式 `--help` |
+| 1 | 运行时错误 | 源不存在、frontmatter 非法、目标已存在、配置损坏 |
+| 2 | 用法错误 | 缺参数、`-g` 与 `-p` 同用、非法 `--lang`、非法 skill 名称、未知配置键、无子命令 |
 
 `--help` / `--version` 输出到 stdout 并退出 0；无子命令时 help 输出到 **stderr** 并退出 2。
 

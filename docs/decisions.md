@@ -33,6 +33,7 @@
 | Q30 | 自更新范围 | 新增 `lsm upgrade [--check] [--force]`，只更新 lsm 自身二进制，不触碰 `.agents/skills`；不加短选项；`--check` 只查不装，发现新版本也退 0（查询失败仍退 1）；`--force` 允许同版本重装与降级回滚；不做自动/后台检查更新 |
 | Q31 | 升级的校验与替换 | HTTPS 下载后以 `<新文件> --version` 退出 0 且输出含 release tag 版本号才算校验通过；**原地替换：exe 路径与文件名保持不变**，禁止版本化文件名；备份只用 `<exe>.old-<pid>` 临时名，成功即删，删不掉留 warning 并在下次升级清理；任一步失败回滚且原文件可执行 |
 | Q32 | 升级的网络与资产契约 | 查询 `https://api.github.com/repos/yearzen1/LocalSkillManager/releases/latest`；`LSM_UPGRADE_API` 覆盖端点（镜像与测试）；资产名 `lsm-<os>-<arch>[.exe]` 是唯一查找键；tag 必须是 `vMAJOR.MINOR.PATCH`；不读 `GITHUB_TOKEN`，限流给可操作提示 |
+| Q33 | CLI 真源与文档同步 | 命令与参数的唯一真源是 `impl/cli.md` §2.1 的状态表（`implemented` / `planned`）；改动顺序固定为「先真源状态列 → 再 `cli/spec.rs`/`domain/action.rs` → 最后两份 README」；两份 README 只描述 `implemented` 命令；`tests/cli.rs::cli_reference_table_matches_binary` 强制状态列与二进制一致（`planned` 必须仍是未知子命令、退出 2） |
 
 ## 维护规则
 
