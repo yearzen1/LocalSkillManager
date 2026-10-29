@@ -887,3 +887,80 @@ fn invalid_subcommand_reports_only_the_name_in_english() {
         .stderr(predicate::str::contains("unrecognized").not());
 }
 
+/// `docs/impl/cli.md` §2.1 的命令表是真源：这里只校验「命令存在性」与「状态列」一致。
+const CLI_REFERENCE: &str = include_str!("../docs/impl/cli.md");
+
+fn cli_reference_rows() -> Vec<(String, String)> {
+    let mut rows = Vec::new();
+    let mut in_table = false;
+
+    for line in CLI_REFERENCE.lines() {
+        let trimmed = line.trim();
+
+        if !in_table {
+            in_table = trimmed.starts_with("| 命令") && trimmed.contains("状态");
+            continue;
+        }
+
+        if !trimmed.starts_with('|') {
+            break;
+        }
+
+        let cells: Vec<&str> = trimmed.split('|').map(str::trim).collect();
+        if cells.len() < 5 {
+            continue;
+        }
+
+        let status = cells[3].to_string();
+        if status.starts_with("---") {
+            continue;
+        }
+
+        rows.push((cells[1].trim_matches('`').to_string(), status));
+    }
+
+    rows
+}
+
+#[test]
+fn cli_reference_table_matches_binary() {
+    let rows = cli_reference_rows();
+    assert!(
+        rows.len() >= 6,
+        "failed to parse the command table in docs/impl/cli.md: {rows:?}"
+    );
+
+    let mut implemented = 0;
+    let mut planned = 0;
+
+    for (command, status) in &rows {
+        let mut parts: Vec<&str> = command.split_whitespace().collect();
+
+        match status.as_str() {
+            "implemented" => {
+                implemented += 1;
+                parts.push("--help");
+                lsm()
+                    .args(&parts)
+                    .assert()
+                    .success()
+                    .stdout(predicate::str::contains("Usage:"));
+            }
+            "planned" => {
+                planned += 1;
+                lsm()
+                    .arg(parts[0])
+                    .assert()
+                    .code(2)
+                    .stderr(predicate::str::contains(parts[0]));
+            }
+            other => panic!("unknown status '{other}' for command '{command}'"),
+        }
+    }
+
+    assert!(implemented > 0, "no implemented rows parsed");
+    assert!(
+        planned > 0,
+        "no planned rows parsed; unimplemented commands must be marked planned"
+    );
+}
