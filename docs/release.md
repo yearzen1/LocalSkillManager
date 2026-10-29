@@ -20,7 +20,7 @@
 2. `os` 只能是 `windows` / `linux` / `macos`；`arch` 只能是 `x64` / `arm64`。
 3. **版本号不进文件名**：版本由 Release tag 表达，重复写进文件名只会让下载名变长。
 4. **同一 Release 内资产名必须唯一**：GitHub 以 `name` 作为唯一键，重名上传会被拒绝（422）。
-5. `label` 只用于页面展示，**不能替代命名**；下载 URL 与用户磁盘上的文件名都取自 `name`。
+5. **不使用 `label`**：平台与架构只体现在 `name` 上。`label` 仅影响页面展示，既不进下载 URL，也解决不了重名。
 6. 因此禁止「三个平台都叫 `lsm.exe`，只用 label 区分」：同 Release 下无法共存，用户下载后也会互相覆盖。
 
 正确与错误示例：
@@ -79,10 +79,13 @@ curl.exe -s -o NUL -w "%{http_code} %{size_download}`n" -L `
 # 取资产 id
 gh api repos/yearzen1/LocalSkillManager/releases --jq '.[] | {tag: .tag_name, assets: [.assets[] | {id, name}]}'
 
-# 改名（可同时改 label）
-gh api -X PATCH repos/yearzen1/LocalSkillManager/releases/assets/<id> `
-  -f name="lsm-windows-x64.exe" -f label="Windows x64"
+# 改名（只改文件名；历史资产若带 label，一并清空）
+'{"name": "lsm-windows-x64.exe", "label": ""}' | Set-Content .\asset.json -Encoding utf8 -NoNewline
+gh api -X PATCH repos/yearzen1/LocalSkillManager/releases/assets/<id> --input .\asset.json
+Remove-Item .\asset.json
 ```
+
+只传 `name` 就能改名；`label` 为可选展示字段，本项目一律留空。清空已有 label 必须显式传 `"label": ""`，省略该字段会保持原值。
 
 改名后必须重新校验下载 URL——旧链接会失效，这属于可接受的代价，但要在改名时确认没有外部依赖旧链接。
 
