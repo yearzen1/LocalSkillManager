@@ -866,3 +866,24 @@ fn invalid_yaml_hints_how_to_fix() {
         .stderr(predicate::str::contains("invalid YAML"))
         .stderr(predicate::str::contains("quote the value"));
 }
+
+#[test]
+fn invalid_subcommand_reports_only_the_name() {
+    lsm()
+        .args(["--lang", "zh", "upgrade"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("非法的子命令 'upgrade'"))
+        .stderr(predicate::str::contains("unrecognized").not());
+}
+
+#[test]
+fn invalid_subcommand_reports_only_the_name_in_english() {
+    lsm()
+        .args(["--lang", "en", "upgrade"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid subcommand 'upgrade'"))
+        .stderr(predicate::str::contains("unrecognized").not());
+}
+

@@ -186,8 +186,13 @@ fn offending(err: &clap::Error) -> Option<String> {
     use clap::error::{ContextKind, ContextValue};
 
     err.context().find_map(|(kind, value)| match (kind, value) {
-        (ContextKind::InvalidArg, ContextValue::String(name)) => Some(name.clone()),
-        (ContextKind::InvalidArg, ContextValue::Strings(names)) => Some(names.join(", ")),
+        (ContextKind::InvalidArg | ContextKind::InvalidSubcommand, ContextValue::String(name)) => {
+            Some(name.clone())
+        }
+        (
+            ContextKind::InvalidArg | ContextKind::InvalidSubcommand,
+            ContextValue::Strings(names),
+        ) => Some(names.join(", ")),
         _ => None,
     })
 }
