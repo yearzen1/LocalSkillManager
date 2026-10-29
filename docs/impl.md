@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.1.0 已实现（Windows 实测；Linux/macOS 未实测）
+> 状态：v0.1.1 已实现（Windows 实测；Linux/macOS 未实测）
 > 最后更新：2026-10-29
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。
@@ -61,7 +61,7 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Install and copy agent skills under .agents/skills"
 license = "MIT"
@@ -305,3 +305,4 @@ pub struct Ctx {
 - [x] `LICENSE` 为 MIT，`Cargo.toml` 与两份 README 均标注。
 - [x] `docs/impl.md`、`docs/impl/*.md`、`docs/decisions.md` 的相对链接全部有效，规则无重复。
 - [x] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿。
+

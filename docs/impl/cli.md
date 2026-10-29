@@ -37,7 +37,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - 文案按语言拆到 `i18n/en.rs`、`i18n/zh.rs`，`mod.rs` 只做分发。
 - 所有 `error:` / `hint:` / 成功提示 / help 正文都从消息表取，禁止在业务代码里写死文案。
 - 中文前缀用 `错误:` / `提示:`，英文用 `error:` / `hint:`。
-- 版本号 `lsm 0.1.0`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
+- 版本号 `lsm 0.1.1`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
 
 ### 1.3 help 与参数错误
 
@@ -124,7 +124,7 @@ lsm --lang <en|zh> <command> ...
 ### 2.4 无参数与帮助行为
 
 - `lsm --help` / `-h` / `lsm <command> --help`：本地化 help 输出到 **stdout**，退出码 0。
-- `lsm --version` / `-V`：输出 `lsm 0.1.0` 到 stdout，退出码 0。
+- `lsm --version` / `-V`：输出 `lsm 0.1.1` 到 stdout，退出码 0。
 - `lsm` 无子命令，或只有全局参数（如 `lsm --lang zh`）：本地化 help 输出到 **stderr**，退出码 2。
 - 嵌套子命令沿用同一规则：`lsm config` 无子命令 → help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
 - 实现方式：clap 解析到 `ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand` 时，按上述规则选择流；不要依赖 clap 默认行为。
@@ -205,3 +205,4 @@ impl AppError {
 - Q29：分层收敛与错误映射（错误枚举在 `domain`/`infra`，`AppError` 只在边界构造，渲染归 `output`）。
 
 完整决策见 [decisions.md](../decisions.md)。
+

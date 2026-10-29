@@ -1,6 +1,6 @@
 [package]
 name = "local-skill-manager"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Install and copy agent skills under .agents/skills"
 license = "MIT"
@@ -26,3 +26,4 @@ toml_edit = "0.22"
 assert_cmd = "2"
 predicates = "3"
 tempfile = "3"
+
