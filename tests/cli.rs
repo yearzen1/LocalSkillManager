@@ -1,14 +1,22 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::TempDir;
 
-/// 干净的命令：不继承开发机上的 LSM_* 变量。
+static CONFIG_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// 干净的命令：不继承开发机上的 LSM_* 变量，也不读真实的 config.toml。
 fn lsm() -> Command {
     let mut cmd = Command::cargo_bin("lsm").unwrap();
-    cmd.env_remove("LSM_LANG")
-        .env_remove("LSM_HOME")
-        .env_remove("LSM_CONFIG_DIR");
+    let config_dir = std::env::temp_dir().join(format!(
+        "lsm-test-config-{}-{}",
+        std::process::id(),
+        CONFIG_SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
+    cmd.env("LSM_CONFIG_DIR", config_dir)
+        .env_remove("LSM_LANG")
+        .env_remove("LSM_HOME");
     cmd
 }
 
@@ -837,4 +845,24 @@ fn copy_warns_about_git_directories() {
         .path()
         .join(".agents/skills/my-skill/.git/HEAD")
         .exists());
+}
+
+#[test]
+fn invalid_yaml_hints_how_to_fix() {
+    let home = home_dir();
+    let work = TempDir::new().unwrap();
+    let source = work.path().join("colon.md");
+    fs::write(
+        &source,
+        "---\nname: colon\ndescription: works: badly\n---\n",
+    )
+    .unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .args(["add", source.to_str().unwrap(), "global"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("invalid YAML"))
+        .stderr(predicate::str::contains("quote the value"));
 }

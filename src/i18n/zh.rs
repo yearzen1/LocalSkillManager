@@ -91,6 +91,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         }
         MsgKey::SkillFrontmatterUtf8 => "{0}：SKILL.md 不是合法的 UTF-8",
         MsgKey::SkillFrontmatterYaml => "{0}：frontmatter 不是合法 YAML：{1}",
+        MsgKey::SkillFrontmatterYamlHint => "值里包含 \": \" 时请加引号或改用 >- 折叠块",
         MsgKey::SkillFieldMissing => "{0}：缺少必需字段 '{1}'",
         MsgKey::SkillDirMismatch => "目录名 '{0}' 与 frontmatter 中的 name '{1}' 不一致",
         MsgKey::SkillDirMismatchHint => "请把目录名改为 '{0}'",

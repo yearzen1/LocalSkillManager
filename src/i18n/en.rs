@@ -93,6 +93,9 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         }
         MsgKey::SkillFrontmatterUtf8 => "{0}: SKILL.md is not valid UTF-8",
         MsgKey::SkillFrontmatterYaml => "{0}: invalid YAML frontmatter: {1}",
+        MsgKey::SkillFrontmatterYamlHint => {
+            "quote the value or use a >- block scalar when it contains \": \""
+        }
         MsgKey::SkillFieldMissing => "{0}: missing required field '{1}'",
         MsgKey::SkillDirMismatch => "directory name '{0}' does not match frontmatter name '{1}'",
         MsgKey::SkillDirMismatchHint => "rename the directory to '{0}'",

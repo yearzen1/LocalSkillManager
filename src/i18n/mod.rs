@@ -108,6 +108,7 @@ keys!(
     SkillFrontmatterMissingHint,
     SkillFrontmatterUtf8,
     SkillFrontmatterYaml,
+    SkillFrontmatterYamlHint,
     SkillFieldMissing,
     SkillDirMismatch,
     SkillDirMismatchHint,

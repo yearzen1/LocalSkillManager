@@ -91,6 +91,7 @@ description: 一句话说明这个 skill 做什么、什么时候用。
 - 上限以 `domain::name::MAX_NAME_LEN`（64）与 `domain::meta::MAX_DESCRIPTION_LEN`（1024）常量表达，代码不写字面量。
 - `SkillName::parse` 的校验顺序固定为：长度 → 格式 → Windows 保留名，只返回第一个命中的错误。
 - 超限一律报错，**不截断、不自动修复**。
+- YAML 语法非法时报错并提示修法：plain scalar 不能包含 `: `（冒号+空格），值里有就加引号或改用 `>-` 折叠块。
 - 不做正则依赖：`name` 校验用字符遍历（首尾必须是字母/数字，中间允许单个连字符）。
 - Windows 保留设备名（大小写不敏感）：`con`、`prn`、`aux`、`nul`、`com1`~`com9`、`lpt1`~`lpt9`。提前拒绝，保证三平台行为一致。
 - **目录名是 skill 的唯一身份**：`SKILL.md` 的 `name` 必须与所在目录名一致；不一致时 `list` 标记 `[invalid]`，`copy` 视为源非法。

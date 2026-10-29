@@ -75,6 +75,7 @@ impl From<FrontmatterError> for AppError {
                 let detail = source.to_string();
                 AppError::runtime(MsgKey::SkillFrontmatterYaml)
                     .with_args([path.display().to_string(), detail])
+                    .with_hint(MsgKey::SkillFrontmatterYamlHint)
                     .with_source(source)
             }
             FrontmatterError::InvalidName { source, .. } => name_error_runtime(source),
@@ -280,6 +281,21 @@ mod tests {
 
         let app: AppError = PathError::ConfigDirUnavailable.into();
         assert_eq!(app.msg.key, MsgKey::PathConfigDirUnavailable);
+    }
+
+    #[test]
+    fn invalid_yaml_hints_the_fix() {
+        let app: AppError = FrontmatterError::InvalidYaml {
+            path: PathBuf::from("SKILL.md"),
+            source: anyhow::anyhow!("mapping values are not allowed in this context"),
+        }
+        .into();
+
+        assert_eq!(app.msg.key, MsgKey::SkillFrontmatterYaml);
+        assert_eq!(
+            app.hint.as_ref().map(|hint| hint.key),
+            Some(MsgKey::SkillFrontmatterYamlHint)
+        );
     }
 
     #[test]
