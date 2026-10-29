@@ -14,6 +14,7 @@
 | [impl/cli.md](impl/cli.md) | i18n、CLI、help、输出与错误 | 实现命令行与输出 |
 | [impl/config.md](impl/config.md) | 配置文件路径、格式、语言持久化、`config` 命令 | 实现持久化语言 |
 | [impl/quality.md](impl/quality.md) | 测试计划、README、许可证、发布 | 测试与交付 |
+| [release.md](release.md) | Release 资产命名、tag 约定、发布与改名流程 | 发布与改资产名 |
 | [decisions.md](decisions.md) | Q1–Q29 决策记录 | 查决策依据 |
 | [Requirements.md](Requirements.md) | 原始需求 | 对齐范围 |
 

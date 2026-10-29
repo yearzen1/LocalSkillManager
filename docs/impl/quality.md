@@ -109,8 +109,7 @@ cd <demo-project> && lsm copy sample && lsm list project
 ## 3. 发布
 
 - v1：本地 `cargo build --release` + `cargo install --path .`，不配置 CI。
-- 第二阶段：GitHub Actions matrix（`windows-latest`、`ubuntu-latest`、`macos-latest`），产物 `lsm-<os>-<arch>.zip/tar.gz`；首期只出 x86_64，aarch64 作为增量。
-- 版本号从 `Cargo.toml` 读取，打 tag 触发 release。
+- Release 资产命名、tag 约定、上传与改名流程、CI 矩阵：见 [发布规则](../release.md)。
 
 ## 4. 相关决策
 
