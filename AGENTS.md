@@ -1,4 +1,4 @@
-## 使用tdd和grill和intent-lock skill
+## 使用tdd、grill、intent-lock、conventional-commit skill
 
 ## 改 CLI 的顺序（命令与参数）
 
