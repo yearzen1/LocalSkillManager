@@ -39,14 +39,26 @@
 - **卡住时**：测试红就先只跑失败项（`cargo test <用例名> -- --nocapture`），把原因记到第 4 节；两类改动绝不合并成一个提交
 - [x] 完成（偏差见第 4 节 D1 备注）
 
+#### Day 1.5 · 2026-11-02（周一）· `list` 描述列改按列换行
+
+- **目标**：`lsm list` 的中文 description 折行时不再顶到第 0 列，也不再按"字符数"假装 60 列。
+- **步骤**
+  1. `docs/decisions.md` 追加 Q34：描述列固定 60 **显示列**、换行后悬挂缩进、最多 3 行；后续决策顺延为 Q35+
+  2. `docs/impl/storage.md` §2.4 与 §3.2 示例改成换行规则
+  3. 先写红用例（中文换行、续行对齐描述列、宽字符不跨行、超 3 行补 `...`），再改 `output/list.rs`
+- **完成标准**：`cargo test` 全绿；`lsm list project` 里 `intent-lock` 的续行从描述列开始，每行 ≤ 60 列
+- **提交信息**：`docs: decide list text wrapping`、`test(list): pin list wrapping behavior`、`feat(list): wrap descriptions with hanging indent`、`docs: document list wrapping`
+- **卡住时**：中英混排仍对不齐就以 `display_width` 为准修换行算法，不改列宽常量
+- [ ] 完成
+
 #### Day 2 · 2026-11-03（周二）· 决策先行，钉住 v0.2.0 范围
 
 - **目标**：按仓库"决策先行"规则，先把范围写进 `decisions.md`，后面不再为"要不要做"返工。
 - **步骤**
-  1. `docs/decisions.md` 表尾追加 Q34：v0.2.0 只含 `copy --all` 与 `remove`；`symlink`、反向 copy、`update` 检查仍为非目标
-  2. 追加 Q35：CI 矩阵、预编译产物、Linux/macOS 实测**延后，等真实 issue 触发再立计划**（当前交付以 Windows 实测为准）
+  1. `docs/decisions.md` 表尾追加 Q35：v0.2.0 只含 `copy --all` 与 `remove`；`symlink`、反向 copy、`update` 检查仍为非目标
+  2. 追加 Q36：CI 矩阵、预编译产物、Linux/macOS 实测**延后，等真实 issue 触发再立计划**（当前交付以 Windows 实测为准）
   3. 同步 `docs/impl.md`「非目标」段与第 5 节约束表，只放摘要 + 链接
-- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q3[45] \|'` 命中 2 行；`docs/impl.md` 新增行能点回 `decisions.md`
+- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q3[56] \|'` 命中 2 行；`docs/impl.md` 新增行能点回 `decisions.md`
 - **提交信息**：`docs: record v0.2.0 scope decisions`
 - **卡住时**：Q31 的措辞拿不准就写"暂不做，触发条件=有用户 issue 提出平台相关问题"，不写时间点
 - [ ] 完成

@@ -152,8 +152,10 @@ pub enum FrontmatterError {
 ### 2.4 list 展示规则
 
 - 文本输出前把 description 的 `\r`、`\n`、连续空白压成单个空格。
-- 按 Unicode 字符截断到 60，超出加 `...`。
-- JSON 输出返回原始 description（由 JSON 自行转义），不做截断。
+- 按**显示列**排版：描述列宽 60 列（CJK 等宽字符占 2 列），超出换行（Q34）。
+- 换行后悬挂缩进，续行起点与首行描述列对齐；最多 3 行，超出部分在第 3 行末尾以 `...` 截断。
+- 不探测终端宽度，固定 60 列，保证脚本输出稳定。
+- JSON 输出返回原始 description（由 JSON 自行转义），不换行、不截断。
 
 ## 3. 各命令实现
 
@@ -217,17 +219,19 @@ lsm list <scope> [--json]
    - 缺失、非法或 `name` 与目录名不一致 → `valid = false`，`name` 用目录名，`description` 为空，并记录 `error`（不一致时 `error = "name mismatch: <dir> vs <name>"`）。
 4. 按 `name` 字典序排序。
 
-文本输出（description 超过 60 字符截断为 `...`）：
+文本输出（描述列 60 列宽，超宽换行并悬挂缩进，最多 3 行）：
 
 ```
-NAME        DESCRIPTION
-----------  ------------------------------------------
-code-review Review a diff for correctness and style...
-my-skill    One-line description.
-broken      [invalid] missing SKILL.md
+NAME         DESCRIPTION
+-----------  ------------------------------------------------------------
+code-review  Review a diff for correctness and style, flagging risky
+             changes before they reach main...
+my-skill     One-line description.
+broken       [invalid] missing SKILL.md
 ```
 
-- 固定 60 字符上限，不做终端宽度探测，保证脚本输出稳定。
+- 固定 60 **显示列**上限，不做终端宽度探测，保证脚本输出稳定（Q34）。
+- 续行用空格补齐到描述列起点，不顶到第 0 列。
 - name 列宽取 `max(10, 最长名称字符数)`，分隔线随列宽生成。
 - 非法项标记 `[invalid]`，不中断整体输出。
 

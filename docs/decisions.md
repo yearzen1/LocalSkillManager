@@ -35,6 +35,8 @@
 | Q32 | 升级的网络与资产契约 | 查询 `https://api.github.com/repos/yearzen1/LocalSkillManager/releases/latest`；`LSM_UPGRADE_API` 覆盖端点（镜像与测试）；资产名 `lsm-<os>-<arch>[.exe]` 是唯一查找键；tag 必须是 `vMAJOR.MINOR.PATCH`；不读 `GITHUB_TOKEN`，限流给可操作提示 |
 | Q33 | CLI 真源与文档同步 | 命令与参数的唯一真源是 `impl/cli.md` §2.1 的状态表（`implemented` / `planned`）；改动顺序固定为「先真源状态列 → 再 `cli/spec.rs`/`domain/action.rs` → 最后两份 README」；两份 README 只描述 `implemented` 命令；`tests/cli.rs::cli_reference_table_matches_binary` 强制状态列与二进制一致（`planned` 必须仍是未知子命令、退出 2） |
 
+| Q34 | list 文本列宽 | 描述列固定 60 **显示列**（宽字符占 2 列），不探测终端宽度；超宽换行并悬挂缩进对齐描述列；最多 3 行，第 3 行末尾补 `...`；宽字符不跨行拆开；`--json` 原样输出，不换行、不截断 |
+
 ## 维护规则
 
 1. 新决策追加到表尾，编号连续，不复用旧编号。
