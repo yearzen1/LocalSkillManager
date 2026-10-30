@@ -187,21 +187,84 @@ mod tests {
     }
 
     #[test]
-    fn truncates_long_description_to_sixty_characters() {
-        let long = "a".repeat(DESCRIPTION_LIMIT + 10);
-        let text = render_text(Lang::En, &[entry("my-skill", &long)]);
+    fn wraps_wide_characters_at_sixty_display_columns() {
+        let text = render_text(Lang::En, &[entry("my-skill", &"干".repeat(45))]);
+        let lines: Vec<&str> = text.lines().collect();
 
-        assert!(text.contains(&format!("{}...", "a".repeat(DESCRIPTION_LIMIT))));
-        assert!(!text.contains(&"a".repeat(DESCRIPTION_LIMIT + 1)));
+        // 45 个宽字符 = 90 列 → 60 列 + 30 列，共两行
+        assert_eq!(lines.len(), 4);
+        assert!(lines[2].ends_with(&"干".repeat(30)));
+        assert_eq!(lines[3].trim_start(), "干".repeat(15));
     }
 
     #[test]
-    fn keeps_exactly_sixty_characters_without_ellipsis() {
-        let exact = "b".repeat(DESCRIPTION_LIMIT);
+    fn continuation_lines_align_with_description_column() {
+        let text = render_text(Lang::Zh, &[entry("my-skill", &"干".repeat(60))]);
+        let lines: Vec<&str> = text.lines().collect();
+
+        let indent = " ".repeat(12);
+        assert_eq!(lines.len(), 4);
+        assert!(lines[3].starts_with(&indent));
+        assert_eq!(&lines[3][indent.len()..], "干".repeat(30));
+    }
+
+    #[test]
+    fn never_exceeds_sixty_display_columns() {
+        let description = format!("{} {}", "word ".repeat(40), "干".repeat(40));
+        let text = render_text(Lang::En, &[entry("my-skill", &description)]);
+
+        for row in description_rows(&text) {
+            assert!(display_width(&row) <= 60, "row over 60 columns: {row:?}");
+        }
+    }
+
+    #[test]
+    fn caps_long_description_at_three_lines() {
+        let text = render_text(Lang::En, &[entry("my-skill", &"a".repeat(1024))]);
+        let lines: Vec<&str> = text.lines().collect();
+
+        assert_eq!(lines.len(), 5);
+        assert!(lines[4].trim_start().ends_with("..."));
+        assert_eq!(display_width(lines[4].trim_start()), 60);
+    }
+
+    #[test]
+    fn keeps_exactly_sixty_columns_without_ellipsis() {
+        let exact = "b".repeat(60);
         let text = render_text(Lang::En, &[entry("my-skill", &exact)]);
 
+        assert_eq!(text.lines().count(), 3);
         assert!(text.contains(&exact));
         assert!(!text.contains("..."));
+    }
+
+    #[test]
+    fn wraps_ascii_at_word_boundaries() {
+        let words: Vec<String> = (0..20).map(|index| format!("word{index:02}")).collect();
+        let text = render_text(Lang::En, &[entry("my-skill", &words.join(" "))]);
+
+        let rows = description_rows(&text);
+        let wrapped: Vec<&str> = rows.iter().flat_map(|row| row.split_whitespace()).collect();
+        assert_eq!(wrapped, words);
+    }
+
+    /// 取出每一行描述列的内容：name 列宽固定 `max(10, 8)`，描述列从第 12 列开始。
+    fn description_rows(text: &str) -> Vec<String> {
+        text.lines()
+            .skip(2)
+            .map(|line| line.chars().skip(12).collect::<String>())
+            .collect()
+    }
+
+    #[test]
+    fn wraps_long_invalid_error_instead_of_overflowing() {
+        let text = render_text(Lang::En, &[invalid("broken", &"x".repeat(80))]);
+        let rows = description_rows(&text);
+
+        assert_eq!(
+            rows,
+            vec!["[invalid]".to_string(), "x".repeat(60), "x".repeat(20)]
+        );
     }
 
     #[test]

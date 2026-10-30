@@ -587,7 +587,7 @@ fn list_marks_name_mismatch() {
 }
 
 #[test]
-fn list_sorts_by_name_and_truncates_long_descriptions() {
+fn list_sorts_by_name_and_wraps_long_descriptions() {
     let home = home_dir();
     let skills = home.path().join("skills");
     write_skill_md(&skills.join("zeta/SKILL.md"), "zeta", &"z".repeat(70));
@@ -606,7 +606,9 @@ fn list_sorts_by_name_and_truncates_long_descriptions() {
     let alpha_at = text.find("alpha").unwrap();
     let zeta_at = text.find("zeta").unwrap();
     assert!(alpha_at < zeta_at, "entries must be sorted by name");
-    assert!(text.contains(&format!("{}...", "z".repeat(60))));
+    // 60 列换行后剩 10 个 z，续行从描述列（10 + 2）开始，不顶到第 0 列
+    assert!(text.contains(&"z".repeat(60)));
+    assert!(text.contains(&format!("            {}", "z".repeat(10))));
     assert!(!text.contains(&"z".repeat(61)));
 }
 
