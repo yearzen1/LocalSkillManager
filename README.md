@@ -106,14 +106,15 @@ Short forms (separate arguments only — `-lg` is not supported):
 ### list
 
 ```
-NAME        DESCRIPTION
-----------  ------------------------------------------
-code-review Reviews a diff for correctness and style...
-my-skill    One-line description.
-broken      [invalid] missing SKILL.md
+NAME         DESCRIPTION
+-----------  ------------------------------------------------------------
+code-review  Review a diff for correctness and style, flagging risky
+             changes before they reach main...
+my-skill     One-line description.
+broken       [invalid] missing SKILL.md
 ```
 
-- descriptions are collapsed to one line and truncated to 60 characters with `...`;
+- descriptions are collapsed to one line, wrapped at 60 display columns (wide CJK characters count as two), and continuation lines are indented to the description column — at most 3 lines, the third ending with `...`;
 - invalid skill directories are marked `[invalid]` and never abort the listing;
 - `--json` prints a single JSON array (pretty-printed, `[]` when empty) with `name`, `description`, `path`, `valid`, and `error` for invalid entries. Warnings never go to stdout.
 

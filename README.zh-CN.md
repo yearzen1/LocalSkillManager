@@ -106,14 +106,14 @@ lsm --lang <en|zh> <command> ...
 ### list
 
 ```
-名称        描述
-----------  ------------------------------------------
-code-review 审查 diff 的正确性与风格...
-my-skill    一句话说明。
-broken      [invalid] missing SKILL.md
+名称         描述
+-----------  ------------------------------------------------------------
+code-review  审查 diff 的正确性与风格，标出合并前需要确认的风险...
+my-skill     一句话说明。
+broken       [invalid] missing SKILL.md
 ```
 
-- description 会压成单行并截断到 60 个字符，超出补 `...`；
+- description 会压成单行，按 60 个显示列换行（宽字符按 2 列计），续行悬挂缩进到描述列；最多 3 行，第 3 行末尾补 `...`；
 - 非法 skill 目录标记 `[invalid]`，不会中断整体输出；
 - `--json` 输出单个 JSON 数组（2 空格缩进，空目录为 `[]`），含 `name`、`description`、`path`、`valid`，非法项额外带 `error`；warning 永远不会写进 stdout。
 

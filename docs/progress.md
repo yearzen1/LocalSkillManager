@@ -49,7 +49,7 @@
 - **完成标准**：`cargo test` 全绿；`lsm list project` 里 `intent-lock` 的续行从描述列开始，每行 ≤ 60 列
 - **提交信息**：`docs: decide list text wrapping`、`test(list): pin list wrapping behavior`、`feat(list): wrap descriptions with hanging indent`、`docs: document list wrapping`
 - **卡住时**：中英混排仍对不齐就以 `display_width` 为准修换行算法，不改列宽常量
-- [ ] 完成
+- [x] 完成
 
 #### Day 2 · 2026-11-03（周二）· 决策先行，钉住 v0.2.0 范围
 
@@ -204,6 +204,7 @@
 | 天 | 日期 | 完成 | 实际用时 | 备注（卡点/顺延原因） |
 |---|---|---|---|---|
 | D1 | 2026-11-02 | ☑ | | 偏差：hint + 测试隔离已合成 `dd005ea` 并推送，按"不改写已发布历史"处理；另以 `5b1563c` 跟踪 `.agents/`、忽略 `TODO.md` |
+| D1.5 | 2026-10-30 | ☑ | | 提前完成：列表描述列改按显示列换行（Q34），占掉原 Q34，D2 顺延为 Q35/Q36 |
 | D2 | 2026-11-03 | ☐ | | |
 | D3 | 2026-11-04 | ☐ | | |
 | D4 | 2026-11-05 | ☐ | | |
