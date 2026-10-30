@@ -6,13 +6,19 @@ use crate::domain::entry::SkillEntry;
 use crate::domain::lang::Lang;
 use crate::i18n::{tr, MsgKey};
 
-/// description 在文本表格里的字符上限。
-const DESCRIPTION_LIMIT: usize = 60;
+/// description 列在终端里占的显示列数（宽字符按 2 列计）。
+const DESCRIPTION_WIDTH: usize = 60;
+
+/// description 换行后的最大行数，超出在第 3 行末尾以省略号收尾。
+const MAX_LINES: usize = 3;
+
+/// 截断标记。
+const ELLIPSIS: &str = "...";
 
 /// 非法项的固定标记。
 const INVALID_MARKER: &str = "[invalid]";
 
-/// 渲染文本表格。description 压成单行并截断，非法项标 `[invalid]`。
+/// 渲染文本表格。description 压成单行后按 60 显示列换行，续行悬挂缩进到描述列。
 pub fn render_text(lang: Lang, entries: &[SkillEntry]) -> String {
     let name_width = entries
         .iter()
@@ -29,16 +35,20 @@ pub fn render_text(lang: Lang, entries: &[SkillEntry]) -> String {
     ));
     text.push_str(&format!("{}  {}\n", "-".repeat(name_width), "-".repeat(42)));
 
+    let indent = " ".repeat(name_width + 2);
     for entry in entries {
         let description = match &entry.error {
             Some(error) => format!("{INVALID_MARKER} {error}"),
-            None => summarize(&entry.description),
+            None => entry.description.clone(),
         };
-        text.push_str(&format!(
-            "{}  {}\n",
-            pad_to(&entry.name, name_width),
-            description
-        ));
+
+        for (index, line) in wrap(&description).into_iter().enumerate() {
+            if index == 0 {
+                text.push_str(&format!("{}  {line}\n", pad_to(&entry.name, name_width)));
+            } else {
+                text.push_str(&format!("{indent}{line}\n"));
+            }
+        }
     }
 
     text
@@ -95,17 +105,87 @@ pub fn render_json(entries: &[SkillEntry]) -> String {
     serde_json::to_string_pretty(&rows).expect("serializing plain skill entries cannot fail")
 }
 
-/// 文本列：压成单行、按字符截断到 [`DESCRIPTION_LIMIT`]，超出加 `...`。
-fn summarize(description: &str) -> String {
+/// 把 description 排成不超过 [`DESCRIPTION_WIDTH`] 显示列的若干行，最多 [`MAX_LINES`] 行。
+///
+/// 先压成单空格分隔的 token 流；英文单词整体换行，单个 token 本身超宽时按列硬切，
+/// 保证宽字符不会被劈成半格。
+fn wrap(description: &str) -> Vec<String> {
     let collapsed = description.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut characters = collapsed.chars();
-
-    let truncated: String = characters.by_ref().take(DESCRIPTION_LIMIT).collect();
-    if characters.next().is_some() {
-        format!("{truncated}...")
-    } else {
-        truncated
+    if collapsed.is_empty() {
+        return vec![String::new()];
     }
+
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+
+    for token in collapsed.split(' ') {
+        for chunk in split_by_width(token) {
+            if current.is_empty() {
+                current.push_str(&chunk);
+            } else if display_width(&current) + 1 + display_width(&chunk) <= DESCRIPTION_WIDTH {
+                current.push(' ');
+                current.push_str(&chunk);
+            } else {
+                lines.push(std::mem::take(&mut current));
+                current.push_str(&chunk);
+            }
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+
+    if lines.len() > MAX_LINES {
+        lines.truncate(MAX_LINES);
+        let last = lines.pop().expect("MAX_LINES is greater than zero");
+        let kept = truncate_to_width(&last, DESCRIPTION_WIDTH - ELLIPSIS.len());
+        lines.push(format!("{kept}{ELLIPSIS}"));
+    }
+
+    lines
+}
+
+/// 把超宽 token 按显示列切成若干块；宽字符独占整列，不跨行拆开。
+fn split_by_width(token: &str) -> Vec<String> {
+    if display_width(token) <= DESCRIPTION_WIDTH {
+        return vec![token.to_string()];
+    }
+
+    let mut chunks: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut width = 0;
+
+    for character in token.chars() {
+        let character_width = if is_wide(character) { 2 } else { 1 };
+        if width + character_width > DESCRIPTION_WIDTH {
+            chunks.push(std::mem::take(&mut current));
+            width = 0;
+        }
+        current.push(character);
+        width += character_width;
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+
+    chunks
+}
+
+/// 按显示宽度截断，保证不把一个字符留在半格上。
+fn truncate_to_width(text: &str, width: usize) -> String {
+    let mut kept = String::new();
+    let mut used = 0;
+
+    for character in text.chars() {
+        let character_width = if is_wide(character) { 2 } else { 1 };
+        if used + character_width > width {
+            break;
+        }
+        kept.push(character);
+        used += character_width;
+    }
+
+    kept
 }
 
 #[derive(serde::Serialize)]
@@ -300,7 +380,7 @@ mod tests {
 
     #[test]
     fn json_keeps_full_description() {
-        let long = "a".repeat(DESCRIPTION_LIMIT + 10);
+        let long = "a".repeat(DESCRIPTION_WIDTH + 10);
         let json = render_json(&[entry("my-skill", &long)]);
 
         assert!(json.contains(&long));
