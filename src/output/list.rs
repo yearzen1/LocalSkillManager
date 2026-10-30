@@ -107,32 +107,53 @@ pub fn render_json(entries: &[SkillEntry]) -> String {
 
 /// 把 description 排成不超过 [`DESCRIPTION_WIDTH`] 显示列的若干行，最多 [`MAX_LINES`] 行。
 ///
-/// 先压成单空格分隔的 token 流；英文单词整体换行，单个 token 本身超宽时按列硬切，
-/// 保证宽字符不会被劈成半格。
+/// 先压成单空格分隔的 token 流；空格后的词放得下一整行就在空格处断行，
+/// 超长 token（如无空格的中文）按列宽硬断把行填满，宽字符不会被劈成半格。
 fn wrap(description: &str) -> Vec<String> {
     let collapsed = description.split_whitespace().collect::<Vec<_>>().join(" ");
     if collapsed.is_empty() {
         return vec![String::new()];
     }
 
+    let characters: Vec<char> = collapsed.chars().collect();
     let mut lines: Vec<String> = Vec::new();
-    let mut current = String::new();
+    let mut start = 0;
 
-    for token in collapsed.split(' ') {
-        for chunk in split_by_width(token) {
-            if current.is_empty() {
-                current.push_str(&chunk);
-            } else if display_width(&current) + 1 + display_width(&chunk) <= DESCRIPTION_WIDTH {
-                current.push(' ');
-                current.push_str(&chunk);
-            } else {
-                lines.push(std::mem::take(&mut current));
-                current.push_str(&chunk);
+    while start < characters.len() {
+        let mut width = 0;
+        let mut end = start;
+        let mut last_space = None;
+
+        while end < characters.len() {
+            let character_width = character_width(characters[end]);
+            if width + character_width > DESCRIPTION_WIDTH {
+                break;
+            }
+            if characters[end] == ' ' {
+                last_space = Some(end);
+            }
+            width += character_width;
+            end += 1;
+        }
+
+        // 空格后那个词自己放得下一整行时才在空格处断，避免劈开单词；
+        // 否则（超长 token，如整段中文）按列宽硬断，把当前行填满。
+        if end < characters.len() {
+            if let Some(space) = last_space.filter(|space| *space > start) {
+                if word_width(&characters, space + 1) <= DESCRIPTION_WIDTH {
+                    end = space;
+                }
             }
         }
-    }
-    if !current.is_empty() {
-        lines.push(current);
+        if end == start {
+            end = start + 1;
+        }
+
+        lines.push(characters[start..end].iter().collect());
+        start = end;
+        while start < characters.len() && characters[start] == ' ' {
+            start += 1;
+        }
     }
 
     if lines.len() > MAX_LINES {
@@ -145,30 +166,22 @@ fn wrap(description: &str) -> Vec<String> {
     lines
 }
 
-/// 把超宽 token 按显示列切成若干块；宽字符独占整列，不跨行拆开。
-fn split_by_width(token: &str) -> Vec<String> {
-    if display_width(token) <= DESCRIPTION_WIDTH {
-        return vec![token.to_string()];
-    }
+/// 从 `start` 起那个空格分隔 token 的显示宽度。
+fn word_width(characters: &[char], start: usize) -> usize {
+    characters[start..]
+        .iter()
+        .take_while(|character| **character != ' ')
+        .map(|character| character_width(*character))
+        .sum()
+}
 
-    let mut chunks: Vec<String> = Vec::new();
-    let mut current = String::new();
-    let mut width = 0;
-
-    for character in token.chars() {
-        let character_width = if is_wide(character) { 2 } else { 1 };
-        if width + character_width > DESCRIPTION_WIDTH {
-            chunks.push(std::mem::take(&mut current));
-            width = 0;
-        }
-        current.push(character);
-        width += character_width;
+/// 单个字符占的显示列数：宽字符（CJK、全角标点等）占两列。
+fn character_width(character: char) -> usize {
+    if is_wide(character) {
+        2
+    } else {
+        1
     }
-    if !current.is_empty() {
-        chunks.push(current);
-    }
-
-    chunks
 }
 
 /// 按显示宽度截断，保证不把一个字符留在半格上。
@@ -177,7 +190,7 @@ fn truncate_to_width(text: &str, width: usize) -> String {
     let mut used = 0;
 
     for character in text.chars() {
-        let character_width = if is_wide(character) { 2 } else { 1 };
+        let character_width = character_width(character);
         if used + character_width > width {
             break;
         }
@@ -338,8 +351,8 @@ mod tests {
         assert_eq!(
             rows,
             vec![
-                "审查 diff 的正确性与风格，标出合并前需要确认的风险点，并给".to_string(),
-                "出具体修改建议。".to_string(),
+                "审查 diff 的正确性与风格，标出合并前需要确认的风险点，并给出".to_string(),
+                "具体修改建议。".to_string(),
             ]
         );
     }
