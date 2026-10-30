@@ -966,3 +966,175 @@ fn cli_reference_table_matches_binary() {
         "no planned rows parsed; unimplemented commands must be marked planned"
     );
 }
+
+/// 解析 §2.1 的选项表，返回 (命令或 `全局`, 选项单元格)。
+fn cli_option_rows() -> Vec<(String, String)> {
+    let mut rows = Vec::new();
+    let mut in_table = false;
+
+    for line in CLI_REFERENCE.lines() {
+        let trimmed = line.trim();
+
+        if !in_table {
+            in_table = trimmed.starts_with("| 命令") && trimmed.contains("选项");
+            continue;
+        }
+
+        if !trimmed.starts_with('|') {
+            break;
+        }
+
+        let cells: Vec<&str> = trimmed.split('|').map(str::trim).collect();
+        if cells.len() < 4 || cells[1].starts_with("---") {
+            continue;
+        }
+
+        rows.push((cells[1].trim_matches('`').to_string(), cells[2].to_string()));
+    }
+
+    rows
+}
+
+/// 把选项单元格里的长选项抽出来：`` `-h`, `--help` `` → `--help`。
+fn long_options(cell: &str) -> Vec<String> {
+    cell.split_whitespace()
+        .map(|token| token.trim_matches(|character| character == '`' || character == ','))
+        .filter(|token| token.starts_with("--"))
+        .map(str::to_string)
+        .collect()
+}
+
+/// 从 help 的 `Options:` 段抓出所有长选项（默认语言是英文）。
+fn help_long_options(help: &str) -> Vec<String> {
+    let mut options = Vec::new();
+    let mut in_options = false;
+
+    for line in help.lines() {
+        if line.trim() == "Options:" {
+            in_options = true;
+            continue;
+        }
+        if !in_options {
+            continue;
+        }
+        if !line.starts_with(' ') {
+            break;
+        }
+        for token in line.split_whitespace() {
+            let token = token.trim_end_matches(',');
+            if token.starts_with("--") {
+                options.push(token.to_string());
+            }
+        }
+    }
+
+    options
+}
+
+/// 跑 `<command> --help`（`None` 为根命令）并返回 stdout。
+fn help_of(command: Option<&str>) -> String {
+    let mut cmd = lsm();
+    if let Some(command) = command {
+        cmd.args(command.split_whitespace());
+    }
+    let output = cmd.arg("--help").output().expect("running lsm --help");
+
+    assert!(output.status.success(), "`--help` failed for {command:?}");
+    String::from_utf8(output.stdout).expect("help output is utf-8")
+}
+
+/// 选项表必须与二进制一致：文档写了什么，`--help` 就得有什么；反之亦然。
+#[test]
+fn cli_option_table_matches_help() {
+    let rows = cli_option_rows();
+    assert!(
+        rows.len() >= 5,
+        "failed to parse the option table in docs/impl/cli.md: {rows:?}"
+    );
+
+    let global: Vec<String> = rows
+        .iter()
+        .filter(|(command, _)| command == "全局")
+        .flat_map(|(_, cell)| long_options(cell))
+        .collect();
+    assert!(!global.is_empty(), "option table has no 全局 rows");
+
+    // `根命令` 的行只对 `lsm ...` 本身生效（如 `-V/--version`）。
+    let root_only: Vec<String> = rows
+        .iter()
+        .filter(|(command, _)| command == "根命令")
+        .flat_map(|(_, cell)| long_options(cell))
+        .collect();
+    let documented_root: Vec<String> = global.iter().cloned().chain(root_only).collect();
+
+    let root_help = help_of(None);
+    for option in &documented_root {
+        assert!(
+            root_help.contains(option.as_str()),
+            "`{option}` is documented for the root command but missing from `lsm --help`"
+        );
+    }
+    let root_options = help_long_options(&root_help);
+    assert!(
+        root_options.iter().any(|option| option == "--help"),
+        "failed to parse options from `lsm --help`: {root_help:?}"
+    );
+    for option in root_options {
+        assert!(
+            documented_root.contains(&option),
+            "`lsm --help` exposes `{option}` but the option table does not document it"
+        );
+    }
+
+    let reference = cli_reference_rows();
+    let known: Vec<String> = reference
+        .iter()
+        .map(|(command, _)| command.clone())
+        .collect();
+    let implemented: Vec<String> = reference
+        .into_iter()
+        .filter(|(_, status)| status == "implemented")
+        .map(|(command, _)| command)
+        .collect();
+
+    // 表里出现的命令名必须是 `全局`、`根命令` 或命令表中的命令，拼错会静默错过检查。
+    for (command, _) in &rows {
+        assert!(
+            command == "全局" || command == "根命令" || known.contains(command),
+            "option table mentions unknown command `{command}`"
+        );
+    }
+
+    // 按命令遍历而不是按表行遍历：漏写整行（如 `list` 一个选项都没写）也要能红。
+    for command in &implemented {
+        let documented: Vec<String> = global
+            .iter()
+            .cloned()
+            .chain(
+                rows.iter()
+                    .filter(|(row_command, _)| row_command == command)
+                    .flat_map(|(_, cell)| long_options(cell)),
+            )
+            .collect();
+
+        let help = help_of(Some(command));
+        let help_options = help_long_options(&help);
+        assert!(
+            help_options.iter().any(|option| option == "--help"),
+            "failed to parse options from `{command} --help`: {help:?}"
+        );
+
+        for option in &documented {
+            assert!(
+                help.contains(option.as_str()),
+                "`{command} {option}` is documented but missing from `{command} --help`"
+            );
+        }
+        for option in help_options {
+            assert!(
+                documented.contains(&option),
+                "`{command} --help` exposes `{option}` but the option table does not document it"
+            );
+        }
+    }
+}
