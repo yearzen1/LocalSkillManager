@@ -107,11 +107,11 @@ Short forms (separate arguments only — `-lg` is not supported):
 
 ```
 NAME         DESCRIPTION
------------  ------------------------------------------------------------
-code-review  Review a diff for correctness and style, flagging risky
-             changes before they reach main...
-my-skill     One-line description.
+-----------  ------------------------------------------
 broken       [invalid] missing SKILL.md
+code-review  Review a diff for correctness and style, flagging risky
+             changes before they reach main.
+my-skill     One-line description.
 ```
 
 - descriptions are collapsed to one line, wrapped at 60 display columns (wide CJK characters count as two), and continuation lines are indented to the description column — at most 3 lines, the third ending with `...`;

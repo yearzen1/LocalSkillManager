@@ -154,6 +154,7 @@ pub enum FrontmatterError {
 - 文本输出前把 description 的 `\r`、`\n`、连续空白压成单个空格。
 - 按**显示列**排版：描述列宽 60 列（CJK 等宽字符占 2 列），超出换行（Q34）。
 - 换行后悬挂缩进，续行起点与首行描述列对齐；最多 3 行，超出部分在第 3 行末尾以 `...` 截断。
+- 断行规则：空格后的词放得下一整行就在空格处断，避免劈开英文单词；放不下（如整段无空格的中文）就按列宽硬断，把当前行填满。
 - 不探测终端宽度，固定 60 列，保证脚本输出稳定。
 - JSON 输出返回原始 description（由 JSON 自行转义），不换行、不截断。
 
@@ -223,15 +224,16 @@ lsm list <scope> [--json]
 
 ```
 NAME         DESCRIPTION
------------  ------------------------------------------------------------
-code-review  Review a diff for correctness and style, flagging risky
-             changes before they reach main...
-my-skill     One-line description.
+-----------  ------------------------------------------
 broken       [invalid] missing SKILL.md
+code-review  Review a diff for correctness and style, flagging risky
+             changes before they reach main.
+my-skill     One-line description.
 ```
 
 - 固定 60 **显示列**上限，不做终端宽度探测，保证脚本输出稳定（Q34）。
 - 续行用空格补齐到描述列起点，不顶到第 0 列。
+- 空格后的词放得下一整行时在空格处断行；放不下（如整段无空格的中文）则按列宽硬断填满当前行。
 - name 列宽取 `max(10, 最长名称字符数)`，分隔线随列宽生成。
 - 非法项标记 `[invalid]`，不中断整体输出。
 
