@@ -37,6 +37,9 @@
 
 | Q34 | list 文本列宽 | 描述列固定 60 **显示列**（宽字符占 2 列），不探测终端宽度；超宽换行并悬挂缩进对齐描述列；最多 3 行，第 3 行末尾补 `...`；宽字符不跨行拆开；`--json` 原样输出，不换行、不截断 |
 
+| Q35 | 显示宽度来源 | 列宽改用 `unicode-width`（`default-features = false`，只用 `width()` 不用 `width_cjk()`）：Ambiguous 字符按 1 列，与 Windows Terminal / VS Code 默认渲染一致；测量以整串为单位，ZWJ emoji 序列与组合标记按序列总宽计算；换行与截断的断点仍在 `char` 边界，不引 `unicode-segmentation`，极端序列可能被拆成两段（各按 2 列计，不超 60）；非空白的控制字符在排版前丢弃 |
+| Q36 | upgrade 的 HTTP 客户端 | 用 `ureq` 3（`default-features = false, features = ["rustls"]`）：rustls + ring + 内置 webpki 根证书，无 gzip、无 async 运行时；`max_redirects` 用库默认的 10；元数据与资产各配一个 `timeout_global`（30 秒 / 5 分钟）；403 走 `http_status_as_error` 映射为限流提示；根证书不随系统更新，靠升级 ureq 版本刷新，内网 MITM 场景用 `LSM_UPGRADE_API` 镜像兜底；依赖在 `upgrade` 切片实现时再加 |
+
 ## 维护规则
 
 1. 新决策追加到表尾，编号连续，不复用旧编号。

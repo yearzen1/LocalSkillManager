@@ -85,6 +85,7 @@ lsm upgrade [--check] [--force]
 - 超时：元数据请求 30 秒；资产下载 5 分钟。超时按网络失败处理，不重试。
 - 不读 `GITHUB_TOKEN`、不支持 `--token`、不做代理参数；HTTP 403 按限流处理，提示稍后重试或手动下载。
 - 网络实现只在 `infra::net`：`commands` 不直接调用 HTTP 客户端，`cli` 不访问网络。
+- HTTP 客户端固定为 `ureq` 3（`default-features = false, features = ["rustls"]`）：阻塞式、无 async 运行时，rustls + ring + 内置 webpki 根证书；`max_redirects` 用库默认的 10，不额外配置；元数据与资产各用一个 Agent，`timeout_global` 分别为 30 秒与 5 分钟；403 由 `http_status_as_error` 直接映射为限流提示；资产用 `body.as_reader()` 流式写盘，不整包读进内存。根证书是内置列表、不随系统更新，靠升级 ureq 版本刷新；内网 MITM 代理场景用 `LSM_UPGRADE_API` 镜像兜底（Q36）。
 - 默认端点必须走 HTTPS；`LSM_UPGRADE_API` 显式写成 `http://` 时按用户选择执行（测试桩、内网镜像）。除 TLS 之外不做额外来源校验。
 
 ## 4. 下载与校验
