@@ -328,6 +328,22 @@ mod tests {
         assert_eq!(wrapped, words);
     }
 
+    #[test]
+    fn fills_lines_instead_of_chunking_wide_runs() {
+        let description =
+            "审查 diff 的正确性与风格，标出合并前需要确认的风险点，并给出具体修改建议。";
+        let text = render_text(Lang::Zh, &[entry("my-skill", description)]);
+        let rows = description_rows(&text);
+
+        assert_eq!(
+            rows,
+            vec![
+                "审查 diff 的正确性与风格，标出合并前需要确认的风险点，并给".to_string(),
+                "出具体修改建议。".to_string(),
+            ]
+        );
+    }
+
     /// 取出每一行描述列的内容：name 列宽固定 `max(10, 8)`，描述列从第 12 列开始。
     fn description_rows(text: &str) -> Vec<String> {
         text.lines()
@@ -343,7 +359,7 @@ mod tests {
 
         assert_eq!(
             rows,
-            vec!["[invalid]".to_string(), "x".repeat(60), "x".repeat(20)]
+            vec![format!("[invalid] {}", "x".repeat(50)), "x".repeat(30)]
         );
     }
 
