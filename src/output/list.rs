@@ -415,4 +415,34 @@ mod tests {
         assert!(json.contains(&long));
         assert!(!json.contains("..."));
     }
+
+    #[test]
+    fn counts_zwj_emoji_sequence_as_two_columns() {
+        // 家庭 emoji 由三个表情与两个零宽连接符组成，整串只占两列。
+        assert_eq!(display_width("👨‍👩‍👧"), 2);
+    }
+
+    #[test]
+    fn counts_combining_mark_as_zero_columns() {
+        // e + 组合重音是一个字素，占一列。
+        assert_eq!(display_width("e\u{0301}"), 1);
+    }
+
+    #[test]
+    fn wraps_zwj_emoji_sequences_by_display_columns() {
+        let family = "👨‍👩‍👧";
+        let text = render_text(Lang::En, &[entry("my-skill", &family.repeat(31))]);
+        let rows = description_rows(&text);
+
+        // 每个家庭占两列，60 列正好放 30 个，剩一个另起一行。
+        assert_eq!(rows, vec![family.repeat(30), family.to_string()]);
+    }
+
+    #[test]
+    fn strips_control_characters_from_description() {
+        let text = render_text(Lang::En, &[entry("my-skill", "safe\u{1b}[31mred")]);
+
+        assert!(!text.contains('\u{1b}'), "escape byte leaked: {text:?}");
+        assert!(text.contains("safe[31mred"));
+    }
 }
