@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use unicode_width::{char_iter_width, UnicodeWidthStr};
+
 use crate::domain::entry::SkillEntry;
 use crate::domain::lang::Lang;
 use crate::i18n::{tr, MsgKey};
@@ -63,26 +65,11 @@ fn pad_to(text: &str, width: usize) -> String {
     padded
 }
 
-/// 终端显示宽度：宽字符（CJK、全角标点等）占两列。
+/// 终端显示宽度：按 UAX #11 计算，宽字符占两列。
+///
+/// 以整串为单位计算，`str::width` 才能把 ZWJ emoji 序列、组合标记合成一个整体。
 fn display_width(text: &str) -> usize {
-    text.chars()
-        .map(|character| if is_wide(character) { 2 } else { 1 })
-        .sum()
-}
-
-fn is_wide(character: char) -> bool {
-    matches!(
-        character as u32,
-        0x1100..=0x115F
-            | 0x2E80..=0xA4CF
-            | 0xAC00..=0xD7A3
-            | 0xF900..=0xFAFF
-            | 0xFE30..=0xFE4F
-            | 0xFF00..=0xFF60
-            | 0xFFE0..=0xFFE6
-            | 0x1F300..=0x1F64F
-            | 0x20000..=0x3FFFD
-    )
+    text.width()
 }
 
 /// 渲染 JSON 数组；空列表输出 `[]`。
@@ -110,7 +97,13 @@ pub fn render_json(entries: &[SkillEntry]) -> String {
 /// 先压成单空格分隔的 token 流；空格后的词放得下一整行就在空格处断行，
 /// 超长 token（如无空格的中文）按列宽硬断把行填满，宽字符不会被劈成半格。
 fn wrap(description: &str) -> Vec<String> {
-    let collapsed = description.split_whitespace().collect::<Vec<_>>().join(" ");
+    // 控制字符不是可显示内容：换行、制表等空白留给 `split_whitespace` 归一化，
+    // 其余（如 ESC）直接丢掉，避免不可见字符把行宽算成 0 并注入终端转义。
+    let cleaned: String = description
+        .chars()
+        .filter(|character| !character.is_control() || character.is_whitespace())
+        .collect();
+    let collapsed = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
     if collapsed.is_empty() {
         return vec![String::new()];
     }
@@ -120,19 +113,16 @@ fn wrap(description: &str) -> Vec<String> {
     let mut start = 0;
 
     while start < characters.len() {
-        let mut width = 0;
         let mut end = start;
         let mut last_space = None;
 
         while end < characters.len() {
-            let character_width = character_width(characters[end]);
-            if width + character_width > DESCRIPTION_WIDTH {
+            if sequence_width(&characters[start..=end]) > DESCRIPTION_WIDTH {
                 break;
             }
             if characters[end] == ' ' {
                 last_space = Some(end);
             }
-            width += character_width;
             end += 1;
         }
 
@@ -140,7 +130,7 @@ fn wrap(description: &str) -> Vec<String> {
         // 否则（超长 token，如整段中文）按列宽硬断，把当前行填满。
         if end < characters.len() {
             if let Some(space) = last_space.filter(|space| *space > start) {
-                if word_width(&characters, space + 1) <= DESCRIPTION_WIDTH {
+                if token_width(&characters, space + 1) <= DESCRIPTION_WIDTH {
                     end = space;
                 }
             }
@@ -167,38 +157,32 @@ fn wrap(description: &str) -> Vec<String> {
 }
 
 /// 从 `start` 起那个空格分隔 token 的显示宽度。
-fn word_width(characters: &[char], start: usize) -> usize {
-    characters[start..]
+fn token_width(characters: &[char], start: usize) -> usize {
+    let end = characters[start..]
         .iter()
-        .take_while(|character| **character != ' ')
-        .map(|character| character_width(*character))
-        .sum()
+        .position(|character| *character == ' ')
+        .map_or(characters.len(), |offset| start + offset);
+    sequence_width(&characters[start..end])
 }
 
-/// 单个字符占的显示列数：宽字符（CJK、全角标点等）占两列。
-fn character_width(character: char) -> usize {
-    if is_wide(character) {
-        2
-    } else {
-        1
-    }
+/// 一段连续字符的显示列数；ZWJ emoji 序列、组合标记按整串累计。
+fn sequence_width(characters: &[char]) -> usize {
+    char_iter_width(characters.iter().copied())
 }
 
 /// 按显示宽度截断，保证不把一个字符留在半格上。
 fn truncate_to_width(text: &str, width: usize) -> String {
-    let mut kept = String::new();
-    let mut used = 0;
+    let characters: Vec<char> = text.chars().collect();
+    let mut end = 0;
 
-    for character in text.chars() {
-        let character_width = character_width(character);
-        if used + character_width > width {
+    while end < characters.len() {
+        if sequence_width(&characters[..=end]) > width {
             break;
         }
-        kept.push(character);
-        used += character_width;
+        end += 1;
     }
 
-    kept
+    characters[..end].iter().collect()
 }
 
 #[derive(serde::Serialize)]
