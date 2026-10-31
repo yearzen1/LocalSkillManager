@@ -55,13 +55,14 @@
 
 - **目标**：按仓库"决策先行"规则，先把范围写进 `decisions.md`，后面不再为"要不要做"返工。
 - **步骤**
-  1. `docs/decisions.md` 表尾追加 Q35：v0.2.0 只含 `copy --all` 与 `remove`；`symlink`、反向 copy、`update` 检查仍为非目标
-  2. 追加 Q36：CI 矩阵、预编译产物、Linux/macOS 实测**延后，等真实 issue 触发再立计划**（当前交付以 Windows 实测为准）
+  1. `docs/decisions.md` 表尾追加 Q38：v0.2.0 只含 `copy --all` 与 `remove`；`symlink`、反向 copy、`update` 检查仍为非目标；已实现命令上的新选项不预写 `planned`
+  2. 追加 Q39：CI 矩阵、预编译产物、Linux/macOS 实测**延后，等真实 issue 触发再立计划**（当前交付以 Windows 实测为准）
   3. 同步 `docs/impl.md`「非目标」段与第 5 节约束表，只放摘要 + 链接
-- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q3[56] \|'` 命中 2 行；`docs/impl.md` 新增行能点回 `decisions.md`
-- **提交信息**：`docs: record v0.2.0 scope decisions`
-- **卡住时**：Q31 的措辞拿不准就写"暂不做，触发条件=有用户 issue 提出平台相关问题"，不写时间点
-- [ ] 完成
+  4. 修号：Q35–Q37 已被显示宽度、`ureq`、选项表占用，本卡与 D9 的编号顺延为 Q38–Q40
+- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q3[89] \|'` 命中 2 行；`docs/impl.md` 新增行能点回 `decisions.md`
+- **提交信息**：`docs: record v0.2.0 scope and renumber decisions`
+- **卡住时**：Q39 的措辞拿不准就写"暂不做，触发条件=有用户 issue 提出平台相关问题"，不写时间点
+- [x] 完成
 
 #### Day 3 · 2026-11-04（周三）· 手工验收写成脚本
 
@@ -141,10 +142,10 @@
 
 - **目标**：把"卸载"从非目标移出，并先用例钉住破坏性行为。
 - **步骤**
-  1. `docs/decisions.md` 追加 Q36：`remove <name> [global|project]` + `--force` 语义、原子删除方式
-  2. 改写 `docs/impl.md`「非目标」段，删掉"不做删除、卸载"
+  1. `docs/decisions.md` 追加 Q40：`remove <name> [global|project]` + `--force` 语义、原子删除方式
+  2. 确认 `docs/impl.md`「非目标」段已不含"不做删除、卸载"（D2 已删），只补 `remove` 的签名摘要
   3. `tests/cli.rs` 加三条用例：正常删除、不存在时报错退 1、`--force` 才删非空
-- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q36 \|'` 命中 1 行；三条新用例红
+- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q40 \|'` 命中 1 行；三条新用例红
 - **提交信息**：`docs: decide skill removal scope`
 - **卡住时**：`--force` 语义拿不准就取"无 `--force` 只删由 `add` 创建的合法 skill 目录（含 SKILL.md 且目录名与 name 一致）"，其余必须显式 `--force`
 - [ ] 完成
@@ -204,8 +205,8 @@
 | 天 | 日期 | 完成 | 实际用时 | 备注（卡点/顺延原因） |
 |---|---|---|---|---|
 | D1 | 2026-11-02 | ☑ | | 偏差：hint + 测试隔离已合成 `dd005ea` 并推送，按"不改写已发布历史"处理；另以 `5b1563c` 跟踪 `.agents/`、忽略 `TODO.md` |
-| D1.5 | 2026-10-30 | ☑ | | 提前完成：列表描述列改按显示列换行（Q34），占掉原 Q34，D2 顺延为 Q35/Q36 |
-| D2 | 2026-11-03 | ☐ | | |
+| D1.5 | 2026-10-30 | ☑ | | 提前完成：列表描述列改按显示列换行（Q34），占掉原 Q34，D2 顺延为 Q38/Q39（Q35–Q37 又被显示宽度、`ureq`、选项表占用） |
+| D2 | 2026-10-31 | ☑ | | 提前完成：Q38/Q39 落地，D9 顺延为 Q40；顺带修正 `impl.md` 的 Q1–Q40 索引、`anyhow` 选型描述与「非目标」段 |
 | D3 | 2026-11-04 | ☐ | | |
 | D4 | 2026-11-05 | ☐ | | |
 | D5 | 2026-11-06 | ☐ | | |
@@ -229,7 +230,7 @@
 
 ## 6. 明确不做
 
-- 不做 CI 矩阵、不做预编译产物、不做 Linux/macOS 实测：等真实 issue 触发再立计划（见 Q31）。
+- 不做 CI 矩阵、不做预编译产物、不做 Linux/macOS 实测：等真实 issue 触发再立计划（见 Q39）。
 - 不排缓冲日、不排机动日：13 天排满，掉队按"顺延不跳天"处理。
 - 不建 `CHANGELOG.md`，版本说明以 tag 为唯一事实来源。
 - 不做甘特图、不写精确到分钟的时间分配、不做完成率打分。

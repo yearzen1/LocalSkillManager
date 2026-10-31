@@ -1,8 +1,8 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.1.1 已实现（Windows 实测；Linux/macOS 未实测）；`upgrade` 规则已定、代码未实现
-> 最后更新：2026-10-29
+> 状态：v0.1.1 已实现（Windows 实测；Linux/macOS 未实测）；`upgrade` 规则已定、代码未实现；v0.2.0 目标为 `copy --all` + `remove`（Q38）
+> 最后更新：2026-10-31
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
 
@@ -16,7 +16,7 @@
 | [impl/quality.md](impl/quality.md) | 测试计划、README、许可证、发布 | 测试与交付 |
 | [impl/upgrade.md](impl/upgrade.md) | 自更新：命令、版本比较、下载校验、原地替换 | 实现或排查 upgrade |
 | [release.md](release.md) | Release 资产命名、tag 约定、发布与改名流程 | 发布与改资产名 |
-| [decisions.md](decisions.md) | Q1–Q32 决策记录 | 查决策依据 |
+| [decisions.md](decisions.md) | Q1–Q40 决策记录 | 查决策依据 |
 | [Requirements.md](Requirements.md) | 原始需求 | 对齐范围 |
 
 推荐阅读顺序：本文 → `storage.md` → `cli.md` → `config.md` → `quality.md` → `upgrade.md`。决策有疑问时查 `decisions.md`。
@@ -31,14 +31,15 @@
 2. `list`：列出指定作用域下已安装的 skill。
 3. `copy`：把全局 skill 复制到当前项目的 `.agents/skills/`。
 4. `upgrade`：从 GitHub Releases 取最新版本并原地替换 lsm 自身二进制，**不改变 exe 的路径与文件名**。
+5. `remove`（v0.2.0，planned）：卸载指定作用域下由 `add` 安装的 skill，未加 `--force` 时只删合法的 skill 目录。
 
-非目标（本期不做）：
+非目标（v0.2.0 不做）：
 
-- 不做 skill 的删除、卸载；不做自动/后台检查更新（`upgrade` 只在显式调用时联网）。
+- 不做自动/后台检查更新（`upgrade` 只在显式调用时联网）。
 - 不做符号链接（Windows 上不可靠），一律物理复制。
 - 不做从 project 反向复制到 global。
 - 不代理任何 agent 私有目录（如 `.claude/skills`），只维护 `.agents/skills` 这一份事实来源。
-- 不做 GitHub Actions 发布矩阵（第二阶段）。
+- 不做 GitHub Actions 发布矩阵、预编译产物与 Linux/macOS 实测（Q39）。
 
 ## 3. 技术选型
 
@@ -47,7 +48,7 @@
 | 语言 | Rust（edition 2021，当前 stable） | 单二进制、无运行时、三平台一致 |
 | 项目结构 | 单 crate + `lib.rs` + 分层模块 | 规模不需要 workspace，核心可复用、易测试 |
 | CLI 解析 | `clap` 4（builder API） | 需要按语言动态生成 help，derive 无法满足 |
-| 错误处理 | `anyhow` | 上下文链式错误，统一出口 |
+| 错误处理 | 结构化 `AppError` + `anyhow` 作 `source` | 面向用户的错误带 `kind`/文案 key/hint，只有底层错误链用 `anyhow`（Q26 / Q29） |
 | 序列化 | `serde` + `serde_yaml_ng` | 解析 SKILL.md frontmatter |
 | JSON 输出 | `serde_json` | `list --json` |
 | HTTP 客户端 | `ureq`（rustls） | `upgrade` 下载 release；同步、纯 Rust，避免 reqwest 量级的依赖树 |
@@ -264,6 +265,7 @@ pub struct Ctx {
 | 分层边界 | `domain`/`infra` 自身错误枚举，映射与渲染在边界；`Ctx` 承载 env/lang/cwd | [impl.md](impl.md)「模块职责」「依赖方向」 |
 | 自更新 | 原地替换，exe 路径与文件名不变；备份只用临时名 | [upgrade.md](impl/upgrade.md)「原地替换与回滚」 |
 | 测试与交付 | 用例数不写死，以 `cargo test` 输出为准（`upgrade` 的 8 条在 quality.md 标记 `[planned]`）；v1 不配 CI | [quality.md](impl/quality.md)「测试计划」「发布」 |
+| v0.2.0 范围 | 只做 `copy --all` 与 `remove`；CI 与 Linux/macOS 实测延后，触发条件是平台相关 issue | [decisions.md](decisions.md) Q38 / Q39 |
 
 ## 6. 文档维护规则
 

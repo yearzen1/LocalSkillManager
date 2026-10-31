@@ -42,6 +42,9 @@
 
 | Q37 | 选项表的真源地位 | `impl/cli.md` §2.1 除命令表外必须维护选项表（命令 / 选项 / 取值 / 默认 / 说明），与命令表同属唯一真源；选项表不单列状态，存在性跟随命令表；改动顺序先选项表、再 `cli/spec.rs`、最后 README；`tests/cli.rs::cli_option_table_matches_help` 双向强制（文档选项必须出现在 `--help`，`--help` 选项必须写进表）；`-a/-l/-c/-g/-p` 是归一化别名，不进选项表 |
 
+| Q38 | v0.2.0 范围 | 只做 `copy --all` 与 `remove`；`symlink`、project→global 反向复制、`update` 检查仍为非目标；两条命令都先在 `impl/cli.md` §2.1 写 `planned`、实现后转 `implemented`；已实现命令上的新选项（如 `copy --all`）不预写 `planned`，与 `cli/spec.rs` 同一提交落地 |
+| Q39 | 跨平台验证与 CI | v0.2.0 不做 GitHub Actions 矩阵、不做预编译产物、不做 Linux/macOS 实测，以 Windows 实测为唯一交付依据；触发条件=出现平台相关 issue，届时单独立计划，不并入 13 天节奏 |
+
 ## 维护规则
 
 1. 新决策追加到表尾，编号连续，不复用旧编号。
