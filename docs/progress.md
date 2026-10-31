@@ -70,11 +70,12 @@
 - **步骤**
   1. 新建 `scripts/acceptance.sh`，内容对应 `quality.md` 的 7 条手工步骤，每步失败即 `exit 1`
   2. 用临时 `LSM_HOME` 与 demo 项目目录，结束时清理，不写死本机绝对路径
-  3. 在 Git Bash 里执行，逐条修到全绿
-- **完成标准**：`bash scripts/acceptance.sh` 退出码 0，末尾打印 `PASS`
-- **提交信息**：`test: script manual acceptance`
-- **卡住时**：Windows 上 `chmod +x` 无效不影响使用，脚本内注释标明用 `bash scripts/acceptance.sh` 调用
-- [ ] 完成
+  3. 加 `.gitattributes`（`*.sh text eol=lf`），否则 Windows 检出成 CRLF 脚本直接跑不起来
+  4. 在 Git Bash 里执行，逐条修到全绿
+- **完成标准**：`"D:/Git/bin/bash.exe" scripts/acceptance.sh` 退出码 0，末尾打印 `PASS`；WSL 的 `bash` 调用应以退出码 2 拒绝
+- **提交信息**：`chore: force lf for shell scripts`、`test: script manual acceptance`
+- **卡住时**：Windows 上 `chmod +x` 无效不影响使用；PATH 上的 `bash` 是 WSL，必须显式用 Git Bash
+- [x] 完成
 
 #### Day 4 · 2026-11-05（周四）· `copy --all` 红用例
 
@@ -182,7 +183,7 @@
 - **步骤**
   1. 补 `remove` 的 en/zh 文案（成功、不存在、拒绝删除的提示）
   2. 更新 `storage.md` / `cli.md` / 双 README
-  3. 跑四道门禁：`cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test`、`bash scripts/acceptance.sh`
+  3. 跑四道门禁：`cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test`、`"D:/Git/bin/bash.exe" scripts/acceptance.sh`
 - **完成标准**：四道门禁全绿；`git status --short` 只剩预期文件
 - **提交信息**：`feat(remove): add messages and docs`
 - **卡住时**：验收脚本里旧的 `add/copy` 步骤失败，说明回归问题优先于文案，先修回归再补文案
@@ -206,8 +207,8 @@
 |---|---|---|---|---|
 | D1 | 2026-11-02 | ☑ | | 偏差：hint + 测试隔离已合成 `dd005ea` 并推送，按"不改写已发布历史"处理；另以 `5b1563c` 跟踪 `.agents/`、忽略 `TODO.md` |
 | D1.5 | 2026-10-30 | ☑ | | 提前完成：列表描述列改按显示列换行（Q34），占掉原 Q34，D2 顺延为 Q38/Q39（Q35–Q37 又被显示宽度、`ureq`、选项表占用） |
-| D2 | 2026-10-31 | ☑ | | 提前完成：Q38/Q39 落地，D9 顺延为 Q40；顺带修正 `impl.md` 的 Q1–Q40 索引、`anyhow` 选型描述与「非目标」段 |
-| D3 | 2026-11-04 | ☐ | | |
+| D2 | 2026-11-03 | ☑ | | 实际 2026-10-31 提前完成：Q38/Q39 落地，D9 顺延为 Q40；顺带修正 `impl.md` 的 Q1–Q40 索引、`anyhow` 选型描述与「非目标」段 |
+| D3 | 2026-11-04 | ☑ | | 实际 2026-10-31 提前完成：`scripts/acceptance.sh` 七步全绿；发现 PATH 上的 `bash` 是 WSL，脚本对 WSL 显式退 2，另加 `.gitattributes` 固定 `*.sh` 为 LF |
 | D4 | 2026-11-05 | ☐ | | |
 | D5 | 2026-11-06 | ☐ | | |
 | D6 | 2026-11-09 | ☐ | | |

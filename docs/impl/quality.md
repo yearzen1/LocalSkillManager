@@ -99,6 +99,8 @@ cd <demo-project> && lsm copy sample && lsm list project
 
 `[planned]`：`upgrade` 实现前跳过这一段；实现后它是这里唯一的联网步骤，不要对日常使用的 `lsm` 直接跑 `upgrade` 做验收。Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
 
+上面这串步骤的执行入口是 `scripts/acceptance.sh`：Windows 用 Git Bash 调用（`"D:/Git/bin/bash.exe" scripts/acceptance.sh`），**不要用 WSL 的 `bash`**——它会把 Linux 路径原样传给 Windows 二进制，测试会在错误目录里跑出假绿。Linux/macOS 直接 `bash scripts/acceptance.sh`。脚本与本节的步骤不一致时以脚本为准，并在同一提交内改本节。
+
 ## 2. README 与许可证
 
 ### 2.1 双文件约定
