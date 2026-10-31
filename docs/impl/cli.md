@@ -74,11 +74,12 @@ Local Skill Manager
 
 ### 2.1 完整版（命令与参数的唯一真源）
 
-本表是**命令与参数面的唯一真源**，其它文档（两份 README、`quality.md` 的测试计划）只能引用，不得另行定义。
+本表（命令表 + 选项表）是**命令与参数面的唯一真源**，其它文档（两份 README、`quality.md` 的测试计划）只能引用，不得另行定义。
 
-- 新增或修改命令的顺序固定：**先改本表状态列 → 再改 `cli/spec.rs` / `domain/action.rs` → 再改两份 README**。顺序颠倒即视为文档漂移。
+- 新增或修改命令、选项的顺序固定：**先改本表的命令表状态列 / 选项表 → 再改 `cli/spec.rs` / `domain/action.rs` → 再改两份 README**。顺序颠倒即视为文档漂移。
 - `implemented` 表示当前二进制支持；`planned` 表示规则已定、代码未实现。两份 README **不得描述任何 `planned` 条目**。
-- 本表与二进制的对应关系由 `tests/cli.rs::cli_reference_table_matches_binary` 强制：`implemented` 行必须 `lsm <command> --help` 退出 0，`planned` 行必须被视为未知子命令（退出 2）。实现完成却忘记改状态列，测试会红。
+- 命令表与二进制的对应关系由 `tests/cli.rs::cli_reference_table_matches_binary` 强制：`implemented` 行必须 `lsm <command> --help` 退出 0，`planned` 行必须被视为未知子命令（退出 2）。实现完成却忘记改状态列，测试会红。
+- 选项表与二进制的对应关系由 `tests/cli.rs::cli_option_table_matches_help` 双向强制：`implemented` 命令文档里的选项必须出现在 `lsm <command> --help`，`--help` 里出现的选项也必须写进选项表。
 
 | 命令 | 参数 | 状态 |
 |---|---|---|
@@ -91,8 +92,25 @@ Local Skill Manager
 
 - `<SCOPE>`：`global` 或 `project`，大小写敏感。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
-- 全局选项（任意位置可用）：`--lang <LANG>`、`-h`/`--help`、`-V`/`--version`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)，实现前不进入 README。
+
+选项：
+
+| 命令 | 选项 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| 全局 | `--lang <LANG>` | `en` / `zh`，接受 `zh-CN` / `en-US` | 见 [config.md](config.md) 优先级 | 输出语言，任意位置可用 |
+| 全局 | `-h`, `--help` | — | — | help 输出到 stdout，退出 0 |
+| 根命令 | `-V`, `--version` | — | — | 输出 `lsm <版本>`，退出 0，子命令不支持 |
+| `add` | `--force` | — | 关闭 | 目标已存在时覆盖：备份 → 安装 → 删备份 |
+| `list` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
+| `copy` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
+| `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0（planned） |
+| `upgrade` | `--force` | — | 关闭 | 允许同版本重装与降级（planned） |
+
+- 选项表**不单列状态**：选项的存在性跟随命令表，`upgrade` 两行随命令一起转为 `implemented`。
+- `全局` 选项对根命令与每个子命令都生效；`根命令` 选项只对 `lsm` 本身生效（`lsm add --version` 是用法错误）。
+- `-a` / `-l` / `-c` / `-g` / `-p` **不是** clap 选项，是 §2.2 的前置归一化别名，不进本表。
+- 选项文案、取值说明与 help 同源，全部来自消息表（§1.2）。
 
 ### 2.2 缩减版
 
@@ -143,6 +161,18 @@ Local Skill Manager
 - 嵌套子命令沿用同一规则：`lsm config` 无子命令 → help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
 - `lsm upgrade --help` 与 `lsm upgrade --check --help` 同样走 stdout、退出码 0，且不联网、不写盘。
 - 实现方式：clap 解析到 `ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand` 时，按上述规则选择流；不要依赖 clap 默认行为。
+
+### 2.5 选项设计规则
+
+新增选项前先对照本节；本节规则与决策记录冲突时，以 `decisions.md` 为准。
+
+1. **取值写法**：长选项收 `--lang zh` 与 `--lang=zh` 两种；短选项只收分离写法，`-lz`、`-lg` 一律按用法错误退 2（Q7 / Q14）。
+2. **布尔与取值**：`--flag` 只表示布尔，不接受 `--flag=true`；带值的选项必须声明取值形态（`--opt <VALUE>`），合法集合由 clap `value_parser` 限定。
+3. **短选项冻结**：新命令不新增短选项；`-a` / `-l` / `-c` / `-g` / `-p` 是历史别名，由 `cli::normalize` 处理，永久冻结（Q7 / Q30）。
+4. **破坏性操作**：覆盖、删除、替换默认拒绝，必须显式 `--force`，且 `--force` 不给短选项（Q5 / Q30）。
+5. **机器可读输出**：只有一个开关 `--json`；开启后 stdout 只放数据，warning 与错误仍走 stderr。
+6. **结束符**：`--` 之后的参数全部按位置参数处理（clap 默认行为）；参数本身可能以 `-` 开头时必须使用。
+7. **退出码**：未知选项、缺值、取值非法一律退 2，不因选项问题退 1（Q20）。
 
 ## 3. 输出、错误与退出码
 
@@ -220,6 +250,7 @@ impl AppError {
 - Q27 / Q28：语言持久化、配置加载与失效策略（见 [config.md](config.md)）。
 - Q29：分层收敛与错误映射（错误枚举在 `domain`/`infra`，`AppError` 只在边界构造，渲染归 `output`）。
 - Q30 / Q31 / Q32：`upgrade` 的命令形态、原地替换（文件名不变）、网络与资产契约（见 [upgrade.md](upgrade.md)）。
+- Q33 / Q37：命令表与选项表同属 CLI 真源，改动顺序与二进制一致性由 `tests/cli.rs` 强制。
 
 完整决策见 [decisions.md](../decisions.md)。
 
