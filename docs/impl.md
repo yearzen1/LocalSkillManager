@@ -265,7 +265,7 @@ pub struct Ctx {
 | 分层边界 | `domain`/`infra` 自身错误枚举，映射与渲染在边界；`Ctx` 承载 env/lang/cwd | [impl.md](impl.md)「模块职责」「依赖方向」 |
 | 自更新 | 原地替换，exe 路径与文件名不变；备份只用临时名 | [upgrade.md](impl/upgrade.md)「原地替换与回滚」 |
 | 测试与交付 | 用例数不写死，以 `cargo test` 输出为准（`upgrade` 的 8 条在 quality.md 标记 `[planned]`）；v1 不配 CI | [quality.md](impl/quality.md)「测试计划」「发布」 |
-| v0.2.0 范围 | 只做 `copy --all` 与 `remove`；CI 与 Linux/macOS 实测延后，触发条件是平台相关 issue | [decisions.md](decisions.md) Q38 / Q39 |
+| v0.2.0 范围 | 只做 `copy --all` 与 `remove`；`--all` 冲突跳过、失败继续、任一失败退 1；CI 与 Linux/macOS 实测延后，触发条件是平台相关 issue | [decisions.md](decisions.md) Q38 / Q39 / Q40 |
 
 ## 6. 文档维护规则
 

@@ -81,11 +81,12 @@
 
 - **目标**：先写三条会失败的用例，把行为钉死。
 - **步骤**
+  0. `docs/decisions.md` 追加 Q40（`copy --all` 批量语义：冲突算跳过、源非法算失败、任一失败退 1），并同步 `storage.md` §3.3
   1. `tests/cli.rs` 加用例：全量复制两个 skill、全局为空时退出码 0 且提示无内容、目标已存在时汇总冲突而不中途中断
   2. 只加测试不改实现，`cargo test` 确认三条红
   3. 用 `-- --nocapture` 记录实际输出，作为实现依据
 - **完成标准**：`cargo test` 中三条新用例失败，失败原因是"未实现/行为不符"而非用例本身写错
-- **提交信息**：`test(copy): add copy-all cases`
+- **提交信息**：`docs: decide copy-all semantics`、`test(copy): add copy-all cases`
 - **卡住时**：空全局的期望输出拿不准就先按"退出码 0 + 一行 info 提示"写，文案留到 D7 定稿
 - [ ] 完成
 
@@ -108,8 +109,8 @@
 - **目标**：D4 的三条用例全绿。
 - **步骤**
   1. `commands/copy.rs` 增加全量分支：扫描全局目录 → 逐个 `install_skill_dir`
-  2. 冲突走既有 `--force` 语义，未加 `--force` 时累计失败项而不是第一个就退出
-  3. 结束打印"成功 N 个 / 跳过 M 个"，全部失败时退出码 1
+  2. 冲突走既有 `--force` 语义：目标已存在且无 `--force` 记**跳过**并继续；源非法 / I/O 失败记**失败**并继续
+  3. 结束打印"成功 N 个 / 跳过 M 个 / 失败 K 个"，任一失败退出码 1（见 Q40）
 - **完成标准**：`cargo test` 全绿；临时目录放两个全局 skill 后 `lsm copy --all` 复制成功
 - **提交信息**：`feat(copy): copy all global skills`
 - **卡住时**：`commands` 不允许直接调 `std::fs`，扫描必须复用 `infra::scan`；需要新接口就先加在 `infra` 再接线
@@ -143,10 +144,10 @@
 
 - **目标**：把"卸载"从非目标移出，并先用例钉住破坏性行为。
 - **步骤**
-  1. `docs/decisions.md` 追加 Q40：`remove <name> [global|project]` + `--force` 语义、原子删除方式
+  1. `docs/decisions.md` 追加 Q41：`remove <name> [global|project]` + `--force` 语义、原子删除方式
   2. 确认 `docs/impl.md`「非目标」段已不含"不做删除、卸载"（D2 已删），只补 `remove` 的签名摘要
   3. `tests/cli.rs` 加三条用例：正常删除、不存在时报错退 1、`--force` 才删非空
-- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q40 \|'` 命中 1 行；三条新用例红
+- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q41 \|'` 命中 1 行；三条新用例红
 - **提交信息**：`docs: decide skill removal scope`
 - **卡住时**：`--force` 语义拿不准就取"无 `--force` 只删由 `add` 创建的合法 skill 目录（含 SKILL.md 且目录名与 name 一致）"，其余必须显式 `--force`
 - [ ] 完成
@@ -207,7 +208,7 @@
 |---|---|---|---|---|
 | D1 | 2026-11-02 | ☑ | | 偏差：hint + 测试隔离已合成 `dd005ea` 并推送，按"不改写已发布历史"处理；另以 `5b1563c` 跟踪 `.agents/`、忽略 `TODO.md` |
 | D1.5 | 2026-10-30 | ☑ | | 提前完成：列表描述列改按显示列换行（Q34），占掉原 Q34，D2 顺延为 Q38/Q39（Q35–Q37 又被显示宽度、`ureq`、选项表占用） |
-| D2 | 2026-11-03 | ☑ | | 实际 2026-10-31 提前完成：Q38/Q39 落地，D9 顺延为 Q40；顺带修正 `impl.md` 的 Q1–Q40 索引、`anyhow` 选型描述与「非目标」段 |
+| D2 | 2026-11-03 | ☑ | | 实际 2026-10-31 提前完成：Q38/Q39 落地；Q40 后被 D4 的 `copy --all` 语义占用，D9 再顺延为 Q41；顺带修正 `impl.md` 的 Q1–Q40 索引、`anyhow` 选型描述与「非目标」段 |
 | D3 | 2026-11-04 | ☑ | | 实际 2026-10-31 提前完成：`scripts/acceptance.sh` 七步全绿；发现 PATH 上的 `bash` 是 WSL，脚本对 WSL 显式退 2，另加 `.gitattributes` 固定 `*.sh` 为 LF |
 | D4 | 2026-11-05 | ☐ | | |
 | D5 | 2026-11-06 | ☐ | | |

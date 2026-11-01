@@ -260,6 +260,7 @@ JSON 输出：
 
 ```
 lsm copy <name> [--force]
+lsm copy --all [--force]
 ```
 
 流程：
@@ -285,6 +286,17 @@ lsm copy <name> [--force]
    ```
 
 copy 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）。
+
+`--all` 与 `<name>` 互斥（同时给出退出码 2）。全量分支：
+
+1. 扫描全局 skills 目录（`infra::scan::scan_skills`，跳过隐藏项与非目录），按名字排序逐条处理。
+2. 每条复用上面的单条流程（校验源 → 算目标 → 原子安装）。
+3. 结果分三类累计，单条失败不中断：
+   - **成功**：安装完成；`.git` 警告照常打到 stderr。
+   - **跳过**：目标已存在且无 `--force`，不算失败。
+   - **失败**：源非法（缺 `SKILL.md`、name 不一致）或 I/O 错误；逐条把错误体打到 stderr，其余条目继续。
+4. 汇总一行到 stdout：成功 / 跳过 / 失败计数。
+5. 退出码：任一失败退 1；只有跳过或全部成功退 0；全局为空退 0 并提示没有可复制的 skill，且不创建项目 skills 目录。
 
 ## 4. 文件系统细节
 
@@ -365,5 +377,6 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError>;
 - Q27：配置文件独立于 `LSM_HOME`，不放进 `.agents` 目录。
 - Q29：`paths` 收 `&Env` 纯函数；`fsops`/`scan` 返回 `FsError`，不构造 `AppError`。
 - Q31：自更新用原地替换，`exe` 路径与文件名不变（`fsops::replace_self` 只实现替换与回滚）。
+- Q40：`copy --all` 逐条复制、冲突跳过、失败继续，任一失败退 1。
 
 完整决策见 [decisions.md](../decisions.md)。
