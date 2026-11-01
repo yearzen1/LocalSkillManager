@@ -200,7 +200,7 @@
 - **完成标准**：`lsm --version` 输出 `0.2.0`；`git tag --points-at HEAD` 含 `v0.2.0`；远端能看到该 tag
 - **提交信息**：`chore: release v0.2.0`
 - **卡住时**：tag 打错就删远端 tag 重打（`git push --delete origin v0.2.0`），不靠加新 tag 掩盖
-- [ ] 完成
+- [x] 完成（本地 tag；推送待确认）
 
 ## 4. 打卡表
 
@@ -219,7 +219,7 @@
 | D10 | 2026-11-13 | ☑ | | 实际 2026-11-01 与 D11 合并落地：`remove <name> <scope> [--force]` + `-r` 归一化、`Action::Remove`、name 校验退 2 |
 | D11 | 2026-11-16 | ☑ | | 实际 2026-11-01 提前完成：`fsops::remove_entry_atomically`（rename → 递归删）+ `commands/remove.rs`；rename 失败路径靠 `SourceMissing` 用例兜底，占用场景只能手工复现 |
 | D12 | 2026-11-17 | ☑ | | 实际 2026-11-01 提前完成：en/zh 文案随实现落地，本次补双 README 与 quality.md，验收脚本扩到 9 步；四道门禁全绿 |
-| D13 | 2026-11-18 | ☐ | | |
+| D13 | 2026-11-18 | ☑ | | 实际 2026-11-01 提前完成：`0.2.0` 版本号与文档样例同步，release 构建通过；本地 tag `v0.2.0`，远端推送待确认 |
 
 ## 5. 风险与应对
 
