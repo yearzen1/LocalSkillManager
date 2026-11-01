@@ -1,21 +1,93 @@
 //! `copy`：把全局 skill 复制到当前项目。
 
 use crate::domain::action::CopyTarget;
+use crate::domain::entry::SkillEntry;
 use crate::domain::name::SkillName;
 use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
 use crate::i18n::MsgKey;
 use crate::infra::fsops::{self, FsError};
-use crate::infra::{frontmatter, paths};
+use crate::infra::{frontmatter, paths, scan};
 use crate::output;
+use crate::output::error as error_output;
 use crate::Ctx;
 
 pub fn run(ctx: &Ctx, target: CopyTarget, force: bool) -> Result<(), AppError> {
     match target {
         CopyTarget::One(name) => copy_one(ctx, &name, force),
-        // D6 才落全量分支；在此之前明确报「未实现」，不要伪装成参数错误。
-        CopyTarget::All => Err(AppError::runtime(MsgKey::CopyAllPending)),
+        CopyTarget::All => copy_all(ctx, force),
     }
+}
+
+/// 逐条复制全局目录下的全部 skill；单条失败只记账，不中断。
+fn copy_all(ctx: &Ctx, force: bool) -> Result<(), AppError> {
+    let global_dir = paths::skills_dir(&ctx.env, Scope::Global, &ctx.cwd)?;
+    let entries = scan::scan_skills(&global_dir)?;
+
+    if entries.is_empty() {
+        output::emit_line(ctx.lang, &Msg::new(MsgKey::CopyAllEmpty));
+        return Ok(());
+    }
+
+    let mut copied = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
+
+    for entry in &entries {
+        if !entry.valid {
+            failed += 1;
+            report_invalid(ctx, entry);
+            continue;
+        }
+
+        let Ok(name) = SkillName::parse(&entry.name) else {
+            // `scan` 已经校验过名字，这里只是兜底，不让单条脏数据中断整批。
+            failed += 1;
+            report_invalid(ctx, entry);
+            continue;
+        };
+
+        let destination = paths::skill_dir(&ctx.env, Scope::Project, &ctx.cwd, &name)?;
+        if !force && fsops::is_present(&destination) {
+            skipped += 1;
+            output::warn(
+                ctx.lang,
+                &Msg::with_args(MsgKey::CopyAllSkipped, [name.as_str()]),
+            );
+            continue;
+        }
+
+        match copy_one(ctx, &name, force) {
+            Ok(()) => copied += 1,
+            Err(err) => {
+                failed += 1;
+                output::emit_stderr(&error_output::render(&err, ctx.lang));
+            }
+        }
+    }
+
+    output::emit_line(
+        ctx.lang,
+        &Msg::with_args(
+            MsgKey::CopyAllSummary,
+            [copied.to_string(), skipped.to_string(), failed.to_string()],
+        ),
+    );
+
+    if failed > 0 {
+        return Err(AppError::runtime(MsgKey::CopyAllFailed)
+            .with_args([failed.to_string()])
+            .with_hint(MsgKey::CopyAllFailedHint));
+    }
+
+    Ok(())
+}
+
+fn report_invalid(ctx: &Ctx, entry: &SkillEntry) {
+    let err = AppError::runtime(MsgKey::CopySourceInvalid)
+        .with_args([entry.name.clone(), entry.error.clone().unwrap_or_default()])
+        .with_hint(MsgKey::CopySourceInvalidHint);
+    output::emit_stderr(&error_output::render(&err, ctx.lang));
 }
 
 /// 复制单个 skill。

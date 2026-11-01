@@ -749,20 +749,22 @@ fn copy_requires_name_or_all() {
 }
 
 #[test]
-fn copy_all_parses_in_both_forms() {
+fn copy_all_short_flag_copies_everything() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
+    install_global(&home, "my-skill", "Copy me.");
 
-    // D6 之前只验证「归一化 + 解析」通了：命令层明确报未实现，而不是参数错误。
-    for args in [vec!["copy", "--all"], vec!["-c", "--all"]] {
-        lsm()
-            .env("LSM_HOME", home.path())
-            .current_dir(project.path())
-            .args(args)
-            .assert()
-            .code(1)
-            .stderr(predicate::str::contains("not implemented"));
-    }
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["-c", "--all"])
+        .assert()
+        .success();
+
+    assert!(project
+        .path()
+        .join(".agents/skills/my-skill/SKILL.md")
+        .exists());
 }
 
 #[test]
@@ -939,7 +941,7 @@ fn copy_all_reports_conflicts_and_keeps_going() {
         .current_dir(project.path())
         .args(["copy", "--all"])
         .assert()
-        .code(1)
+        .success()
         .stderr(predicate::str::contains("alpha"))
         .stderr(predicate::str::contains("already exists"));
 
