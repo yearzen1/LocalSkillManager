@@ -188,7 +188,7 @@
 - **完成标准**：四道门禁全绿；`git status --short` 只剩预期文件
 - **提交信息**：`feat(remove): add messages and docs`
 - **卡住时**：验收脚本里旧的 `add/copy` 步骤失败，说明回归问题优先于文案，先修回归再补文案
-- [ ] 完成
+- [x] 完成
 
 #### Day 13 · 2026-11-18（周三）· 版本 0.2.0 与 tag
 
@@ -218,7 +218,7 @@
 | D9 | 2026-11-12 | ☑ | | 实际 2026-11-01 提前完成：Q41 落决策，`remove` 在 cli.md 先记 `planned`；三条用例红在 `invalid subcommand 'remove'`。因 planned 行必须是未知子命令，D10 一旦加子命令就得同提交转 `implemented`，D10/D11 合并为一次落地 |
 | D10 | 2026-11-13 | ☑ | | 实际 2026-11-01 与 D11 合并落地：`remove <name> <scope> [--force]` + `-r` 归一化、`Action::Remove`、name 校验退 2 |
 | D11 | 2026-11-16 | ☑ | | 实际 2026-11-01 提前完成：`fsops::remove_entry_atomically`（rename → 递归删）+ `commands/remove.rs`；rename 失败路径靠 `SourceMissing` 用例兜底，占用场景只能手工复现 |
-| D12 | 2026-11-17 | ☐ | | |
+| D12 | 2026-11-17 | ☑ | | 实际 2026-11-01 提前完成：en/zh 文案随实现落地，本次补双 README 与 quality.md，验收脚本扩到 9 步；四道门禁全绿 |
 | D13 | 2026-11-18 | ☐ | | |
 
 ## 5. 风险与应对
