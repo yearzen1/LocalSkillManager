@@ -73,6 +73,8 @@ curl.exe -s -o NUL -w "%{http_code} %{size_download}`n" -L `
   "https://github.com/yearzen1/LocalSkillManager/releases/download/vX.Y.Z/lsm-windows-x64.exe"
 ```
 
+正文模板与参考样例见 [release-notes.md](release-notes.md)；不逐版本归档实例。
+
 ## 4. 资产改名
 
 已发布资产的命名不合规时，用 API 改名（内容不变、不重新上传）：
