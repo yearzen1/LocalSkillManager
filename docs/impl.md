@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.1.1 已实现（Windows 实测；Linux/macOS 未实测）；`upgrade` 规则已定、代码未实现；v0.2.0 目标为 `copy --all` + `remove`（Q38）
+> 状态：v0.2.0 已实现（Windows 实测；Linux/macOS 未实测）；`upgrade` 规则已定、代码未实现；v0.2.0 交付 `copy --all` + `remove`（Q38）
 > 最后更新：2026-10-31
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
@@ -66,7 +66,7 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Install and copy agent skills under .agents/skills"
 license = "MIT"
