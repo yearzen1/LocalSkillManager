@@ -56,7 +56,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::ListHeaderName => "NAME",
         MsgKey::ListHeaderDescription => "DESCRIPTION",
 
-        MsgKey::CopyAbout => "Copy a global skill into the current project",
+        MsgKey::CopyAbout => "Copy global skills into the current project",
         MsgKey::CopyNameArg => "Skill name to copy",
         MsgKey::CopyAllFlag => "Copy every global skill",
         MsgKey::CopyAllEmpty => "no global skills to copy",

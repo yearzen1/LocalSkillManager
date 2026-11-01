@@ -731,6 +731,21 @@ fn copy_short_flag_works() {
 }
 
 #[test]
+fn copy_all_output_is_localized() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "my-skill", "Copy me.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["--lang", "zh", "copy", "--all"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("成功 1 个，跳过 0 个，失败 0 个"));
+}
+
+#[test]
 fn copy_rejects_name_together_with_all() {
     lsm()
         .args(["copy", "foo", "--all"])
@@ -898,7 +913,8 @@ fn copy_all_copies_every_global_skill() {
         .current_dir(project.path())
         .args(["copy", "--all"])
         .assert()
-        .success();
+        .success()
+        .stdout(predicate::str::contains("copied 2, skipped 0, failed 0"));
 
     for name in ["alpha", "beta"] {
         let copied = project
@@ -919,7 +935,7 @@ fn copy_all_with_empty_global_succeeds_without_touching_project() {
         .args(["copy", "--all"])
         .assert()
         .success()
-        .stdout(predicate::str::is_empty().not());
+        .stdout(predicate::str::contains("no global skills to copy"));
 
     assert!(!project.path().join(".agents/skills").exists());
 }
@@ -942,8 +958,8 @@ fn copy_all_reports_conflicts_and_keeps_going() {
         .args(["copy", "--all"])
         .assert()
         .success()
-        .stderr(predicate::str::contains("alpha"))
-        .stderr(predicate::str::contains("already exists"));
+        .stdout(predicate::str::contains("copied 1, skipped 1, failed 0"))
+        .stderr(predicate::str::contains("skipped alpha"));
 
     // 冲突不中断：后面的 skill 照常复制，冲突目标保持原样。
     assert!(project.path().join(".agents/skills/beta/SKILL.md").exists());
