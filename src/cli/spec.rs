@@ -29,6 +29,7 @@ pub fn build(lang: Lang) -> Command {
         .subcommand(add_command(lang))
         .subcommand(list_command(lang))
         .subcommand(copy_command(lang))
+        .subcommand(remove_command(lang))
         .subcommand(config_command(lang));
 
     with_help_flag(root, lang).disable_version_flag(true).arg(
@@ -116,6 +117,32 @@ fn copy_command(lang: Lang) -> Command {
                 .long("force")
                 .action(clap::ArgAction::SetTrue)
                 .help(tr(lang, MsgKey::CopyForceFlag)),
+        );
+
+    with_help_flag(command, lang)
+}
+
+fn remove_command(lang: Lang) -> Command {
+    let command = Command::new("remove")
+        .about(tr(lang, MsgKey::RemoveAbout))
+        .arg(
+            Arg::new("name")
+                .required(true)
+                .value_name("NAME")
+                .help(tr(lang, MsgKey::RemoveNameArg)),
+        )
+        .arg(
+            Arg::new("scope")
+                .required(true)
+                .value_name("SCOPE")
+                .value_parser(SCOPE_VALUES)
+                .help(tr(lang, MsgKey::RemoveScopeArg)),
+        )
+        .arg(
+            Arg::new("force")
+                .long("force")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::RemoveForceFlag)),
         );
 
     with_help_flag(command, lang)

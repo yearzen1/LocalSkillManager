@@ -73,6 +73,17 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::CopySamePath => "source and destination are the same path",
         MsgKey::CopySamePathHint => "run this command from a different directory",
 
+        MsgKey::RemoveAbout => "Remove a skill from global or project",
+        MsgKey::RemoveNameArg => "Skill name to remove",
+        MsgKey::RemoveScopeArg => "Scope to remove from",
+        MsgKey::RemoveForceFlag => "Remove even if the directory is not a valid skill",
+        MsgKey::RemoveRemoved => "removed {0} -> {1}",
+        MsgKey::RemoveNotFound => "skill '{0}' not found in {1}",
+        MsgKey::RemoveNotFoundHint => "run `lsm list {0}` to see available skills",
+        MsgKey::RemoveNotSkill => "'{0}' is not a valid skill: {1}",
+        MsgKey::RemoveNotSkillHint => "pass --force to remove it anyway",
+        MsgKey::RemoveLeftover => "temporary directory could not be removed: {0}",
+
         MsgKey::ConfigAbout => "Manage persistent settings",
         MsgKey::ConfigGetAbout => "Print a saved setting",
         MsgKey::ConfigSetAbout => "Save a setting",

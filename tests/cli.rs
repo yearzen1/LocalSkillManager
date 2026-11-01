@@ -1045,6 +1045,38 @@ fn remove_refuses_non_skill_dir_unless_forced() {
 }
 
 #[test]
+fn remove_requires_scope() {
+    lsm()
+        .args(["remove", "foo"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("SCOPE").or(predicate::str::contains("scope")));
+}
+
+#[test]
+fn remove_rejects_path_traversal() {
+    lsm()
+        .args(["remove", "..", "project"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid skill name"));
+}
+
+#[test]
+fn remove_short_flag_works() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "my-skill", "Remove me.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["-r", "my-skill", "-p"])
+        .assert()
+        .success();
+
+    assert!(!project.path().join(".agents/skills/my-skill").exists());
+}
+
+#[test]
 fn invalid_yaml_hints_how_to_fix() {
     let home = home_dir();
     let work = TempDir::new().unwrap();

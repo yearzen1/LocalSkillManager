@@ -26,6 +26,13 @@ pub struct InstallReport {
     pub leftover_backup: Option<PathBuf>,
 }
 
+/// 删除结果中需要在命令层转成 warning 的残留。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoveReport {
+    /// 临时目录删除失败时保留其路径，由调用方打印 warning。
+    pub leftover_temp: Option<PathBuf>,
+}
+
 /// 源路径的类型。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceKind {
@@ -127,6 +134,31 @@ pub fn install_skill_file(src: &Path, dst: &Path, force: bool) -> Result<Install
         std::fs::copy(src, tmp.join("SKILL.md")).map_err(|err| io_error(src, err))?;
         Ok(())
     })
+}
+
+/// 原子删除目录或文件：先 rename 到同级临时目录，成功后再递归删除。
+pub fn remove_entry_atomically(target: &Path) -> Result<RemoveReport, FsError> {
+    let meta = std::fs::symlink_metadata(target).map_err(|err| source_error(target, err))?;
+
+    if meta.file_type().is_symlink() {
+        return Err(FsError::SymlinkUnsupported {
+            path: target.to_path_buf(),
+        });
+    }
+
+    let tmp = sibling(target, ".tmp-remove-")?;
+    let _ = remove_existing(&tmp);
+
+    if let Err(err) = std::fs::rename(target, &tmp) {
+        return Err(io_error(target, err));
+    }
+
+    let leftover_temp = match remove_existing(&tmp) {
+        Ok(()) => None,
+        Err(_) => Some(tmp),
+    };
+
+    Ok(RemoveReport { leftover_temp })
 }
 
 enum SourceType {
@@ -449,6 +481,29 @@ mod tests {
             fs::read_to_string(dst.join("SKILL.md")).unwrap(),
             "---\nname: foo\ndescription: Foo.\n---\nbody"
         );
+    }
+
+    #[test]
+    fn removes_entry_atomically() {
+        let dir = TempDir::new().unwrap();
+        let skills = dir.path().join("skills");
+        let target = skills.join("my-skill");
+        write(&target.join("SKILL.md"), "skill");
+
+        let report = remove_entry_atomically(&target).unwrap();
+
+        assert_eq!(report.leftover_temp, None);
+        assert!(!target.exists());
+        assert!(leftovers(&skills).is_empty());
+    }
+
+    #[test]
+    fn remove_reports_missing_target() {
+        let dir = TempDir::new().unwrap();
+
+        let err = remove_entry_atomically(&dir.path().join("nope")).unwrap_err();
+
+        assert!(matches!(err, FsError::SourceMissing { .. }));
     }
 
     #[cfg(unix)]

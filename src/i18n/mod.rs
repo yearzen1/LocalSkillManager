@@ -91,6 +91,17 @@ keys!(
     CopySourceInvalidHint,
     CopySamePath,
     CopySamePathHint,
+    // remove
+    RemoveAbout,
+    RemoveNameArg,
+    RemoveScopeArg,
+    RemoveForceFlag,
+    RemoveRemoved,
+    RemoveNotFound,
+    RemoveNotFoundHint,
+    RemoveNotSkill,
+    RemoveNotSkillHint,
+    RemoveLeftover,
     // config
     ConfigAbout,
     ConfigGetAbout,

@@ -4,6 +4,7 @@ pub mod add;
 pub mod config;
 pub mod copy;
 pub mod list;
+pub mod remove;
 
 use crate::domain::action::Action;
 use crate::error::AppError;
@@ -20,5 +21,6 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
         Action::Config(command) => config::run(ctx, command),
         Action::List { scope, json } => list::run(ctx, scope, json),
         Action::Copy { target, force } => copy::run(ctx, target, force),
+        Action::Remove { scope, name, force } => remove::run(ctx, scope, name, force),
     }
 }

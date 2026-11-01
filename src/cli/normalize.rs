@@ -45,6 +45,12 @@ pub fn normalize(argv: Vec<OsString>) -> Result<Vec<OsString>, NormalizeError> {
                     .ok_or(NormalizeError::MissingActionValue { flag: "-c" })?;
                 actions.push(("copy", Some(value)));
             }
+            Some("-r") | Some("--remove") => {
+                let value = tokens
+                    .next()
+                    .ok_or(NormalizeError::MissingActionValue { flag: "-r" })?;
+                actions.push(("remove", Some(value)));
+            }
             Some("-l") | Some("--list") => actions.push(("list", None)),
             Some("-g") | Some("--global") => scopes.push("global"),
             Some("-p") | Some("--project") => scopes.push("project"),
@@ -67,7 +73,7 @@ pub fn normalize(argv: Vec<OsString>) -> Result<Vec<OsString>, NormalizeError> {
     let has_subcommand = passthrough
         .iter()
         .filter_map(|token| token.to_str())
-        .any(|token| matches!(token, "add" | "list" | "copy"));
+        .any(|token| matches!(token, "add" | "list" | "copy" | "remove"));
     if has_subcommand && !(actions.is_empty() && scopes.is_empty()) {
         return Err(NormalizeError::MixedForms);
     }
@@ -173,6 +179,18 @@ mod tests {
     }
 
     #[test]
+    fn maps_remove_with_scope() {
+        assert_eq!(
+            run(&["-r", "foo", "-p"]).unwrap(),
+            ["remove", "foo", "project"]
+        );
+        assert_eq!(
+            run(&["-r", "foo", "-g", "--force"]).unwrap(),
+            ["remove", "foo", "global", "--force"]
+        );
+    }
+
+    #[test]
     fn rejects_missing_action_value() {
         assert_eq!(
             run(&["-a"]).unwrap_err(),
@@ -181,6 +199,10 @@ mod tests {
         assert_eq!(
             run(&["-c"]).unwrap_err(),
             NormalizeError::MissingActionValue { flag: "-c" }
+        );
+        assert_eq!(
+            run(&["-r"]).unwrap_err(),
+            NormalizeError::MissingActionValue { flag: "-r" }
         );
     }
 
@@ -193,6 +215,10 @@ mod tests {
         assert_eq!(
             run(&["-l"]).unwrap_err(),
             NormalizeError::MissingScope { action: "list" }
+        );
+        assert_eq!(
+            run(&["-r", "foo"]).unwrap_err(),
+            NormalizeError::MissingScope { action: "remove" }
         );
     }
 

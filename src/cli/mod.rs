@@ -99,6 +99,11 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
             }
         }
         "config" => Action::Config(parse_config(sub)?),
+        "remove" => Action::Remove {
+            scope: scope_of(&required(sub, "scope")),
+            name: SkillName::parse(&required(sub, "name"))?,
+            force: sub.get_flag("force"),
+        },
         other => return Err(AppError::usage(MsgKey::UsageInvalidSubcommand).with_args([other])),
     };
 

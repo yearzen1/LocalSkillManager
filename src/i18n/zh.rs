@@ -73,6 +73,17 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::CopySamePath => "源与目标是同一路径",
         MsgKey::CopySamePathHint => "请在其它目录下运行该命令",
 
+        MsgKey::RemoveAbout => "从 global 或 project 卸载 skill",
+        MsgKey::RemoveNameArg => "要卸载的 skill 名称",
+        MsgKey::RemoveScopeArg => "从哪个作用域卸载",
+        MsgKey::RemoveForceFlag => "即使不是合法 skill 目录也删除",
+        MsgKey::RemoveRemoved => "已卸载 {0} -> {1}",
+        MsgKey::RemoveNotFound => "在 {1} 中找不到 skill '{0}'",
+        MsgKey::RemoveNotFoundHint => "运行 `lsm list {0}` 查看可用 skill",
+        MsgKey::RemoveNotSkill => "'{0}' 不是合法 skill：{1}",
+        MsgKey::RemoveNotSkillHint => "确认要删除请加 --force",
+        MsgKey::RemoveLeftover => "临时目录未能删除：{0}",
+
         MsgKey::ConfigAbout => "查看或修改持久化配置",
         MsgKey::ConfigGetAbout => "打印已保存的配置值",
         MsgKey::ConfigSetAbout => "保存配置值",

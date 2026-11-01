@@ -86,7 +86,7 @@ Local Skill Manager
 | `add` | `<SOURCE> <SCOPE> [--force]` | implemented |
 | `list` | `<SCOPE> [--json]` | implemented |
 | `copy` | `<NAME> 或 --all [--force]` | implemented |
-| `remove` | `<NAME> <SCOPE> [--force]` | planned |
+| `remove` | `<NAME> <SCOPE> [--force]` | implemented |
 | `config get` | `lang` | implemented |
 | `config set` | `lang <LANG>` | implemented |
 | `upgrade` | `[--check] [--force]` | planned |
@@ -106,7 +106,7 @@ Local Skill Manager
 | `list` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
 | `copy` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
 | `copy` | `--all` | — | 关闭 | 复制全局全部 skill，与 `<NAME>` 互斥 |
-| `remove` | `--force` | — | 关闭 | 允许删除非合法 skill 目录（planned） |
+| `remove` | `--force` | — | 关闭 | 允许删除非合法 skill 目录 |
 | `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0（planned） |
 | `upgrade` | `--force` | — | 关闭 | 允许同版本重装与降级（planned） |
 

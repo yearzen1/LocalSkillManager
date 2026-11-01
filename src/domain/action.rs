@@ -23,6 +23,11 @@ pub enum Action {
         target: CopyTarget,
         force: bool,
     },
+    Remove {
+        scope: Scope,
+        name: SkillName,
+        force: bool,
+    },
     Config(ConfigCommand),
 }
 
