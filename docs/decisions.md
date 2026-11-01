@@ -45,6 +45,7 @@
 | Q38 | v0.2.0 范围 | 只做 `copy --all` 与 `remove`；`symlink`、project→global 反向复制、`update` 检查仍为非目标；两条命令都先在 `impl/cli.md` §2.1 写 `planned`、实现后转 `implemented`；已实现命令上的新选项（如 `copy --all`）不预写 `planned`，与 `cli/spec.rs` 同一提交落地 |
 | Q39 | 跨平台验证与 CI | v0.2.0 不做 GitHub Actions 矩阵、不做预编译产物、不做 Linux/macOS 实测，以 Windows 实测为唯一交付依据；触发条件=出现平台相关 issue，届时单独立计划，不并入 13 天节奏 |
 | Q40 | `copy --all` 批量语义 | `--all` 与 `<name>` 互斥（同时给出退 2）；逐条复用 `copy <name>` 的校验与原子安装，单条失败不中断：目标已存在且无 `--force` 算**跳过**（不算失败），源非法或 I/O 失败算**失败**并逐条报错；结束打印成功/跳过/失败计数，任一失败退 1，只有跳过或全部成功退 0，全局为空退 0 并提示无可复制内容 |
+| Q41 | `remove` 卸载语义 | 签名 `remove <name> <scope> [--force]`，scope 必填（与 `add`/`list` 一致），短选项 `-r <name> -g/-p`；无 `--force` 只删「目录名等于 name、含合法 `SKILL.md`、且 frontmatter name 与目录名一致」的目录，其余必须显式 `--force`；删除方式为「rename 到同级 `.tmp-remove-*` → 递归删临时目录」，rename 失败原目录不动；目标不存在退 1；不做批量删除 |
 
 ## 维护规则
 

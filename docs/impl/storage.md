@@ -298,6 +298,25 @@ copy 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）�
 4. 汇总一行到 stdout：成功 / 跳过 / 失败计数。
 5. 退出码：任一失败退 1；只有跳过或全部成功退 0；全局为空退 0 并提示没有可复制的 skill，且不创建项目 skills 目录。
 
+### 3.4 remove
+
+```
+lsm remove <name> <global|project> [--force]
+lsm -r <name> -g|-p [--force]
+```
+
+流程：
+
+1. **先校验 `name`**：与 `copy` 同一套规则（含长度、保留名），不拼路径；失败退 2。
+2. 目标：对应作用域 skills 目录下的 `<name>`；不存在 → 报错退 1。
+3. 无 `--force` 时只删**合法 skill 目录**：目录名等于 `<name>`、`SKILL.md` 可解析、frontmatter `name` 与目录名一致。缺 `SKILL.md`、name 不一致或根本不是目录 → 拒绝，提示加 `--force`。
+4. 删除方式：先把目标 `rename` 到同级 `.tmp-remove-<name>-<pid>`，成功后再递归删除临时目录。`rename` 失败时原目录保持完整；临时目录删不掉只留 warning（`.tmp-*` 已被 `scan` 忽略，不会污染 `list`）。
+5. 输出：
+   ```
+   removed my-skill -> <cwd>/.agents/skills/my-skill
+   ```
+6. `--force` 只放开第 3 步的合法性检查，不改变 name 校验，也不做批量删除。
+
 ## 4. 文件系统细节
 
 `infra::fsops` 与 `infra::scan` 接口：
@@ -378,5 +397,6 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError>;
 - Q29：`paths` 收 `&Env` 纯函数；`fsops`/`scan` 返回 `FsError`，不构造 `AppError`。
 - Q31：自更新用原地替换，`exe` 路径与文件名不变（`fsops::replace_self` 只实现替换与回滚）。
 - Q40：`copy --all` 逐条复制、冲突跳过、失败继续，任一失败退 1。
+- Q41：`remove` 只删合法 skill 目录，`--force` 才放开；rename 到临时目录再递归删。
 
 完整决策见 [decisions.md](../decisions.md)。

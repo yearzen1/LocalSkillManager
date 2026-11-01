@@ -86,6 +86,7 @@ Local Skill Manager
 | `add` | `<SOURCE> <SCOPE> [--force]` | implemented |
 | `list` | `<SCOPE> [--json]` | implemented |
 | `copy` | `<NAME> 或 --all [--force]` | implemented |
+| `remove` | `<NAME> <SCOPE> [--force]` | planned |
 | `config get` | `lang` | implemented |
 | `config set` | `lang <LANG>` | implemented |
 | `upgrade` | `[--check] [--force]` | planned |
@@ -105,12 +106,13 @@ Local Skill Manager
 | `list` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
 | `copy` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
 | `copy` | `--all` | — | 关闭 | 复制全局全部 skill，与 `<NAME>` 互斥 |
+| `remove` | `--force` | — | 关闭 | 允许删除非合法 skill 目录（planned） |
 | `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0（planned） |
 | `upgrade` | `--force` | — | 关闭 | 允许同版本重装与降级（planned） |
 
 - 选项表**不单列状态**：选项的存在性跟随命令表，`upgrade` 两行随命令一起转为 `implemented`。
 - `全局` 选项对根命令与每个子命令都生效；`根命令` 选项只对 `lsm` 本身生效（`lsm add --version` 是用法错误）。
-- `-a` / `-l` / `-c` / `-g` / `-p` **不是** clap 选项，是 §2.2 的前置归一化别名，不进本表。
+- `-a` / `-l` / `-c` / `-r` / `-g` / `-p` **不是** clap 选项，是 §2.2 的前置归一化别名，不进本表。
 - 选项文案、取值说明与 help 同源，全部来自消息表（§1.2）。
 
 ### 2.2 缩减版
@@ -127,17 +129,18 @@ Local Skill Manager
 | `lsm -l -g --json` | `lsm list global --json` |
 | `lsm -c foo` | `lsm copy foo` |
 | `lsm -c --all` | `lsm copy --all` |
+| `lsm -r foo -p` | `lsm remove foo project` |
 | `lsm --add foo.md --global` | `lsm add foo.md global` |
 
 归一化规则：
 
-1. 识别动作标志 `-a/--add`、`-l/--list`、`-c/--copy`（`-a`/`-c` 吞掉下一个参数；`-c --all` 归一化为 `copy --all`，`--all` 不做 name 校验）。
+1. 识别动作标志 `-a/--add`、`-l/--list`、`-c/--copy`、`-r/--remove`（`-a`/`-c`/`-r` 吞掉下一个参数；`-c --all` 归一化为 `copy --all`，`--all` 不做 name 校验）。
 2. 识别作用域标志 `-g/--global`、`-p/--project`，转换为位置参数。
 3. 未出现任何动作标志时原样交给 clap，走完整版语法。
 4. 以下情况直接报用法错误（退出码 2），并打印两种正确写法：
    - `-g` 与 `-p` 同时出现；
    - 多个动作标志同时出现；
-   - `-a` / `-c` 缺少参数；
+   - `-a` / `-c` / `-r` 缺少参数；
    - `add` / `list` 缺少作用域；
    - `-c` 与 `-g` / `-p` 同现；
    - 混用形式（如 `lsm add foo.md -g`）。
