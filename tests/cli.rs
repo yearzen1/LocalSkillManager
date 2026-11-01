@@ -850,6 +850,83 @@ fn copy_warns_about_git_directories() {
 }
 
 #[test]
+fn copy_all_copies_every_global_skill() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "First.");
+    install_global(&home, "beta", "Second.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "--all"])
+        .assert()
+        .success();
+
+    for name in ["alpha", "beta"] {
+        let copied = project
+            .path()
+            .join(format!(".agents/skills/{name}/SKILL.md"));
+        assert!(copied.exists(), "{name} should have been copied");
+    }
+}
+
+#[test]
+fn copy_all_with_empty_global_succeeds_without_touching_project() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "--all"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty().not());
+
+    assert!(!project.path().join(".agents/skills").exists());
+}
+
+#[test]
+fn copy_all_reports_conflicts_and_keeps_going() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "From global.");
+    install_global(&home, "beta", "From global.");
+    write_skill_md(
+        &project.path().join(".agents/skills/alpha/SKILL.md"),
+        "alpha",
+        "Local version.",
+    );
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "--all"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("alpha"))
+        .stderr(predicate::str::contains("already exists"));
+
+    // 冲突不中断：后面的 skill 照常复制，冲突目标保持原样。
+    assert!(project.path().join(".agents/skills/beta/SKILL.md").exists());
+    let alpha = project.path().join(".agents/skills/alpha/SKILL.md");
+    assert!(fs::read_to_string(alpha)
+        .unwrap()
+        .contains("Local version."));
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "--all", "--force"])
+        .assert()
+        .success();
+
+    let alpha = project.path().join(".agents/skills/alpha/SKILL.md");
+    assert!(fs::read_to_string(alpha).unwrap().contains("From global."));
+}
+
+#[test]
 fn invalid_yaml_hints_how_to_fix() {
     let home = home_dir();
     let work = TempDir::new().unwrap();
