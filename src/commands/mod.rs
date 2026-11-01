@@ -19,6 +19,6 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
         } => add::run(ctx, source, scope, force),
         Action::Config(command) => config::run(ctx, command),
         Action::List { scope, json } => list::run(ctx, scope, json),
-        Action::Copy { name, force } => copy::run(ctx, name, force),
+        Action::Copy { target, force } => copy::run(ctx, target, force),
     }
 }

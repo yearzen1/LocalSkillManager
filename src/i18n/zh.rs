@@ -27,6 +27,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UsageMultipleScopes => "-g 与 -p 不能同时使用",
         MsgKey::UsageMissingScope => "'{0}' 需要配合 -g 或 -p",
         MsgKey::UsageCopyWithScope => "copy 不接受 -g 或 -p",
+        MsgKey::UsageCopyTargetMissing => "copy 需要 skill 名称或 --all",
+        MsgKey::UsageCopyTargetConflict => "copy 只能在 skill 名称与 --all 之间二选一",
         MsgKey::UsageMixedForms => "不能混用短选项与子命令",
         MsgKey::UsageHintForms => "示例：lsm -a foo.md -g | lsm add foo.md global",
         MsgKey::UsageMissingArgument => "缺少必需参数 '{0}'",
@@ -56,6 +58,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::CopyAbout => "把全局 skill 复制到当前项目",
         MsgKey::CopyNameArg => "要复制的 skill 名称",
+        MsgKey::CopyAllFlag => "复制全部全局 skill",
+        MsgKey::CopyAllPending => "`copy --all` 尚未实现",
         MsgKey::CopyForceFlag => "覆盖已存在的 skill",
         MsgKey::CopyCopied => "已复制 {0} -> {1}",
         MsgKey::CopyNotFound => "在 global 中找不到 skill '{0}'",

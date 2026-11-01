@@ -148,6 +148,15 @@ mod tests {
     }
 
     #[test]
+    fn maps_copy_all() {
+        assert_eq!(run(&["-c", "--all"]).unwrap(), ["copy", "--all"]);
+        assert_eq!(
+            run(&["-c", "--all", "--force"]).unwrap(),
+            ["copy", "--all", "--force"]
+        );
+    }
+
+    #[test]
     fn rejects_multiple_actions() {
         assert_eq!(
             run(&["-l", "-c", "foo"]).unwrap_err(),

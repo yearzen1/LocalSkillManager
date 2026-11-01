@@ -85,7 +85,7 @@ Local Skill Manager
 |---|---|---|
 | `add` | `<SOURCE> <SCOPE> [--force]` | implemented |
 | `list` | `<SCOPE> [--json]` | implemented |
-| `copy` | `<NAME> [--force]` | implemented |
+| `copy` | `<NAME> 或 --all [--force]` | implemented |
 | `config get` | `lang` | implemented |
 | `config set` | `lang <LANG>` | implemented |
 | `upgrade` | `[--check] [--force]` | planned |
@@ -104,6 +104,7 @@ Local Skill Manager
 | `add` | `--force` | — | 关闭 | 目标已存在时覆盖：备份 → 安装 → 删备份 |
 | `list` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
 | `copy` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
+| `copy` | `--all` | — | 关闭 | 复制全局全部 skill，与 `<NAME>` 互斥 |
 | `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0（planned） |
 | `upgrade` | `--force` | — | 关闭 | 允许同版本重装与降级（planned） |
 
@@ -125,11 +126,12 @@ Local Skill Manager
 | `lsm -l -p` | `lsm list project` |
 | `lsm -l -g --json` | `lsm list global --json` |
 | `lsm -c foo` | `lsm copy foo` |
+| `lsm -c --all` | `lsm copy --all` |
 | `lsm --add foo.md --global` | `lsm add foo.md global` |
 
 归一化规则：
 
-1. 识别动作标志 `-a/--add`、`-l/--list`、`-c/--copy`（`-a`/`-c` 吞掉下一个参数）。
+1. 识别动作标志 `-a/--add`、`-l/--list`、`-c/--copy`（`-a`/`-c` 吞掉下一个参数；`-c --all` 归一化为 `copy --all`，`--all` 不做 name 校验）。
 2. 识别作用域标志 `-g/--global`、`-p/--project`，转换为位置参数。
 3. 未出现任何动作标志时原样交给 clap，走完整版语法。
 4. 以下情况直接报用法错误（退出码 2），并打印两种正确写法：

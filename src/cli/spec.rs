@@ -102,9 +102,14 @@ fn copy_command(lang: Lang) -> Command {
         .about(tr(lang, MsgKey::CopyAbout))
         .arg(
             Arg::new("name")
-                .required(true)
                 .value_name("NAME")
                 .help(tr(lang, MsgKey::CopyNameArg)),
+        )
+        .arg(
+            Arg::new("all")
+                .long("all")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::CopyAllFlag)),
         )
         .arg(
             Arg::new("force")

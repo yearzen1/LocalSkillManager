@@ -1,5 +1,6 @@
 //! `copy`：把全局 skill 复制到当前项目。
 
+use crate::domain::action::CopyTarget;
 use crate::domain::name::SkillName;
 use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
@@ -9,7 +10,16 @@ use crate::infra::{frontmatter, paths};
 use crate::output;
 use crate::Ctx;
 
-pub fn run(ctx: &Ctx, name: SkillName, force: bool) -> Result<(), AppError> {
+pub fn run(ctx: &Ctx, target: CopyTarget, force: bool) -> Result<(), AppError> {
+    match target {
+        CopyTarget::One(name) => copy_one(ctx, &name, force),
+        // D6 才落全量分支；在此之前明确报「未实现」，不要伪装成参数错误。
+        CopyTarget::All => Err(AppError::runtime(MsgKey::CopyAllPending)),
+    }
+}
+
+/// 复制单个 skill。
+fn copy_one(ctx: &Ctx, name: &SkillName, force: bool) -> Result<(), AppError> {
     let global_dir = paths::skills_dir(&ctx.env, Scope::Global, &ctx.cwd)?;
     let source = global_dir.join(name.as_str());
 
@@ -19,9 +29,9 @@ pub fn run(ctx: &Ctx, name: SkillName, force: bool) -> Result<(), AppError> {
             .with_hint(MsgKey::CopyNotFoundHint));
     }
 
-    ensure_valid_source(&source, &name)?;
+    ensure_valid_source(&source, name)?;
 
-    let destination = paths::skill_dir(&ctx.env, Scope::Project, &ctx.cwd, &name)?;
+    let destination = paths::skill_dir(&ctx.env, Scope::Project, &ctx.cwd, name)?;
 
     if fsops::is_same_path(&source, &destination)? {
         return Err(AppError::runtime(MsgKey::CopySamePath).with_hint(MsgKey::CopySamePathHint));

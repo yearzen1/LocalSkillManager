@@ -27,6 +27,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UsageMultipleScopes => "-g and -p cannot be combined",
         MsgKey::UsageMissingScope => "'{0}' requires -g or -p",
         MsgKey::UsageCopyWithScope => "copy does not take -g or -p",
+        MsgKey::UsageCopyTargetMissing => "copy needs a skill name or --all",
+        MsgKey::UsageCopyTargetConflict => "copy takes either a skill name or --all, not both",
         MsgKey::UsageMixedForms => "cannot mix short flags with subcommands",
         MsgKey::UsageHintForms => "examples: lsm -a foo.md -g | lsm add foo.md global",
         MsgKey::UsageMissingArgument => "missing required argument '{0}'",
@@ -56,6 +58,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::CopyAbout => "Copy a global skill into the current project",
         MsgKey::CopyNameArg => "Skill name to copy",
+        MsgKey::CopyAllFlag => "Copy every global skill",
+        MsgKey::CopyAllPending => "`copy --all` is not implemented yet",
         MsgKey::CopyForceFlag => "Overwrite an existing skill",
         MsgKey::CopyCopied => "copied {0} -> {1}",
         MsgKey::CopyNotFound => "skill '{0}' not found in global",

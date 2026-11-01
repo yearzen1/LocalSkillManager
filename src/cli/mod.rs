@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use clap::ArgMatches;
 
-use crate::domain::action::{Action, ConfigCommand};
+use crate::domain::action::{Action, ConfigCommand, CopyTarget};
 use crate::domain::config::ConfigKey;
 use crate::domain::lang::Lang;
 use crate::domain::name::SkillName;
@@ -91,15 +91,35 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
             scope: scope_of(&required(sub, "scope")),
             json: sub.get_flag("json"),
         },
-        "copy" => Action::Copy {
-            name: SkillName::parse(&required(sub, "name"))?,
-            force: sub.get_flag("force"),
-        },
+        "copy" => {
+            let target = copy_target(sub)?;
+            Action::Copy {
+                target,
+                force: sub.get_flag("force"),
+            }
+        }
         "config" => Action::Config(parse_config(sub)?),
         other => return Err(AppError::usage(MsgKey::UsageInvalidSubcommand).with_args([other])),
     };
 
     Ok(Outcome::Action(action))
+}
+
+/// `copy` 的复制对象：`<NAME>` 与 `--all` 必须二选一。
+fn copy_target(matches: &ArgMatches) -> Result<CopyTarget, AppError> {
+    let name = matches.get_one::<String>("name");
+    let all = matches.get_flag("all");
+
+    match (name, all) {
+        (Some(name), false) => Ok(CopyTarget::One(SkillName::parse(name)?)),
+        (None, true) => Ok(CopyTarget::All),
+        (Some(_), true) => {
+            Err(AppError::usage(MsgKey::UsageCopyTargetConflict).with_hint(MsgKey::UsageHelpHint))
+        }
+        (None, false) => {
+            Err(AppError::usage(MsgKey::UsageCopyTargetMissing).with_hint(MsgKey::UsageHelpHint))
+        }
+    }
 }
 
 fn parse_config(matches: &ArgMatches) -> Result<ConfigCommand, AppError> {

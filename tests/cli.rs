@@ -731,6 +731,41 @@ fn copy_short_flag_works() {
 }
 
 #[test]
+fn copy_rejects_name_together_with_all() {
+    lsm()
+        .args(["copy", "foo", "--all"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("not both"));
+}
+
+#[test]
+fn copy_requires_name_or_all() {
+    lsm()
+        .args(["copy"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("needs a skill name or --all"));
+}
+
+#[test]
+fn copy_all_parses_in_both_forms() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+
+    // D6 之前只验证「归一化 + 解析」通了：命令层明确报未实现，而不是参数错误。
+    for args in [vec!["copy", "--all"], vec!["-c", "--all"]] {
+        lsm()
+            .env("LSM_HOME", home.path())
+            .current_dir(project.path())
+            .args(args)
+            .assert()
+            .code(1)
+            .stderr(predicate::str::contains("not implemented"));
+    }
+}
+
+#[test]
 fn copy_missing_skill_points_at_list() {
     let home = home_dir();
     let project = TempDir::new().unwrap();

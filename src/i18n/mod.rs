@@ -46,6 +46,8 @@ keys!(
     UsageMultipleScopes,
     UsageMissingScope,
     UsageCopyWithScope,
+    UsageCopyTargetMissing,
+    UsageCopyTargetConflict,
     UsageMixedForms,
     UsageHintForms,
     UsageMissingArgument,
@@ -75,6 +77,8 @@ keys!(
     // copy
     CopyAbout,
     CopyNameArg,
+    CopyAllFlag,
+    CopyAllPending,
     CopyForceFlag,
     CopyCopied,
     CopyNotFound,

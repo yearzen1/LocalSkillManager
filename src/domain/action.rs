@@ -20,10 +20,17 @@ pub enum Action {
         json: bool,
     },
     Copy {
-        name: SkillName,
+        target: CopyTarget,
         force: bool,
     },
     Config(ConfigCommand),
+}
+
+/// `copy` 的复制对象：单个 skill 或全局全部。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CopyTarget {
+    One(SkillName),
+    All,
 }
 
 /// `config` 子命令。
