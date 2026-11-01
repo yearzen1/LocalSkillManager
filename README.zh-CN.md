@@ -78,6 +78,7 @@ lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
 lsm copy <name> [--force]
 lsm copy --all [--force]
+lsm remove <name> <global|project> [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
@@ -95,6 +96,7 @@ lsm --lang <en|zh> <command> ...
 | `lsm -l -p --json` | `lsm list project --json` |
 | `lsm -c foo` | `lsm copy foo` |
 | `lsm -c --all` | `lsm copy --all` |
+| `lsm -r foo -p` | `lsm remove foo project` |
 
 `-g` 与 `-p` 不能同时使用、不能与 `copy` 一起用，也不能与完整子命令写法混用。
 
@@ -126,6 +128,12 @@ my-skill     一句话说明。
 - 源与目标相同、或目标位于源内部时拒绝；目标已存在需要 `--force`。
 - `name` 在拼任何路径之前完成校验，`..`、`/`、`\` 与保留设备名都以退出码 2 失败。
 - `--all` 复制全部合法全局 skill。目标已存在时默认跳过（`--force` 覆盖）；非法 skill 逐条报错但不中断。跳过不算失败：只有真的复制失败才退出码 1。
+
+### remove
+
+- `lsm remove <name> <global|project>` 卸载 skill。无 `--force` 时只删合法 skill 目录（存在 `SKILL.md` 且其 `name` 与目录名一致），其余必须显式加 `--force`。
+- 删除是原子的：先把目标 rename 到同级 `.tmp-remove-*`，再递归删除；rename 失败时原目录保持完整。
+- 目标不存在退出码 1；`name` 在拼任何路径之前完成校验，`..` 与保留设备名以退出码 2 失败。
 
 ## 语言
 

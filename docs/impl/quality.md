@@ -90,6 +90,8 @@ lsm config set lang zh
 lsm config get lang
 lsm list global          # 应为中文
 cd <demo-project> && lsm copy sample && lsm list project
+lsm copy --all                                  # 目标已存在时跳过，退出码 0
+lsm remove sample project && lsm list project   # 列表里不再有 sample
 
 # [planned] upgrade 冒烟（`upgrade` 未实现前跳过）：复制一份再执行，确认替换的不是正在使用的二进制
 # cp ./target/release/lsm /tmp/lsm-check

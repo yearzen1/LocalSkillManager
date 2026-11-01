@@ -78,6 +78,7 @@ lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
 lsm copy <name> [--force]
 lsm copy --all [--force]
+lsm remove <name> <global|project> [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
@@ -95,6 +96,7 @@ Short forms (separate arguments only — `-lg` is not supported):
 | `lsm -l -p --json` | `lsm list project --json` |
 | `lsm -c foo` | `lsm copy foo` |
 | `lsm -c --all` | `lsm copy --all` |
+| `lsm -r foo -p` | `lsm remove foo project` |
 
 `-g`/`-p` may not be combined, may not be used with `copy`, and may not be mixed with the long subcommand form.
 
@@ -126,6 +128,12 @@ my-skill     One-line description.
 - Copying onto the same path, or into the source itself, is refused; an existing target needs `--force`.
 - `name` is validated before any path is built, so `..`, `/`, `\` and reserved device names exit with code 2.
 - `--all` copies every valid global skill. Existing targets are skipped unless `--force`; invalid skills are reported and the batch keeps going. Skipped skills are not failures: the command exits 1 only when a skill actually failed to copy.
+
+### remove
+
+- `lsm remove <name> <global|project>` uninstalls a skill. Without `--force` only a valid skill directory is deleted (`SKILL.md` present and its `name` matching the directory); anything else needs `--force`.
+- Deletion is atomic: the target is renamed to a sibling `.tmp-remove-*` first, then removed. If the rename fails, the original directory stays intact.
+- A missing target exits with code 1; `name` is validated before any path is built, so `..` and reserved device names exit with code 2.
 
 ## Language
 
