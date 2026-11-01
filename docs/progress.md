@@ -1,10 +1,12 @@
-# v0.2.0 进度表（40 分钟/天）
+# v0.3.0 进度表（40 分钟/天）
 
 > 上级：[实现方案索引](impl.md) ｜ 决策：[decisions.md](decisions.md) ｜ 需求：[Requirements.md](Requirements.md)
 >
-> 版本目标：v0.2.0（`copy --all` + `remove`）
-> 节奏：13 个工作日，每天 40 分钟，一个可验收切片
-> 起始日：2026-11-02（周一）｜ 收尾日：2026-11-18（周三）
+> 上一版：v0.2.0 已发布（tag `v0.2.0`，`copy --all` + `remove`）
+>
+> 版本目标：v0.3.0（`upgrade` 自更新，`Requirements.md` 第 3 条）
+> 节奏：10 个工作日，每天 40 分钟，一个可验收切片
+> 起始日：2026-11-02（周一）｜ 收尾日：2026-11-13（周五）
 
 ## 1. 怎么用
 
@@ -12,228 +14,172 @@
 - 完成标准只认**可执行命令**或可观察结果，不认"感觉做完了"。
 - 卡住超过 10 分钟就停：把卡点写进当天「卡住时」栏，第二天第一件事处理，不要在同一处硬耗。
 - 涉及代码的切片按 [tdd](../AGENTS.md) 走"红 → 绿 → 重构"，先写失败用例再改实现。
-- 当天没做完不跳天：把剩余步骤顺延到次日，把次日任务里可延后的部分往后推，保持"每天一个切片"。
+- 当天没做完不跳天：把剩余步骤顺延到次日，把次日任务里可延后的部分往后推。
 - 每个切片完成即提交，提交信息已写在日卡里，不要攒到最后一起提交。
+- **联网切片只打本地桩**：`LSM_UPGRADE_API` 指向回环地址；真实 GitHub 请求只在 D10 手工验收时跑一次。
+- **自替换只碰临时副本**：测试与验收都先 `Copy-Item` 一份 exe，不对正在使用的二进制做替换。
 
 ## 2. 总览
 
 | 周 | 天 | 主题 | 周交付物 |
 |---|---|---|---|
-| 1 | D1–D5 | 收尾 + 起头 | 工作区干净、v0.2.0 决策、验收脚本、`copy --all` 红用例与 CLI |
-| 2 | D6–D10 | 两个切片的主体 | `copy --all` 完成并入文档、`remove` 决策与 CLI |
-| 3 | D11–D13 | 收尾发布 | `remove` 落地、全量回归、v0.2.0 tag |
+| 1 | D1–D5 | 解析与网络 | 决策补口、版本解析、资产映射、HTTP 客户端、`--check` 命令层 |
+| 2 | D6–D10 | 下载、替换与发布 | 下载校验、原地替换、CLI 接线、文档、v0.3.0 tag |
 
 ## 3. 每日任务
 
 ### 第 1 周
 
-#### Day 1 · 2026-11-02（周一）· 提交现有改动
+#### Day 1 · 2026-11-02（周一）· 决策补口：升级怎么测
 
-- **目标**：把工作区里已完成的 YAML hint 与测试隔离分别提交，让历史保持单一目的。
+- **目标**：把"本地桩 + 临时副本"写进决策，后面不再为"能不能连真网"返工。
 - **步骤**
-  1. `git status --short` 确认改动只有 `src/error/mapping.rs`、`src/i18n/*`、`tests/cli.rs`
-  2. 跑 `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test`
-  3. `git add src/` 后提交 hint；再 `git add tests/cli.rs` 后提交测试隔离
-- **完成标准**：三条命令退出码均为 0；`git status --short` 输出为空；`git log --oneline -2` 就是下面两条提交
-- **提交信息**：`fix(i18n): hint how to fix invalid yaml`、`test: isolate config dir in cli tests`
-- **卡住时**：测试红就先只跑失败项（`cargo test <用例名> -- --nocapture`），把原因记到第 4 节；两类改动绝不合并成一个提交
-- [x] 完成（偏差见第 4 节 D1 备注）
+  1. `docs/decisions.md` 表尾追加 Q42：`LSM_UPGRADE_API` 可指向任意回环 HTTP 桩；测试只操作临时 exe 副本；真实联网验收只保留一次手动步骤；不推翻 Q39（CI 仍非目标）
+  2. `docs/impl/upgrade.md` §8 测试策略补一句：桩服务用标准库 `TcpListener` 起，不引额外测试依赖
+  3. 确认 `docs/impl/quality.md` 的 8 条 `[planned]` 用例编号 37–44 不变
+- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q42 \|'` 命中 1 行；`cargo test` 全绿
+- **提交信息**：`docs: decide upgrade test harness`
+- **卡住时**：Q42 的措辞拿不准就只写两条硬约束——"测试不联网"、"测试不碰正在使用的 exe"
 
-#### Day 1.5 · 2026-11-02（周一）· `list` 描述列改按列换行
+#### Day 2 · 2026-11-03（周二）· 版本解析
 
-- **目标**：`lsm list` 的中文 description 折行时不再顶到第 0 列，也不再按"字符数"假装 60 列。
+- **目标**：`v0.3.0` / `0.3.0` 能被解析并比较，为 `--check` 提供判据。
 - **步骤**
-  1. `docs/decisions.md` 追加 Q34：描述列固定 60 **显示列**、换行后悬挂缩进、最多 3 行；后续决策顺延为 Q35+
-  2. `docs/impl/storage.md` §2.4 与 §3.2 示例改成换行规则
-  3. 先写红用例（中文换行、续行对齐描述列、宽字符不跨行、超 3 行补 `...`），再改 `output/list.rs`
-- **完成标准**：`cargo test` 全绿；`lsm list project` 里 `intent-lock` 的续行从描述列开始，每行 ≤ 60 列
-- **提交信息**：`docs: decide list text wrapping`、`test(list): pin list wrapping behavior`、`feat(list): wrap descriptions with hanging indent`、`docs: document list wrapping`
-- **卡住时**：中英混排仍对不齐就以 `display_width` 为准修换行算法，不改列宽常量
-- [x] 完成
+  1. 红用例：接受 `v0.3.0`、`0.3.0`；拒绝 `v0.3`、`v0.3.0-rc.1`、`latest`、空串；三段数值比较；前导零按数值处理
+  2. 新建 `domain/version.rs`，错误用独立枚举，不构造 `AppError`
+  3. 在 `error/mapping.rs` 补 `AppError` 转换
+- **完成标准**：`cargo test version` 全绿；`domain::version` 不依赖 `std::fs` 与网络
+- **提交信息**：`test(domain): pin version parsing`、`feat(domain): parse release versions`
+- **卡住时**：前导零与 `v` 前缀的边界拿不准就以 `upgrade.md` §2.1 为准，不改规则迁就实现
 
-#### Day 2 · 2026-11-03（周二）· 决策先行，钉住 v0.2.0 范围
+#### Day 3 · 2026-11-04（周三）· 资产映射与元数据解析
 
-- **目标**：按仓库"决策先行"规则，先把范围写进 `decisions.md`，后面不再为"要不要做"返工。
+- **目标**：把当前平台映射到唯一资产名，并能读出 release 元数据里的 tag 与资产列表。
 - **步骤**
-  1. `docs/decisions.md` 表尾追加 Q38：v0.2.0 只含 `copy --all` 与 `remove`；`symlink`、反向 copy、`update` 检查仍为非目标；已实现命令上的新选项不预写 `planned`
-  2. 追加 Q39：CI 矩阵、预编译产物、Linux/macOS 实测**延后，等真实 issue 触发再立计划**（当前交付以 Windows 实测为准）
-  3. 同步 `docs/impl.md`「非目标」段与第 5 节约束表，只放摘要 + 链接
-  4. 修号：Q35–Q37 已被显示宽度、`ureq`、选项表占用，本卡与 D9 的编号顺延为 Q38–Q40
-- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q3[89] \|'` 命中 2 行；`docs/impl.md` 新增行能点回 `decisions.md`
-- **提交信息**：`docs: record v0.2.0 scope and renumber decisions`
-- **卡住时**：Q39 的措辞拿不准就写"暂不做，触发条件=有用户 issue 提出平台相关问题"，不写时间点
-- [x] 完成
+  1. 红用例：`upgrade.md` §2.2 的 6 种 os/arch 组合各命中一个资产名；未知组合报错；元数据缺字段、资产重复、非 JSON 各有独立错误
+  2. 新建 `domain/release.rs`：平台 → `lsm-<os>-<arch>[.exe]`，元数据结构只保留 `tag_name` 与资产 `name`/下载地址
+  3. 解析用 `serde_json`，不把原始 JSON 泄漏到命令层
+- **完成标准**：`cargo test release` 全绿；资产名与 `docs/release.md` §1 的命名表逐条一致
+- **提交信息**：`test(domain): pin asset selection`、`feat(domain): map platforms to release assets`
+- **卡住时**：Windows ARM64 等暂不发布的组合照表实现，不因"当前只有 x64"删映射
 
-#### Day 3 · 2026-11-04（周三）· 手工验收写成脚本
+#### Day 4 · 2026-11-05（周四）· HTTP 客户端与错误映射
 
-- **目标**：把 `docs/impl/quality.md`「手工验收」那串命令变成一条可重复执行的脚本。
+- **目标**：能取到 release 元数据，并把网络、状态码、解析失败分门别类地报出来。
 - **步骤**
-  1. 新建 `scripts/acceptance.sh`，内容对应 `quality.md` 的 7 条手工步骤，每步失败即 `exit 1`
-  2. 用临时 `LSM_HOME` 与 demo 项目目录，结束时清理，不写死本机绝对路径
-  3. 加 `.gitattributes`（`*.sh text eol=lf`），否则 Windows 检出成 CRLF 脚本直接跑不起来
-  4. 在 Git Bash 里执行，逐条修到全绿
-- **完成标准**：`"D:/Git/bin/bash.exe" scripts/acceptance.sh` 退出码 0，末尾打印 `PASS`；WSL 的 `bash` 调用应以退出码 2 拒绝
-- **提交信息**：`chore: force lf for shell scripts`、`test: script manual acceptance`
-- **卡住时**：Windows 上 `chmod +x` 无效不影响使用；PATH 上的 `bash` 是 WSL，必须显式用 Git Bash
-- [x] 完成
+  1. `Cargo.toml` 加 `ureq` 3（`default-features = false, features = ["rustls"]`），按 Q36 配两个超时
+  2. 新建 `infra/http.rs`：GET 元数据端点，`LSM_UPGRADE_API` 覆盖
+  3. 红用例用标准库 `TcpListener` 起桩：200 正常、403/429 限流、404、非 JSON 各一条
+- **完成标准**：`cargo test http` 全绿；测试全程不访问外网
+- **提交信息**：`build: add ureq for upgrade`、`test(http): pin upgrade error mapping`、`feat(http): fetch release metadata`
+- **卡住时**：`ureq` 版本 API 不熟就先只跑通 200 一条，再补错误分支，不要一次写四类错误
 
-#### Day 4 · 2026-11-05（周四）· `copy --all` 红用例
+#### Day 5 · 2026-11-06（周五）· `upgrade --check` 命令层
 
-- **目标**：先写三条会失败的用例，把行为钉死。
+- **目标**：已最新与有新版本两种结论都能算出来，且不下载、不写盘。
 - **步骤**
-  0. `docs/decisions.md` 追加 Q40（`copy --all` 批量语义：冲突算跳过、源非法算失败、任一失败退 1），并同步 `storage.md` §3.3
-  1. `tests/cli.rs` 加用例：全量复制两个 skill、全局为空时退出码 0 且提示无内容、目标已存在时汇总冲突而不中途中断
-  2. 只加测试不改实现，`cargo test` 确认三条红
-  3. 用 `-- --nocapture` 记录实际输出，作为实现依据
-- **完成标准**：`cargo test` 中三条新用例失败，失败原因是"未实现/行为不符"而非用例本身写错
-- **提交信息**：`docs: decide copy-all semantics`、`test(copy): add copy-all cases`
-- **卡住时**：空全局的期望输出拿不准就先按"退出码 0 + 一行 info 提示"写，文案留到 D7 定稿
-- [x] 完成
-
-#### Day 5 · 2026-11-06（周五）· `copy --all` CLI 接线
-
-- **目标**：`-c --all` 能解析成 `Action::Copy { all: true }`。
-- **步骤**
-  1. `domain/action.rs` 扩展 `Copy` 变体；`cli/spec.rs` 加 `--all`
-  2. `cli/normalize.rs` 里 `-c` 吞参数的行为要兼容 `-c --all`
-  3. 补参数用例：`-c --all`、`copy --all`、`copy <name>`，三者互斥
-- **完成标准**：三条参数用例绿；`lsm copy --all` 返回"未实现"而非解析错误
-- **提交信息**：`feat(cli): add copy --all flag`
-- **卡住时**：与 `copy <name>` 的互斥规则有歧义时，取"同时给出则退出码 2 并提示"，与现有短选项非法组合策略一致
-- [x] 完成
+  1. 新建 `commands/upgrade.rs`：取元数据 → 解析 tag → 与 `CARGO_PKG_VERSION` 比较 → 返回结论
+  2. `--check` 分支只输出结论；`--force` 对 `--check` 无意义，忽略
+  3. 单测覆盖：已最新、有新版本、当前版本更新且未加 `--force`
+- **完成标准**：`cargo test upgrade` 全绿；测试后临时目录无新增文件
+- **提交信息**：`test(upgrade): pin check behavior`、`feat(upgrade): report latest release`
+- **卡住时**：这一层先不接 CLI——`cli.md` 的 `planned` 行要求命令仍是未知子命令，接子命令留到 D8 一次做完
 
 ### 第 2 周
 
-#### Day 6 · 2026-11-09（周一）· `copy --all` 全量复制实现
+#### Day 6 · 2026-11-09（周一）· 下载与冒烟校验
 
-- **目标**：D4 的三条用例全绿。
+- **目标**：下载到的文件只有通过 `<新文件> --version` 才算可用。
 - **步骤**
-  1. `commands/copy.rs` 增加全量分支：扫描全局目录 → 逐个 `install_skill_dir`
-  2. 冲突走既有 `--force` 语义：目标已存在且无 `--force` 记**跳过**并继续；源非法 / I/O 失败记**失败**并继续
-  3. 结束打印"成功 N 个 / 跳过 M 个 / 失败 K 个"，任一失败退出码 1（见 Q40）
-- **完成标准**：`cargo test` 全绿；临时目录放两个全局 skill 后 `lsm copy --all` 复制成功
-- **提交信息**：`feat(copy): copy all global skills`
-- **卡住时**：`commands` 不允许直接调 `std::fs`，扫描必须复用 `infra::scan`；需要新接口就先加在 `infra` 再接线
-- [x] 完成
+  1. `infra/http.rs` 加下载到临时文件的能力，超时 5 分钟（Q36）
+  2. 冒烟校验：以子进程执行 `<新文件> --version`，退出 0 且输出含目标 tag 的版本号
+  3. 红用例：下载失败、版本不匹配、子进程非 0，三种都不得进入替换流程
+- **完成标准**：`cargo test download` 全绿；校验失败时临时文件被清理
+- **提交信息**：`feat(upgrade): download and verify release assets`
+- **卡住时**：子进程在 Windows 上拿不到输出就先写文件再读，不要为此换校验方式
 
-#### Day 7 · 2026-11-10（周二）· `copy --all` i18n 与输出
+#### Day 7 · 2026-11-10（周二）· 原地替换与回滚
 
-- **目标**：新提示全部走消息表，en/zh 同步。
+- **目标**：替换后 exe 路径与文件名不变，失败时原文件仍可执行。
 - **步骤**
-  1. `i18n/mod.rs` 加 key，`en.rs` / `zh.rs` 各补文案（成功汇总、空全局、部分失败）
-  2. `output` 侧确认汇总输出用 `tr_args` 而不是字符串拼接
-  3. 分别用 `--lang en` / `--lang zh` 各跑一次
-- **完成标准**：`en.rs` 与 `zh.rs` 的 key 集合一致；代码里无硬编码用户可见文案
-- **提交信息**：`feat(i18n): add copy-all messages`
-- **卡住时**：中英文案长度差异导致列宽不齐，就改用逐行输出，别为对齐写死宽度
-- [ ] 完成
+  1. `infra/fsops.rs` 加 `replace_self`：备份为 `<exe>.old-<pid>` → 换位 → 删备份，失败回滚（Q31）
+  2. 单测在临时目录用副本跑：成功、换位失败、备份删不掉留 warning
+  3. 确认不产生版本化文件名
+- **完成标准**：`cargo test replace_self` 全绿；测试后目录里没有 `.old-*` 残留
+- **提交信息**：`feat(fs): replace the running binary in place`
+- **卡住时**：Windows 上正在运行的 exe 不能直接覆盖，必须走 rename；失败就如实报错，不静默重试
 
-#### Day 8 · 2026-11-11（周三）· `copy --all` 文档同步
+#### Day 8 · 2026-11-11（周三）· CLI 接线与状态列
 
-- **目标**：`copy --all` 在文档里与代码一致。
+- **目标**：`lsm upgrade [--check] [--force]` 可用，`cli.md` 同步转 `implemented`。
 - **步骤**
-  1. `docs/impl/storage.md`「各命令实现」补全量分支规则
-  2. `docs/impl/cli.md` 命令表加 `-c --all`
-  3. 两份 README 的命令参考各加一行示例
-- **完成标准**：`docs/impl.md` 第 5 节指向的规则里能找到 `--all`；两份 README 命令表行数一致
-- **提交信息**：`docs: document copy --all`
-- **卡住时**：文档与实现不一致时以代码为准改文档，不改代码迁就旧文档；差异写进第 5 节风险表
-- [x] 完成
+  1. `domain/action.rs` 加 `Upgrade { check, force }`；`cli/spec.rs` 加子命令（无短选项）
+  2. `docs/impl/cli.md` §2.1 把 `upgrade` 行改成 `implemented`，同一提交完成
+  3. `tests/cli.rs` 落地 `quality.md` 37–44 八条，并删掉 `[planned]` 标记
+- **完成标准**：`cargo test` 全绿；`lsm upgrade --help` 退出 0；`lsm -u` 退 2
+- **提交信息**：`feat(cli): add upgrade command`
+- **卡住时**：`cli_reference_table_matches_binary` 红了先看状态列，不要为了过测试把 `planned` 留着
 
-#### Day 9 · 2026-11-12（周四）· `remove` 决策 + 红用例
+#### Day 9 · 2026-11-12（周四）· 文档与验收脚本
 
-- **目标**：把"卸载"从非目标移出，并先用例钉住破坏性行为。
+- **目标**：用户面文档只描述已实现行为，脚本覆盖不联网的部分。
 - **步骤**
-  1. `docs/decisions.md` 追加 Q41：`remove <name> [global|project]` + `--force` 语义、原子删除方式
-  2. 确认 `docs/impl.md`「非目标」段已不含"不做删除、卸载"（D2 已删），只补 `remove` 的签名摘要
-  3. `tests/cli.rs` 加三条用例：正常删除、不存在时报错退 1、`--force` 才删非空
-- **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q41 \|'` 命中 1 行；三条新用例红
-- **提交信息**：`docs: decide skill removal scope`
-- **卡住时**：`--force` 语义拿不准就取"无 `--force` 只删由 `add` 创建的合法 skill 目录（含 SKILL.md 且目录名与 name 一致）"，其余必须显式 `--force`
-- [x] 完成
+  1. 两份 README 命令参考各加 `lsm upgrade [--check] [--force]` 与行为说明
+  2. `scripts/acceptance.sh` 加两步：`upgrade --help` 退 0、`upgrade --bogus` 退 2（不联网）
+  3. `docs/impl/quality.md` §1.3 去掉 `upgrade` 冒烟的 `[planned]` 注释，写清真实联网只手动跑一次
+- **完成标准**：`"D:/Git/bin/bash.exe" scripts/acceptance.sh` 退出 0；两份 README 命令表行数一致
+- **提交信息**：`docs: document upgrade`、`test: cover upgrade in acceptance script`
+- **卡住时**：脚本里起本地桩太复杂就先只做 `--help` 与非法参数两步，真实请求留给手动验收
 
-#### Day 10 · 2026-11-13（周五）· `remove` CLI 与校验
+#### Day 10 · 2026-11-13（周五）· 全量回归与发布
 
-- **目标**：`-r/--remove` 能解析并做前置校验。
+- **目标**：v0.3.0 收口，tag 与 release 是唯一发布标记。
 - **步骤**
-  1. `domain/action.rs` 加 `Remove { scope, name, force }`；`cli/spec.rs` 加子命令与短选项
-  2. 复用 `SkillName::parse` 防路径穿越；存在性检查放在命令层
-  3. 参数用例：无 name、非法 name、scope 缺省
-- **完成标准**：参数用例绿；`lsm remove ..` 被拦截且退出码 2
-- **提交信息**：`feat(cli): add remove command`
-- **卡住时**：短选项冲突时优先换长选项并在 `docs/impl/cli.md` 注明，不为凑短选项改既有行为
-- [x] 完成
-
-### 第 3 周
-
-#### Day 11 · 2026-11-16（周一）· `remove` 原子删除实现
-
-- **目标**：删除失败可回滚，不留半个 skill。
-- **步骤**
-  1. `infra/fsops.rs` 加 `remove_skill_dir`：先 `rename` 到同级临时目录，成功后再递归删临时目录
-  2. `commands/remove.rs` 编排：解析路径 → 校验 → 删除 → 输出
-  3. 失败路径用例：目标不可删时不破坏原目录
-- **完成标准**：`cargo test` 全绿；D9 三条用例全绿；异常路径下原目录仍完整
-- **提交信息**：`feat(remove): uninstall skill atomically`
-- **卡住时**：Windows 上 `rename` 仍可能因占用失败，就把错误如实抛出并提示"是否被编辑器占用"，不做静默重试
-- [x] 完成
-
-#### Day 12 · 2026-11-17（周二）· `remove` i18n + 全量回归
-
-- **目标**：命令可用、文案齐、旧功能没被带坏。
-- **步骤**
-  1. 补 `remove` 的 en/zh 文案（成功、不存在、拒绝删除的提示）
-  2. 更新 `storage.md` / `cli.md` / 双 README
-  3. 跑四道门禁：`cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test`、`"D:/Git/bin/bash.exe" scripts/acceptance.sh`
-- **完成标准**：四道门禁全绿；`git status --short` 只剩预期文件
-- **提交信息**：`feat(remove): add messages and docs`
-- **卡住时**：验收脚本里旧的 `add/copy` 步骤失败，说明回归问题优先于文案，先修回归再补文案
-- [x] 完成
-
-#### Day 13 · 2026-11-18（周三）· 版本 0.2.0 与 tag
-
-- **目标**：v0.2.0 收口，以 tag 为唯一发布标记。
-- **步骤**
-  1. `Cargo.toml` 版本改 `0.2.0`，`cargo build --release` 让 `Cargo.lock` 同步
-  2. 跑一次 `./target/release/lsm --version` 与 `lsm list global`，确认本地可用
-  3. `git tag v0.2.0` 并 `git push origin v0.2.0`
-- **完成标准**：`lsm --version` 输出 `0.2.0`；`git tag --points-at HEAD` 含 `v0.2.0`；远端能看到该 tag
-- **提交信息**：`chore: release v0.2.0`
-- **卡住时**：tag 打错就删远端 tag 重打（`git push --delete origin v0.2.0`），不靠加新 tag 掩盖
-- [x] 完成（本地 tag；推送待确认）
+  1. 四道门禁：`cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test`、`"D:/Git/bin/bash.exe" scripts/acceptance.sh`
+  2. `Cargo.toml` 改 `0.3.0`，`cargo build --release`，产物改名为 `lsm-windows-x64.exe`
+  3. 手工联网验收：复制一份 exe，`upgrade --check` 确认能查到 `v0.2.0`；再跑 `upgrade --force` 确认替换后 `--version` 正常
+  4. `git tag -a v0.3.0`，推送 `main` 与 tag，按 [release-notes.md](release-notes.md) 模板发 release
+- **完成标准**：四道门禁全绿；`lsm --version` 输出 `0.3.0`；远端 release 资产可下载且字节数一致
+- **提交信息**：`chore: release v0.3.0`
+- **卡住时**：联网验收失败先判断是 GitHub 限流还是资产缺失，限流就等 10 分钟重试，不改实现绕过
 
 ## 4. 打卡表
 
 | 天 | 日期 | 完成 | 实际用时 | 备注（卡点/顺延原因） |
 |---|---|---|---|---|
-| D1 | 2026-11-02 | ☑ | | 偏差：hint + 测试隔离已合成 `dd005ea` 并推送，按"不改写已发布历史"处理；另以 `5b1563c` 跟踪 `.agents/`、忽略 `TODO.md` |
-| D1.5 | 2026-10-30 | ☑ | | 提前完成：列表描述列改按显示列换行（Q34），占掉原 Q34，D2 顺延为 Q38/Q39（Q35–Q37 又被显示宽度、`ureq`、选项表占用） |
-| D2 | 2026-11-03 | ☑ | | 实际 2026-10-31 提前完成：Q38/Q39 落地；Q40 后被 D4 的 `copy --all` 语义占用，D9 再顺延为 Q41；顺带修正 `impl.md` 的 Q1–Q40 索引、`anyhow` 选型描述与「非目标」段 |
-| D3 | 2026-11-04 | ☑ | | 实际 2026-10-31 提前完成：`scripts/acceptance.sh` 七步全绿；发现 PATH 上的 `bash` 是 WSL，脚本对 WSL 显式退 2，另加 `.gitattributes` 固定 `*.sh` 为 LF |
-| D4 | 2026-11-05 | ☑ | | 实际 2026-11-01 提前完成：先落 Q40 决策（占用原定给 D9 的号，D9 顺延为 Q41），三条用例红在 `unknown argument '--all'`（退 2）；汇总文案待 D7 收紧 |
-| D5 | 2026-11-06 | ☑ | | 实际 2026-11-01 提前完成：互斥改在 `cli::parse` 判定并新增 `UsageCopyTargetMissing/Conflict` 两条本地化文案（clap 原生冲突只吐出 `[NAME]`，不可用）；命令层临时 `CopyAllPending`，D6 删除 |
-| D6 | 2026-11-09 | ☑ | | 实际 2026-11-01 提前完成：`CopyAll*` 文案随实现一起进消息表（原计划 D7），D7 只剩措辞打磨与断言收紧；D4 冲突用例按 Q40 从退 1 改为退 0（跳过不算失败） |
+| D1 | 2026-11-02 | ☐ | | |
+| D2 | 2026-11-03 | ☐ | | |
+| D3 | 2026-11-04 | ☐ | | |
+| D4 | 2026-11-05 | ☐ | | |
+| D5 | 2026-11-06 | ☐ | | |
+| D6 | 2026-11-09 | ☐ | | |
 | D7 | 2026-11-10 | ☐ | | |
-| D8 | 2026-11-11 | ☑ | | 实际 2026-11-01 提前完成：storage.md/cli.md 已在 D4/D5 落地，本次只补两份 README 的命令行、短选项表与 `--all` 行为说明 |
-| D9 | 2026-11-12 | ☑ | | 实际 2026-11-01 提前完成：Q41 落决策，`remove` 在 cli.md 先记 `planned`；三条用例红在 `invalid subcommand 'remove'`。因 planned 行必须是未知子命令，D10 一旦加子命令就得同提交转 `implemented`，D10/D11 合并为一次落地 |
-| D10 | 2026-11-13 | ☑ | | 实际 2026-11-01 与 D11 合并落地：`remove <name> <scope> [--force]` + `-r` 归一化、`Action::Remove`、name 校验退 2 |
-| D11 | 2026-11-16 | ☑ | | 实际 2026-11-01 提前完成：`fsops::remove_entry_atomically`（rename → 递归删）+ `commands/remove.rs`；rename 失败路径靠 `SourceMissing` 用例兜底，占用场景只能手工复现 |
-| D12 | 2026-11-17 | ☑ | | 实际 2026-11-01 提前完成：en/zh 文案随实现落地，本次补双 README 与 quality.md，验收脚本扩到 9 步；四道门禁全绿 |
-| D13 | 2026-11-18 | ☑ | | 实际 2026-11-01 提前完成：`0.2.0` 版本号与文档样例同步，release 构建通过；本地 tag `v0.2.0`，远端推送待确认 |
+| D8 | 2026-11-11 | ☐ | | |
+| D9 | 2026-11-12 | ☐ | | |
+| D10 | 2026-11-13 | ☐ | | |
 
 ## 5. 风险与应对
 
 | 风险 | 触发信号 | 应对 |
 |---|---|---|
-| `remove` 破坏性 | 用户删错目录 | 无 `--force` 只删合法 skill 目录；先 rename 到临时目录再删，失败可回滚 |
-| 40 分钟不够 | 连续两天顺延 | 把当天任务砍成"只写用例"或"只改文档"两个半天切片，不合并任务 |
-| 文档与实现漂移 | D8/D12 发现文档与代码不同 | 以代码为准改文档，同一提交内完成；差异记入本表 |
-| 跨平台问题冒出来 | 出现 Linux/macOS 相关 issue | 单独立计划补 CI 与实测，不在本表临时插入，避免打乱 13 天节奏 |
+| 自替换弄坏正在运行的 exe | 替换后 `--version` 失败 | 只在临时副本上跑测试；Windows 用 rename 换位，失败回滚并保留 `.old-*` |
+| 网络测试不稳定 | 测试偶发超时 | 只用回环桩，不联外网；真实请求只留一次手动验收 |
+| 下载内容不可信 | 冒烟校验失败 | 以 `<新文件> --version` 退出 0 且版本匹配为唯一通过条件（Q31） |
+| 文档与实现漂移 | D8/D9 发现 `cli.md` 与 `--help` 不一致 | 以代码为准改文档，同一提交内完成；状态列与子命令必须同一次提交 |
 
 ## 6. 明确不做
 
-- 不做 CI 矩阵、不做预编译产物、不做 Linux/macOS 实测：等真实 issue 触发再立计划（见 Q39）。
-- 不排缓冲日、不排机动日：13 天排满，掉队按"顺延不跳天"处理。
-- 不建 `CHANGELOG.md`，版本说明以 tag 为唯一事实来源。
-- 不做甘特图、不写精确到分钟的时间分配、不做完成率打分。
-- 不做 `update` 检查、不做符号链接、不做从 project 反向复制到 global。
+- 不做 CI 矩阵、预编译产物、Linux/macOS 实测：仍按 Q39，等真实 issue 触发再立计划。
+- 不做自动/后台检查更新：只在用户显式执行 `upgrade` 时联网（Q30）。
+- 不发布 `.sha256`：v1 用「下载后执行 `--version`」兜底（Q31）。
+- 不建 `CHANGELOG.md`：版本说明按 [release-notes.md](release-notes.md) 模板写进 release。
+
+## 7. 候选池（来自 `TODO.md`，待决策后再排期）
+
+| 候选 | 状态 | 前置 |
+|---|---|---|
+| `copy a b c` / `remove a b c` 多参数 | 待决策 | 需扩 `--all` 与多 name 的互斥规则 |
+| `search` 命令 | 待决策 | 需定匹配字段（name / description）与输出格式 |
+| copy/remove 找不到时自动 search | 待决策 | 依赖 `search`，且会改现有 `not found` 输出 |
+| project → global 反向复制 | 待决策 | 与 Q38 冲突，需先定命令形态 |
+| 日志功能 | 待决策 | 范围未定（文件日志 / 调试开关 / 审计） |
