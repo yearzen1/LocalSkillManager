@@ -150,7 +150,7 @@
 - **完成标准**：`Select-String -Path docs/decisions.md -Pattern '\| Q41 \|'` 命中 1 行；三条新用例红
 - **提交信息**：`docs: decide skill removal scope`
 - **卡住时**：`--force` 语义拿不准就取"无 `--force` 只删由 `add` 创建的合法 skill 目录（含 SKILL.md 且目录名与 name 一致）"，其余必须显式 `--force`
-- [ ] 完成
+- [x] 完成
 
 #### Day 10 · 2026-11-13（周五）· `remove` CLI 与校验
 
@@ -162,7 +162,7 @@
 - **完成标准**：参数用例绿；`lsm remove ..` 被拦截且退出码 2
 - **提交信息**：`feat(cli): add remove command`
 - **卡住时**：短选项冲突时优先换长选项并在 `docs/impl/cli.md` 注明，不为凑短选项改既有行为
-- [ ] 完成
+- [x] 完成
 
 ### 第 3 周
 
@@ -176,7 +176,7 @@
 - **完成标准**：`cargo test` 全绿；D9 三条用例全绿；异常路径下原目录仍完整
 - **提交信息**：`feat(remove): uninstall skill atomically`
 - **卡住时**：Windows 上 `rename` 仍可能因占用失败，就把错误如实抛出并提示"是否被编辑器占用"，不做静默重试
-- [ ] 完成
+- [x] 完成
 
 #### Day 12 · 2026-11-17（周二）· `remove` i18n + 全量回归
 
@@ -215,9 +215,9 @@
 | D6 | 2026-11-09 | ☑ | | 实际 2026-11-01 提前完成：`CopyAll*` 文案随实现一起进消息表（原计划 D7），D7 只剩措辞打磨与断言收紧；D4 冲突用例按 Q40 从退 1 改为退 0（跳过不算失败） |
 | D7 | 2026-11-10 | ☐ | | |
 | D8 | 2026-11-11 | ☑ | | 实际 2026-11-01 提前完成：storage.md/cli.md 已在 D4/D5 落地，本次只补两份 README 的命令行、短选项表与 `--all` 行为说明 |
-| D9 | 2026-11-12 | ☐ | | |
-| D10 | 2026-11-13 | ☐ | | |
-| D11 | 2026-11-16 | ☐ | | |
+| D9 | 2026-11-12 | ☑ | | 实际 2026-11-01 提前完成：Q41 落决策，`remove` 在 cli.md 先记 `planned`；三条用例红在 `invalid subcommand 'remove'`。因 planned 行必须是未知子命令，D10 一旦加子命令就得同提交转 `implemented`，D10/D11 合并为一次落地 |
+| D10 | 2026-11-13 | ☑ | | 实际 2026-11-01 与 D11 合并落地：`remove <name> <scope> [--force]` + `-r` 归一化、`Action::Remove`、name 校验退 2 |
+| D11 | 2026-11-16 | ☑ | | 实际 2026-11-01 提前完成：`fsops::remove_entry_atomically`（rename → 递归删）+ `commands/remove.rs`；rename 失败路径靠 `SourceMissing` 用例兜底，占用场景只能手工复现 |
 | D12 | 2026-11-17 | ☐ | | |
 | D13 | 2026-11-18 | ☐ | | |
 
