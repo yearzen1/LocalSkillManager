@@ -979,6 +979,71 @@ fn copy_all_reports_conflicts_and_keeps_going() {
     assert!(fs::read_to_string(alpha).unwrap().contains("From global."));
 }
 
+// ---------- remove ----------
+
+fn install_project(project: &TempDir, name: &str, description: &str) {
+    let work = TempDir::new().unwrap();
+    let source = work.path().join(format!("{name}.md"));
+    write_skill_md(&source, name, description);
+    lsm()
+        .current_dir(project.path())
+        .args(["add", source.to_str().unwrap(), "project"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn remove_deletes_project_skill() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "my-skill", "Remove me.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "my-skill", "project"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("removed my-skill"));
+
+    assert!(!project.path().join(".agents/skills/my-skill").exists());
+}
+
+#[test]
+fn remove_missing_skill_exits_one() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["remove", "nope", "project"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("not found"));
+}
+
+#[test]
+fn remove_refuses_non_skill_dir_unless_forced() {
+    let project = TempDir::new().unwrap();
+    let stray = project.path().join(".agents/skills/odd");
+    fs::create_dir_all(stray.join("nested")).unwrap();
+    fs::write(stray.join("nested/file.txt"), "keep").unwrap();
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "odd", "project"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("odd"));
+    assert!(stray.join("nested/file.txt").exists());
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "odd", "project", "--force"])
+        .assert()
+        .success();
+    assert!(!stray.exists());
+}
+
 #[test]
 fn invalid_yaml_hints_how_to_fix() {
     let home = home_dir();
