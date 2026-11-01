@@ -77,6 +77,7 @@ Limits are never truncated or auto-fixed: violating them is an error.
 lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
 lsm copy <name> [--force]
+lsm copy --all [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
@@ -93,6 +94,7 @@ Short forms (separate arguments only — `-lg` is not supported):
 | `lsm -l -g` | `lsm list global` |
 | `lsm -l -p --json` | `lsm list project --json` |
 | `lsm -c foo` | `lsm copy foo` |
+| `lsm -c --all` | `lsm copy --all` |
 
 `-g`/`-p` may not be combined, may not be used with `copy`, and may not be mixed with the long subcommand form.
 
@@ -123,6 +125,7 @@ my-skill     One-line description.
 - The source must be a valid global skill: `SKILL.md` present and its `name` must match the directory.
 - Copying onto the same path, or into the source itself, is refused; an existing target needs `--force`.
 - `name` is validated before any path is built, so `..`, `/`, `\` and reserved device names exit with code 2.
+- `--all` copies every valid global skill. Existing targets are skipped unless `--force`; invalid skills are reported and the batch keeps going. Skipped skills are not failures: the command exits 1 only when a skill actually failed to copy.
 
 ## Language
 

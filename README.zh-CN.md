@@ -77,6 +77,7 @@ description: 审查 diff 的正确性与风格。
 lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
 lsm copy <name> [--force]
+lsm copy --all [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
@@ -93,6 +94,7 @@ lsm --lang <en|zh> <command> ...
 | `lsm -l -g` | `lsm list global` |
 | `lsm -l -p --json` | `lsm list project --json` |
 | `lsm -c foo` | `lsm copy foo` |
+| `lsm -c --all` | `lsm copy --all` |
 
 `-g` 与 `-p` 不能同时使用、不能与 `copy` 一起用，也不能与完整子命令写法混用。
 
@@ -123,6 +125,7 @@ my-skill     一句话说明。
 - 源必须是合法的全局 skill：存在 `SKILL.md` 且其 `name` 与目录名一致。
 - 源与目标相同、或目标位于源内部时拒绝；目标已存在需要 `--force`。
 - `name` 在拼任何路径之前完成校验，`..`、`/`、`\` 与保留设备名都以退出码 2 失败。
+- `--all` 复制全部合法全局 skill。目标已存在时默认跳过（`--force` 覆盖）；非法 skill 逐条报错但不中断。跳过不算失败：只有真的复制失败才退出码 1。
 
 ## 语言
 
