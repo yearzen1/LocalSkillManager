@@ -26,6 +26,14 @@ impl fmt::Display for ProcessError {
     }
 }
 
+/// 当前可执行文件路径：升级要替换的就是它。
+pub fn current_exe() -> Result<PathBuf, ProcessError> {
+    std::env::current_exe().map_err(|err| ProcessError::Spawn {
+        path: PathBuf::from("<current executable>"),
+        detail: err.to_string(),
+    })
+}
+
 /// 执行 `<exe> --version`，返回 stdout。
 pub fn version_output(exe: &Path) -> Result<String, ProcessError> {
     let output = std::process::Command::new(exe)

@@ -23,5 +23,6 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
         Action::List { scope, json } => list::run(ctx, scope, json),
         Action::Copy { target, force } => copy::run(ctx, target, force),
         Action::Remove { scope, name, force } => remove::run(ctx, scope, name, force),
+        Action::Upgrade { check, force } => upgrade::run(ctx, check, force),
     }
 }

@@ -4,11 +4,12 @@ use std::cmp::Ordering;
 use std::path::Path;
 
 use crate::domain::lang::Lang;
-use crate::domain::release::Asset;
+use crate::domain::release::{self, Asset, Release};
 use crate::domain::version::Version;
-use crate::error::{self, AppError};
+use crate::error::{self, AppError, Msg};
 use crate::i18n::{tr_args, MsgKey};
 use crate::infra::{fsops, net, process};
+use crate::output;
 use crate::Ctx;
 
 /// 版本比较的结论（`upgrade.md` §1）。
@@ -42,6 +43,89 @@ pub fn decide(current: Version, latest: Version) -> Check {
         Ordering::Equal => Check::UpToDate { current },
         Ordering::Less => Check::CurrentIsNewer { current, latest },
     }
+}
+
+/// `upgrade [--check] [--force]` 的命令入口。
+pub fn run(ctx: &Ctx, check: bool, force: bool) -> Result<(), AppError> {
+    let current = current_version();
+    let release = net::fetch_latest_release(ctx.env.upgrade_api.as_deref(), current)?;
+    let latest = release.tag();
+    let verdict = decide(current, latest);
+
+    let install = !check && (force || matches!(verdict, Check::Available { .. }));
+    if !install {
+        output::emit_stdout(&format!("{}\n", render(verdict, ctx.lang)));
+        return Ok(());
+    }
+
+    let exe = process::current_exe()?;
+    fsops::clean_stale_backups(&exe);
+
+    let asset = select_asset(&release)?;
+    let temp = fsops::upgrade_temp_path(&exe)?;
+    fsops::discard(&temp);
+
+    download_and_verify(asset, &temp, latest)?;
+
+    let report = fsops::replace_self(&exe, &temp)
+        .map_err(|err| error::replace_failed(&exe, &err.to_string()))?;
+
+    if let Some(backup) = report.leftover_backup {
+        output::warn(
+            ctx.lang,
+            &Msg::with_args(
+                MsgKey::UpgradeBackupLeftover,
+                [backup.display().to_string()],
+            ),
+        );
+    }
+
+    if is_cargo_install(&exe, ctx) {
+        output::warn(ctx.lang, &Msg::new(MsgKey::UpgradeCargoInstallWarning));
+    }
+
+    let key = if latest < current {
+        MsgKey::UpgradeDowngraded
+    } else {
+        MsgKey::UpgradeUpgraded
+    };
+    output::emit_stdout(&format!(
+        "{}\n",
+        tr_args(
+            ctx.lang,
+            key,
+            &[
+                &current.to_string(),
+                &latest.tag(),
+                &exe.display().to_string()
+            ]
+        )
+    ));
+
+    Ok(())
+}
+
+/// 当前平台的资产：命名表里没有该组合、或 release 里没有这个名字，都按「缺资产」报。
+fn select_asset(release: &Release) -> Result<&Asset, AppError> {
+    let (os, arch) = (std::env::consts::OS, std::env::consts::ARCH);
+    let platform = format!("{os}-{arch}");
+
+    let name = match release::asset_name(os, arch) {
+        Ok(name) => name,
+        Err(_) => return Err(error::no_asset(&release.tag().tag(), &platform, &platform)),
+    };
+
+    release
+        .asset(&name)
+        .ok_or_else(|| error::no_asset(&release.tag().tag(), &platform, &name))
+}
+
+/// `$CARGO_HOME/bin` 下的副本：升级能成功，但 cargo 下次安装会把它覆盖回去。
+fn is_cargo_install(exe: &Path, ctx: &Ctx) -> bool {
+    ctx.env
+        .cargo_bin_dir
+        .as_ref()
+        .is_some_and(|dir| exe.starts_with(dir))
 }
 
 /// 结论对应的单行文案。
@@ -111,6 +195,7 @@ mod tests {
                 config_dir: Some(dir.path().join("config")),
                 lang: None,
                 upgrade_api: Some(endpoint.to_string()),
+                cargo_bin_dir: None,
             },
             lang: Lang::En,
             cwd: dir.path().to_path_buf(),

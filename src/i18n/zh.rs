@@ -128,9 +128,14 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::UpgradeInvalidVersion => "release 版本号不合法：'{0}'",
         MsgKey::UpgradeInvalidVersionHint => "期望形如 v0.3.0 的版本号",
+        MsgKey::UpgradeAbout => "更新 lsm 自身",
+        MsgKey::UpgradeCheckFlag => "只检查是否有新版本",
+        MsgKey::UpgradeForceFlag => "同版本重装或降级",
         MsgKey::UpgradeUpToDate => "lsm {0} 已是最新版本",
         MsgKey::UpgradeAvailable => "有新版本可用：{0}（当前 {1}）",
         MsgKey::UpgradeCurrentNewer => "lsm {0} 比 {1} 更新",
+        MsgKey::UpgradeUpgraded => "已升级 lsm {0} -> {1}（{2}）",
+        MsgKey::UpgradeDowngraded => "已降级 lsm {0} -> {1}（{2}）",
         MsgKey::UpgradeFetchFailed => "无法获取最新 release：{0}",
         MsgKey::UpgradeFetchFailedHint => "设置 LSM_UPGRADE_API 指向镜像，或从 release 页手动下载",
         MsgKey::UpgradeRateLimited => "GitHub API 已触发限流",
@@ -139,5 +144,13 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UpgradeDownloadFailedHint => "请从 release 页手动下载",
         MsgKey::UpgradeVerifyFailed => "下载的二进制未通过校验",
         MsgKey::UpgradeVerifyFailedHint => "请检查 release 资产后重试",
+        MsgKey::UpgradeNoAsset => "release {0} 没有适用于 {1} 的资产",
+        MsgKey::UpgradeNoAssetHint => "期望的资产名是 {0}",
+        MsgKey::UpgradeReplaceFailed => "无法替换 {0}：{1}",
+        MsgKey::UpgradeReplaceFailedHint => "请换到可写目录运行，或从 release 页手动下载",
+        MsgKey::UpgradeBackupLeftover => "旧二进制残留在 {0}，下次升级时会清理",
+        MsgKey::UpgradeCargoInstallWarning => {
+            "lsm 由 cargo 安装，建议改用 cargo install --force local-skill-manager"
+        }
     }
 }

@@ -29,6 +29,10 @@ pub enum Action {
         force: bool,
     },
     Config(ConfigCommand),
+    Upgrade {
+        check: bool,
+        force: bool,
+    },
 }
 
 /// `copy` 的复制对象：单个 skill 或全局全部。

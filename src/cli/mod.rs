@@ -104,6 +104,10 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
             name: SkillName::parse(&required(sub, "name"))?,
             force: sub.get_flag("force"),
         },
+        "upgrade" => Action::Upgrade {
+            check: sub.get_flag("check"),
+            force: sub.get_flag("force"),
+        },
         other => return Err(AppError::usage(MsgKey::UsageInvalidSubcommand).with_args([other])),
     };
 

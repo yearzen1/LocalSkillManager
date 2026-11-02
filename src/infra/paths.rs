@@ -57,6 +57,7 @@ mod tests {
             config_dir: config_dir.map(PathBuf::from),
             lang: None,
             upgrade_api: None,
+            cargo_bin_dir: None,
         }
     }
 

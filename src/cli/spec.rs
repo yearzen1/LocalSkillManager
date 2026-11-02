@@ -30,6 +30,7 @@ pub fn build(lang: Lang) -> Command {
         .subcommand(list_command(lang))
         .subcommand(copy_command(lang))
         .subcommand(remove_command(lang))
+        .subcommand(upgrade_command(lang))
         .subcommand(config_command(lang));
 
     with_help_flag(root, lang).disable_version_flag(true).arg(
@@ -143,6 +144,26 @@ fn remove_command(lang: Lang) -> Command {
                 .long("force")
                 .action(clap::ArgAction::SetTrue)
                 .help(tr(lang, MsgKey::RemoveForceFlag)),
+        );
+
+    with_help_flag(command, lang)
+}
+
+/// `upgrade` 不带位置参数，也没有短选项（不参与归一化）。
+fn upgrade_command(lang: Lang) -> Command {
+    let command = Command::new("upgrade")
+        .about(tr(lang, MsgKey::UpgradeAbout))
+        .arg(
+            Arg::new("check")
+                .long("check")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::UpgradeCheckFlag)),
+        )
+        .arg(
+            Arg::new("force")
+                .long("force")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::UpgradeForceFlag)),
         );
 
     with_help_flag(command, lang)

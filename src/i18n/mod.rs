@@ -143,11 +143,16 @@ keys!(
     PathConfigDirUnavailable,
     PathConfigDirUnavailableHint,
     // upgrade
+    UpgradeAbout,
+    UpgradeCheckFlag,
+    UpgradeForceFlag,
     UpgradeInvalidVersion,
     UpgradeInvalidVersionHint,
     UpgradeUpToDate,
     UpgradeAvailable,
     UpgradeCurrentNewer,
+    UpgradeUpgraded,
+    UpgradeDowngraded,
     UpgradeFetchFailed,
     UpgradeFetchFailedHint,
     UpgradeRateLimited,
@@ -156,6 +161,12 @@ keys!(
     UpgradeDownloadFailedHint,
     UpgradeVerifyFailed,
     UpgradeVerifyFailedHint,
+    UpgradeNoAsset,
+    UpgradeNoAssetHint,
+    UpgradeReplaceFailed,
+    UpgradeReplaceFailedHint,
+    UpgradeBackupLeftover,
+    UpgradeCargoInstallWarning,
 );
 
 /// 取一条文案。

@@ -2,7 +2,7 @@
 
 mod mapping;
 
-pub(crate) use mapping::{download_failed, verification_failed};
+pub(crate) use mapping::{download_failed, no_asset, replace_failed, verification_failed};
 
 use crate::i18n::MsgKey;
 

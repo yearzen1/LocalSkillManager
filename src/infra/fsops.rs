@@ -19,6 +19,23 @@ pub enum FsError {
     SourceNotExpectedType { path: PathBuf },
 }
 
+/// 只用于把技术细节拼进 `<原因>`；用户可见文案仍来自 `i18n`。
+impl std::fmt::Display for FsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FsError::Io { path, source } => write!(f, "{}: {source}", path.display()),
+            FsError::SymlinkUnsupported { path } => {
+                write!(f, "symbolic link: {}", path.display())
+            }
+            FsError::AlreadyExists { path } => write!(f, "already exists: {}", path.display()),
+            FsError::SourceMissing { path } => write!(f, "source missing: {}", path.display()),
+            FsError::SourceNotExpectedType { path } => {
+                write!(f, "unexpected source type: {}", path.display())
+            }
+        }
+    }
+}
+
 /// 安装结果中需要在命令层转成 warning 的残留。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstallReport {
@@ -202,6 +219,16 @@ pub fn replace_self(exe: &Path, new_binary: &Path) -> Result<ReplaceReport, FsEr
             leftover_backup: None,
         })
     }
+}
+
+/// `<exe 所在目录>/.lsm-upgrade-<pid>`：与 exe 同卷，后续 `rename` 才是原子的。
+pub fn upgrade_temp_path(exe: &Path) -> Result<PathBuf, FsError> {
+    let parent = exe.parent().ok_or_else(|| FsError::Io {
+        path: exe.to_path_buf(),
+        source: anyhow::anyhow!("executable path has no parent directory"),
+    })?;
+
+    Ok(parent.join(format!(".lsm-upgrade-{}", std::process::id())))
 }
 
 /// 清理上次升级留下的 `<exe>.old-*`；失败忽略。

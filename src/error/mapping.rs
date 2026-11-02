@@ -11,6 +11,7 @@ use crate::infra::frontmatter::FrontmatterError;
 use crate::infra::fsops::FsError;
 use crate::infra::net::NetError;
 use crate::infra::paths::PathError;
+use crate::infra::process::ProcessError;
 
 use super::AppError;
 
@@ -223,6 +224,30 @@ pub(crate) fn download_failed(asset: &str, err: NetError) -> AppError {
 /// 冒烟校验失败：文案固定，不暴露子进程细节（`upgrade.md` §7）。
 pub(crate) fn verification_failed() -> AppError {
     AppError::runtime(MsgKey::UpgradeVerifyFailed).with_hint(MsgKey::UpgradeVerifyFailedHint)
+}
+
+/// 当前平台在 release 里没有资产：带上 tag、平台与期望的资产名。
+pub(crate) fn no_asset(tag: &str, platform: &str, expected: &str) -> AppError {
+    AppError::runtime(MsgKey::UpgradeNoAsset)
+        .with_args([tag, platform])
+        .with_hint_args(MsgKey::UpgradeNoAssetHint, [expected])
+}
+
+/// 替换失败：带上 exe 路径与原因。
+pub(crate) fn replace_failed(exe: &std::path::Path, detail: &str) -> AppError {
+    AppError::runtime(MsgKey::UpgradeReplaceFailed)
+        .with_args([exe.display().to_string(), detail.to_string()])
+        .with_hint(MsgKey::UpgradeReplaceFailedHint)
+}
+
+/// 子进程失败：起不来按替换失败报，退出码非 0 按校验失败报。
+impl From<ProcessError> for AppError {
+    fn from(err: ProcessError) -> Self {
+        match err {
+            ProcessError::Spawn { path, detail } => replace_failed(&path, &detail),
+            ProcessError::Failed { .. } => verification_failed(),
+        }
+    }
 }
 
 fn net_failure_detail(err: &NetError) -> String {

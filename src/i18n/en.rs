@@ -132,9 +132,14 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::UpgradeInvalidVersion => "invalid release version '{0}'",
         MsgKey::UpgradeInvalidVersionHint => "expected a version like v0.3.0",
+        MsgKey::UpgradeAbout => "Update lsm itself",
+        MsgKey::UpgradeCheckFlag => "Only check for a newer release",
+        MsgKey::UpgradeForceFlag => "Reinstall the same version or downgrade",
         MsgKey::UpgradeUpToDate => "lsm {0} is up to date",
         MsgKey::UpgradeAvailable => "new version available: {0} (current {1})",
         MsgKey::UpgradeCurrentNewer => "lsm {0} is newer than {1}",
+        MsgKey::UpgradeUpgraded => "upgraded lsm {0} -> {1} ({2})",
+        MsgKey::UpgradeDowngraded => "downgraded lsm {0} -> {1} ({2})",
         MsgKey::UpgradeFetchFailed => "cannot fetch latest release: {0}",
         MsgKey::UpgradeFetchFailedHint => {
             "set LSM_UPGRADE_API to a mirror or download the binary manually from the releases page"
@@ -147,5 +152,17 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UpgradeDownloadFailedHint => "download the binary manually from the releases page",
         MsgKey::UpgradeVerifyFailed => "downloaded binary failed verification",
         MsgKey::UpgradeVerifyFailedHint => "check the release assets and try again later",
+        MsgKey::UpgradeNoAsset => "release {0} has no asset for {1}",
+        MsgKey::UpgradeNoAssetHint => "expected {0}",
+        MsgKey::UpgradeReplaceFailed => "cannot replace {0}: {1}",
+        MsgKey::UpgradeReplaceFailedHint => {
+            "run from a writable directory or download the binary manually from the releases page"
+        }
+        MsgKey::UpgradeBackupLeftover => {
+            "old binary left at {0}, it will be cleaned on next upgrade"
+        }
+        MsgKey::UpgradeCargoInstallWarning => {
+            "lsm is installed by cargo, consider cargo install --force local-skill-manager"
+        }
     }
 }

@@ -147,6 +147,7 @@ mod tests {
             config_dir: Some(dir.path().join("lsm")),
             lang: None,
             upgrade_api: None,
+            cargo_bin_dir: None,
         }
     }
 

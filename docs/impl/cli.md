@@ -45,20 +45,21 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - clap 自带的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）与结尾提示，在渲染后按语言替换为 `用法:`、`命令:`、`选项:`、`参数:` 等；自带的 `-h/--help` 与 `-V/--version` 说明同样是英文，因此改为自建参数注入本地化文案。
 - 参数解析错误按 `clap::error::ErrorKind` 映射常用类型：缺参数、非法值、未知参数、多余参数、缺子命令、非法子命令，并带上 clap 记录的出错参数名；未覆盖的类型回退英文原文。
 - `DisplayHelp` / `DisplayVersion` 直接输出并退出 0。
-- 实测 help（v0.2.0，与 `cli/spec.rs` 一致）：
+- 实测 help（v0.3.0，与 `cli/spec.rs` 一致）：
 
 ```
 $ lsm --lang zh --help
-Local Skill Manager
+在 .agents/skills 下安装与复制 agent skill
 
 用法: lsm [OPTIONS] <COMMAND>
 
 命令:
-  add     安装 skill 到 global 或 project
-  list    列出已安装的 skill
-  copy    把全局 skill 复制到当前项目
-  remove  从 global 或 project 卸载 skill
-  config  查看或修改持久化配置
+  add      安装 skill 到 global 或 project
+  list     列出已安装的 skill
+  copy     把全局 skill 复制到当前项目
+  remove   从 global 或 project 卸载 skill
+  upgrade  更新 lsm 自身
+  config   查看或修改持久化配置
 
 选项:
       --lang <LANG>  输出语言 [en, zh]
@@ -66,7 +67,7 @@ Local Skill Manager
   -V, --version      打印版本
 ```
 
-- `planned`：`upgrade` 落地后，`命令:` 段应在 `config` 之前插入一行 `upgrade  更新 lsm 自身（不改文件名）`，其余不变。未实现前禁止把这一行写进上面的实测样例。
+- `upgrade` 的 help 只列 `--check` / `--force`，没有位置参数，也不联网。
 - 英文模式输出完全对应的英文版本。
 - `-h` 与 `--help` 走同一套渲染；`lsm add --lang zh --help` 同样生效。
 
@@ -89,11 +90,11 @@ Local Skill Manager
 | `remove` | `<NAME> <SCOPE> [--force]` | implemented |
 | `config get` | `lang` | implemented |
 | `config set` | `lang <LANG>` | implemented |
-| `upgrade` | `[--check] [--force]` | planned |
+| `upgrade` | `[--check] [--force]` | implemented |
 
 - `<SCOPE>`：`global` 或 `project`，大小写敏感。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
-- `upgrade` 的行为细节见 [upgrade.md](upgrade.md)，实现前不进入 README。
+- `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
 
 选项：
 
@@ -107,10 +108,10 @@ Local Skill Manager
 | `copy` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
 | `copy` | `--all` | — | 关闭 | 复制全局全部 skill，与 `<NAME>` 互斥 |
 | `remove` | `--force` | — | 关闭 | 允许删除非合法 skill 目录 |
-| `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0（planned） |
-| `upgrade` | `--force` | — | 关闭 | 允许同版本重装与降级（planned） |
+| `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0 |
+| `upgrade` | `--force` | — | 关闭 | 允许同版本重装与降级 |
 
-- 选项表**不单列状态**：选项的存在性跟随命令表，`upgrade` 两行随命令一起转为 `implemented`。
+- 选项表**不单列状态**：选项的存在性跟随命令表。
 - `全局` 选项对根命令与每个子命令都生效；`根命令` 选项只对 `lsm` 本身生效（`lsm add --version` 是用法错误）。
 - `-a` / `-l` / `-c` / `-r` / `-g` / `-p` **不是** clap 选项，是 §2.2 的前置归一化别名，不进本表。
 - 选项文案、取值说明与 help 同源，全部来自消息表（§1.2）。
@@ -146,14 +147,14 @@ Local Skill Manager
    - 混用形式（如 `lsm add foo.md -g`）。
 5. `-h`、`-V` 不参与归一化，交给 clap。
 6. `config` 子命令不参与短选项归一化，永远原样交给 clap。
-7. `upgrade`（planned）没有短选项，也不参与归一化：`lsm -u` 按未知参数退出 2；`upgrade` 与 `-g` / `-p` 同现视为未知参数，不解释为升级某个作用域。
+7. `upgrade` 没有短选项，也不参与归一化：`lsm -u` 按未知参数退出 2；`upgrade` 与 `-g` / `-p` 同现视为未知参数，不解释为升级某个作用域。
 
 ### 2.3 clap 结构
 
 - 直接用 builder API 构建 `clap::Command`，所有 about / 参数说明 / `--lang` 说明都从消息表按语言注入（`cli/spec.rs::build(lang)`）。
 - 作用域参数用 `value_parser(["global", "project"])` 限定合法值，大小写敏感，错误时由 clap 报用法错误。
 - `config` 子命令的 `get`/`set` 是嵌套子命令，键用 `value_parser(["lang"])`（v1 只有 `lang`），未知键由 clap 报用法错误。
-- `upgrade`（planned）只有两个布尔 flag：`--check`、`--force`，不带位置参数；行为与文案见 [upgrade.md](upgrade.md)。
+- `upgrade` 只有两个布尔 flag：`--check`、`--force`，不带位置参数；行为与文案见 [upgrade.md](upgrade.md)。
 - clap 自带的 `-h` / `-V` 说明是英文，因此根命令与各子命令都 `disable_help_flag(true)` 后自建 `-h/--help`，根命令另外自建 `-V/--version`，说明文案来自消息表。
 - 参数校验错误统一由 `cli::parse` 转成 `AppError`，在 `lib::run` 边界渲染。
 - 代码落点：`cli/spec.rs`（构建 Command）、`cli/help.rs`（结构标题本地化）、`cli/lang.rs`（预扫描 + 决策表）、`cli/mod.rs`（解析为 `Action`）；`Action` 定义在 `domain/action.rs`，配置键定义在 `domain/config.rs`。

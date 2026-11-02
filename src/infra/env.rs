@@ -15,6 +15,8 @@ pub struct Env {
     pub lang: Option<String>,
     /// `LSM_UPGRADE_API` 原始值，空串按未设置处理；合法性由 `infra::net` 判断。
     pub upgrade_api: Option<String>,
+    /// cargo 的 bin 目录：`$CARGO_HOME/bin` 或 `~/.cargo/bin`；用于识别 cargo 安装的副本。
+    pub cargo_bin_dir: Option<PathBuf>,
 }
 
 impl Env {
@@ -29,6 +31,10 @@ impl Env {
                 .or_else(|| dirs::config_dir().map(|dir| dir.join("lsm"))),
             lang: non_empty_string("LSM_LANG"),
             upgrade_api: non_empty_string("LSM_UPGRADE_API"),
+            cargo_bin_dir: non_empty_os("CARGO_HOME")
+                .map(PathBuf::from)
+                .or_else(|| dirs::home_dir().map(|home| home.join(".cargo")))
+                .map(|dir| dir.join("bin")),
         }
     }
 }
@@ -70,6 +76,10 @@ mod tests {
         assert_eq!(env.config_dir, Some(PathBuf::from("/tmp/lsm-config")));
         assert_eq!(env.lang.as_deref(), Some("zh-CN"));
         assert_eq!(env.upgrade_api.as_deref(), Some("http://127.0.0.1:9/api"));
+        assert!(env
+            .cargo_bin_dir
+            .as_ref()
+            .is_some_and(|dir| dir.ends_with("bin")));
 
         std::env::remove_var("LSM_HOME");
         std::env::remove_var("LSM_CONFIG_DIR");
