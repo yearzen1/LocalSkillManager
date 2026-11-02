@@ -154,7 +154,7 @@
 | D5 | 2026-11-06 | ☑ | 35 min | `check` 返回 `Check`，打印留给 D8；`--force` 尚未进签名，等于天然忽略；新增 7 条 upgrade 文案与 `NetError`/`ReleaseError` 映射；`UnsupportedPlatform` 暂时并入取元数据失败，D7 再细分 |
 | D6 | 2026-11-09 | ☑ | 45 min | 新增 `infra::process`（跑 `<exe> --version`）；下载走后 `body.as_reader()` 流式写盘；集成测试 `tests/upgrade.rs` 用真实二进制当载荷，覆盖不匹配与不可执行两种清理路径 |
 | D7 | 2026-11-10 | ☑ | 40 min | `replace_self` + `clean_stale_backups`；只读文件在现在的 Windows 上已不阻止删除，剩余分支改用「备份路径是目录」直接测 `remove_backup`，真实「被占用」场景未模拟 |
-| D8 | 2026-11-11 | ☐ | | |
+| D8 | 2026-11-11 | ☑ | 60 min | CLI 已接；`cli.md` 状态列与选项表同提交转 `implemented`；`quality.md` 37–44 落地并去掉 `[planned]`；39 按 §5 改成「允许 Windows 留 `.old-*`」，42 仅 Unix；顺带修正 help 样例里过期的 about 文案 |
 | D9 | 2026-11-12 | ☐ | | |
 | D10 | 2026-11-13 | ☐ | | |
 
