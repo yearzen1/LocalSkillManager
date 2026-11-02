@@ -23,8 +23,24 @@ pub enum VersionError {
 
 impl Version {
     /// 解析 `v0.3.0` 或 `0.3.0`；其余形式一律拒绝，不猜测、不截断。
-    pub fn parse(_input: &str) -> Result<Self, VersionError> {
-        unimplemented!("parse release version")
+    pub fn parse(input: &str) -> Result<Self, VersionError> {
+        let body = input.strip_prefix('v').unwrap_or(input);
+        let mut parts = body.split('.');
+
+        let major = parse_segment(parts.next(), input)?;
+        let minor = parse_segment(parts.next(), input)?;
+        let patch = parse_segment(parts.next(), input)?;
+        if parts.next().is_some() {
+            return Err(VersionError::Format {
+                input: input.to_string(),
+            });
+        }
+
+        Ok(Self {
+            major,
+            minor,
+            patch,
+        })
     }
 
     /// 规范化输出，不带 `v` 前缀（与 `CARGO_PKG_VERSION` 形式一致）。
@@ -33,9 +49,28 @@ impl Version {
     }
 }
 
+/// 单个数值段：必须非空且全是 ASCII 数字。
+fn parse_segment(segment: Option<&str>, input: &str) -> Result<u64, VersionError> {
+    let Some(segment) = segment else {
+        return Err(VersionError::Format {
+            input: input.to_string(),
+        });
+    };
+
+    if segment.is_empty() || !segment.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(VersionError::Format {
+            input: input.to_string(),
+        });
+    }
+
+    segment.parse().map_err(|_| VersionError::TooLarge {
+        input: input.to_string(),
+    })
+}
+
 impl fmt::Display for Version {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unimplemented!("render release version")
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
     }
 }
 
@@ -59,8 +94,19 @@ mod tests {
     #[test]
     fn rejects_everything_but_three_numeric_parts() {
         for input in [
-            "", "v", "v0.3", "0.3.0.1", "v0.3.0-rc.1", "v0.3.0+build", "latest", "v0.3.x",
-            "V0.3.0", " v0.3.0", "v0.3.0 ", "0..0", "v1.-1.0",
+            "",
+            "v",
+            "v0.3",
+            "0.3.0.1",
+            "v0.3.0-rc.1",
+            "v0.3.0+build",
+            "latest",
+            "v0.3.x",
+            "V0.3.0",
+            " v0.3.0",
+            "v0.3.0 ",
+            "0..0",
+            "v1.-1.0",
         ] {
             assert_eq!(
                 Version::parse(input),
@@ -77,7 +123,10 @@ mod tests {
         assert!(parse("v0.9.9") < parse("v0.10.0"));
         assert!(parse("v1.0.0") > parse("v0.99.99"));
         assert!(parse("v0.3.1") > parse("v0.3.0"));
-        assert_eq!(parse("v0.3.0").cmp(&parse("0.3.0")), std::cmp::Ordering::Equal);
+        assert_eq!(
+            parse("v0.3.0").cmp(&parse("0.3.0")),
+            std::cmp::Ordering::Equal
+        );
     }
 
     #[test]

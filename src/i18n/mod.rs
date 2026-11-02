@@ -142,6 +142,9 @@ keys!(
     PathHomeUnavailableHint,
     PathConfigDirUnavailable,
     PathConfigDirUnavailableHint,
+    // upgrade
+    UpgradeInvalidVersion,
+    UpgradeInvalidVersionHint,
 );
 
 /// 取一条文案。

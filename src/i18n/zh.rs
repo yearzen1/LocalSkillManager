@@ -125,5 +125,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::PathHomeUnavailableHint => "请设置 LSM_HOME",
         MsgKey::PathConfigDirUnavailable => "无法确定配置目录",
         MsgKey::PathConfigDirUnavailableHint => "请设置 LSM_CONFIG_DIR",
+
+        MsgKey::UpgradeInvalidVersion => "release 版本号不合法：'{0}'",
+        MsgKey::UpgradeInvalidVersionHint => "期望形如 v0.3.0 的版本号",
     }
 }

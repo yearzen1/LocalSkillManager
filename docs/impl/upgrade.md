@@ -137,6 +137,7 @@ lsm upgrade [--check] [--force]
 | 当前版本更新且未加 `--force` | `lsm 0.2.0 is newer than v0.1.1` | 0 |
 | 当前平台无资产 | `error: release v0.2.0 has no asset for <os>-<arch>` + hint `expected lsm-<os>-<arch>` | 1 |
 | 元数据请求失败（网络/非 200/解析） | `error: cannot fetch latest release: <原因>` + hint 镜像与手动下载 | 1 |
+| 元数据里的 tag 不合法 | `error: invalid release version '<tag>'` + hint `expected a version like v0.3.0` | 1 |
 | 限流（HTTP 403/429） | `error: github api rate limit reached` + hint 稍后重试或手动下载 | 1 |
 | 下载失败 | `error: cannot download <资产名>: <原因>` + hint 手动下载 | 1 |
 | 冒烟校验失败 | `error: downloaded binary failed verification` + hint 检查 release 资产 | 1 |

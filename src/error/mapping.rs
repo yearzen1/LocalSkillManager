@@ -3,6 +3,7 @@
 use crate::domain::lang::LangError;
 use crate::domain::meta::MetaError;
 use crate::domain::name::NameError;
+use crate::domain::version::VersionError;
 use crate::i18n::MsgKey;
 use crate::infra::config::ConfigError;
 use crate::infra::frontmatter::FrontmatterError;
@@ -174,6 +175,18 @@ impl From<ConfigError> for AppError {
     }
 }
 
+/// release tag 不合法属于运行时错误（发布端数据问题），与 CLI 入参无关。
+impl From<VersionError> for AppError {
+    fn from(err: VersionError) -> Self {
+        let input = match err {
+            VersionError::Format { input } | VersionError::TooLarge { input } => input,
+        };
+        AppError::runtime(MsgKey::UpgradeInvalidVersion)
+            .with_args([input])
+            .with_hint(MsgKey::UpgradeInvalidVersionHint)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -308,5 +321,28 @@ mod tests {
             app.hint.as_ref().map(|hint| hint.key),
             Some(MsgKey::UsageInvalidLanguageHint)
         );
+    }
+
+    #[test]
+    fn invalid_release_versions_are_runtime_errors_with_the_raw_input() {
+        let app: AppError = VersionError::Format {
+            input: "v0.3.0-rc.1".to_string(),
+        }
+        .into();
+
+        assert_eq!(app.kind, ErrorKind::Runtime);
+        assert_eq!(app.exit_code(), 1);
+        assert_eq!(app.msg.key, MsgKey::UpgradeInvalidVersion);
+        assert_eq!(app.msg.args, ["v0.3.0-rc.1"]);
+        assert_eq!(
+            app.hint.as_ref().map(|hint| hint.key),
+            Some(MsgKey::UpgradeInvalidVersionHint)
+        );
+
+        let app: AppError = VersionError::TooLarge {
+            input: "v18446744073709551616.0.0".to_string(),
+        }
+        .into();
+        assert_eq!(app.msg.args, ["v18446744073709551616.0.0"]);
     }
 }

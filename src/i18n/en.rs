@@ -129,5 +129,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::PathHomeUnavailableHint => "set LSM_HOME",
         MsgKey::PathConfigDirUnavailable => "cannot determine the config directory",
         MsgKey::PathConfigDirUnavailableHint => "set LSM_CONFIG_DIR",
+
+        MsgKey::UpgradeInvalidVersion => "invalid release version '{0}'",
+        MsgKey::UpgradeInvalidVersionHint => "expected a version like v0.3.0",
     }
 }
