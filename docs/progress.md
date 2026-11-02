@@ -156,7 +156,7 @@
 | D7 | 2026-11-10 | ☑ | 40 min | `replace_self` + `clean_stale_backups`；只读文件在现在的 Windows 上已不阻止删除，剩余分支改用「备份路径是目录」直接测 `remove_backup`，真实「被占用」场景未模拟 |
 | D8 | 2026-11-11 | ☑ | 60 min | CLI 已接；`cli.md` 状态列与选项表同提交转 `implemented`；`quality.md` 37–44 落地并去掉 `[planned]`；39 按 §5 改成「允许 Windows 留 `.old-*`」，42 仅 Unix；顺带修正 help 样例里过期的 about 文案 |
 | D9 | 2026-11-12 | ☑ | 35 min | 两份 README 命令表行数一致（各 14 行 `lsm ` 开头）；验收脚本加 10/10 离线两步；`quality.md` 去掉 `[planned]` 并写明联网只对副本手工跑 |
-| D10 | 2026-11-13 | ☐ | | |
+| D10 | 2026-11-13 | ☑ | 50 min | 四道门禁全绿；`0.3.0` 构建后上传；副本联网验收：`--check` 查到 v0.2.0 并正确判「当前更新」，`--force` 降级成功；首次对 v0.3.0 资产 `--force` 遇到一次 `timeout: global`，重试 3.8 秒成功（CDN 瞬时问题，未改实现）；tag `v0.3.0` 已推、release 资产字节数与本地一致 |
 
 ## 5. 风险与应对
 
