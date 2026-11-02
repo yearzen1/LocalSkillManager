@@ -4,5 +4,6 @@ pub mod config;
 pub mod env;
 pub mod frontmatter;
 pub mod fsops;
+pub mod net;
 pub mod paths;
 pub mod scan;
