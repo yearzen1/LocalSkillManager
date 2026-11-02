@@ -29,16 +29,55 @@ pub enum NetError {
 }
 
 /// 取 `releases/latest`，解析为 [`Release`]。
-pub fn fetch_latest_release(
-    _endpoint: Option<&str>,
-    _current: Version,
-) -> Result<Release, NetError> {
-    unimplemented!("fetch latest release")
+pub fn fetch_latest_release(endpoint: Option<&str>, current: Version) -> Result<Release, NetError> {
+    let url = endpoint_url(endpoint)?;
+    let agent = agent(METADATA_TIMEOUT);
+
+    let response = agent
+        .get(url)
+        .header("User-Agent", &format!("lsm/{current}"))
+        .header("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|err| NetError::Network {
+            detail: err.to_string(),
+        })?;
+
+    let status = response.status().as_u16();
+    match status {
+        200..=299 => {}
+        403 | 429 => return Err(NetError::RateLimited),
+        code => return Err(NetError::Status { code }),
+    }
+
+    let mut response = response;
+    let body = response
+        .body_mut()
+        .read_to_string()
+        .map_err(|err| NetError::Network {
+            detail: err.to_string(),
+        })?;
+
+    Release::parse_metadata(&body).map_err(|source| NetError::Parse { source })
 }
 
 /// 空串与 `None` 回落到默认端点；其余必须是绝对 `http(s)` URL。
-fn endpoint_url(_endpoint: Option<&str>) -> Result<&str, NetError> {
-    unimplemented!("resolve endpoint")
+fn endpoint_url(endpoint: Option<&str>) -> Result<&str, NetError> {
+    match endpoint {
+        None | Some("") => Ok(DEFAULT_API),
+        Some(value) if value.starts_with("http://") || value.starts_with("https://") => Ok(value),
+        Some(value) => Err(NetError::Network {
+            detail: format!("LSM_UPGRADE_API is not an absolute http(s) URL: {value}"),
+        }),
+    }
+}
+
+/// 一个请求一个 Agent：超时按 Q36 固定，重定向用库默认的 10 次。
+fn agent(timeout: Duration) -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .timeout_global(Some(timeout))
+        .http_status_as_error(false)
+        .build()
+        .new_agent()
 }
 
 #[cfg(test)]
@@ -111,7 +150,10 @@ mod tests {
         assert!(release.asset("lsm-windows-x64.exe").is_some());
 
         let request = stub.request().to_lowercase();
-        assert!(request.starts_with("get /api/releases/latest http/1.1"), "{request}");
+        assert!(
+            request.starts_with("get /api/releases/latest http/1.1"),
+            "{request}"
+        );
         assert!(request.contains("user-agent: lsm/0.3.0"), "{request}");
         assert!(
             request.contains("accept: application/vnd.github+json"),

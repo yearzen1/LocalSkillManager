@@ -146,6 +146,7 @@ mod tests {
             home: None,
             config_dir: Some(dir.path().join("lsm")),
             lang: None,
+            upgrade_api: None,
         }
     }
 

@@ -56,6 +56,7 @@ mod tests {
             home: home.map(PathBuf::from),
             config_dir: config_dir.map(PathBuf::from),
             lang: None,
+            upgrade_api: None,
         }
     }
 
