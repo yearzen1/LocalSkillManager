@@ -5,8 +5,30 @@ use serde_json::Value;
 use crate::domain::version::{Version, VersionError};
 
 /// 平台到资产名的映射（`upgrade.md` §2.2）。`os`/`arch` 取 `std::env::consts` 的原始值。
-pub fn asset_name(_os: &str, _arch: &str) -> Result<String, ReleaseError> {
-    unimplemented!("map platform to asset name")
+pub fn asset_name(os: &str, arch: &str) -> Result<String, ReleaseError> {
+    let os_label = match os {
+        "windows" | "linux" | "macos" => os,
+        _ => {
+            return Err(ReleaseError::UnsupportedPlatform {
+                os: os.to_string(),
+                arch: arch.to_string(),
+            })
+        }
+    };
+
+    let arch_label = match arch {
+        "x86_64" => "x64",
+        "aarch64" => "arm64",
+        _ => {
+            return Err(ReleaseError::UnsupportedPlatform {
+                os: os.to_string(),
+                arch: arch.to_string(),
+            })
+        }
+    };
+
+    let extension = if os_label == "windows" { ".exe" } else { "" };
+    Ok(format!("lsm-{os_label}-{arch_label}{extension}"))
 }
 
 /// 一个可下载的 release 资产。
@@ -41,8 +63,53 @@ pub enum ReleaseError {
 
 impl Release {
     /// 解析 GitHub release 元数据；未知字段忽略。
-    pub fn parse_metadata(_json: &str) -> Result<Self, ReleaseError> {
-        unimplemented!("parse release metadata")
+    pub fn parse_metadata(json: &str) -> Result<Self, ReleaseError> {
+        let root: Value = serde_json::from_str(json).map_err(|err| ReleaseError::Json {
+            detail: err.to_string(),
+        })?;
+        let object = root.as_object().ok_or_else(|| ReleaseError::Json {
+            detail: "response is not a JSON object".to_string(),
+        })?;
+
+        let tag = required_str(object.get("tag_name"), "tag_name")?;
+        let tag = Version::parse(tag).map_err(|source| ReleaseError::InvalidTag { source })?;
+
+        let values = object
+            .get("assets")
+            .ok_or_else(|| missing("assets"))?
+            .as_array()
+            .ok_or_else(|| invalid("assets"))?;
+
+        let mut assets = Vec::with_capacity(values.len());
+        let mut duplicate_assets = Vec::new();
+        for (index, value) in values.iter().enumerate() {
+            let entry = value
+                .as_object()
+                .ok_or_else(|| invalid(&format!("assets[{index}]")))?;
+            let name = required_str(entry.get("name"), &format!("assets[{index}].name"))?;
+            let url = required_str(
+                entry.get("browser_download_url"),
+                &format!("assets[{index}].browser_download_url"),
+            )?;
+
+            if assets.iter().any(|asset: &Asset| asset.name == name) {
+                if !duplicate_assets.iter().any(|seen| seen == name) {
+                    duplicate_assets.push(name.to_string());
+                }
+                continue;
+            }
+
+            assets.push(Asset {
+                name: name.to_string(),
+                url: url.to_string(),
+            });
+        }
+
+        Ok(Self {
+            tag,
+            assets,
+            duplicate_assets,
+        })
     }
 
     /// release 的版本号。
@@ -58,6 +125,27 @@ impl Release {
     /// 重复出现的资产名（保留首次出现顺序）；只取第一个，不阻断升级。
     pub fn duplicate_assets(&self) -> &[String] {
         &self.duplicate_assets
+    }
+}
+
+fn missing(field: &str) -> ReleaseError {
+    ReleaseError::MissingField {
+        field: field.to_string(),
+    }
+}
+
+fn invalid(field: &str) -> ReleaseError {
+    ReleaseError::InvalidField {
+        field: field.to_string(),
+    }
+}
+
+/// 取一个必须是字符串的字段；缺失与类型错误分开报。
+fn required_str<'a>(value: Option<&'a Value>, field: &str) -> Result<&'a str, ReleaseError> {
+    match value {
+        None => Err(missing(field)),
+        Some(Value::String(text)) => Ok(text),
+        Some(_) => Err(invalid(field)),
     }
 }
 
@@ -77,7 +165,11 @@ mod tests {
         ];
 
         for (os, arch, expected) in cases {
-            assert_eq!(asset_name(os, arch), Ok(expected.to_string()), "{os}/{arch}");
+            assert_eq!(
+                asset_name(os, arch),
+                Ok(expected.to_string()),
+                "{os}/{arch}"
+            );
         }
     }
 
@@ -216,7 +308,9 @@ mod tests {
         let release = Release::parse_metadata(json).expect("should parse");
 
         assert_eq!(
-            release.asset("lsm-windows-x64.exe").map(|asset| &asset.url[..]),
+            release
+                .asset("lsm-windows-x64.exe")
+                .map(|asset| &asset.url[..]),
             Some("https://example.test/first")
         );
         assert_eq!(release.duplicate_assets(), ["lsm-windows-x64.exe"]);
