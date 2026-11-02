@@ -2,6 +2,8 @@
 
 mod mapping;
 
+pub(crate) use mapping::{download_failed, verification_failed};
+
 use crate::i18n::MsgKey;
 
 /// 错误类别决定退出码。

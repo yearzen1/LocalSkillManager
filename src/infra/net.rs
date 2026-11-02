@@ -62,8 +62,42 @@ pub fn fetch_latest_release(endpoint: Option<&str>, current: Version) -> Result<
 }
 
 /// 下载资产到 `dest`，超时 5 分钟（Q36）；内容校验由调用方负责。
-pub fn download_asset(_url: &str, _dest: &Path) -> Result<(), NetError> {
-    unimplemented!("download release asset")
+pub fn download_asset(url: &str, dest: &Path) -> Result<(), NetError> {
+    let agent = agent(ASSET_TIMEOUT);
+    let response = agent.get(url).call().map_err(|err| NetError::Network {
+        detail: err.to_string(),
+    })?;
+
+    let status = response.status().as_u16();
+    match status {
+        200..=299 => {}
+        403 | 429 => return Err(NetError::RateLimited),
+        code => return Err(NetError::Status { code }),
+    }
+
+    let mut response = response;
+    let mut file = std::fs::File::create(dest).map_err(|err| NetError::Network {
+        detail: format!("{}: {err}", dest.display()),
+    })?;
+
+    std::io::copy(&mut response.body_mut().as_reader(), &mut file).map_err(|err| {
+        NetError::Network {
+            detail: format!("{}: {err}", dest.display()),
+        }
+    })?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // 冒烟校验要执行这个文件；读不到原 exe 权限时按 0o755 兜底（upgrade.md §4）。
+        std::fs::set_permissions(dest, std::fs::Permissions::from_mode(0o755)).map_err(|err| {
+            NetError::Network {
+                detail: format!("{}: {err}", dest.display()),
+            }
+        })?;
+    }
+
+    Ok(())
 }
 
 /// 空串与 `None` 回落到默认端点；其余必须是绝对 `http(s)` URL。

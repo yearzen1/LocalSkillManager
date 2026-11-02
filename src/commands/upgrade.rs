@@ -6,9 +6,9 @@ use std::path::Path;
 use crate::domain::lang::Lang;
 use crate::domain::release::Asset;
 use crate::domain::version::Version;
-use crate::error::AppError;
+use crate::error::{self, AppError};
 use crate::i18n::{tr_args, MsgKey};
-use crate::infra::net;
+use crate::infra::{fsops, net, process};
 use crate::Ctx;
 
 /// 版本比较的结论（`upgrade.md` §1）。
@@ -64,22 +64,32 @@ pub fn render(check: Check, lang: Lang) -> String {
 }
 
 /// 冒烟校验：`<新文件> --version` 的 stdout 必须含 `lsm <期望版本>`。
-pub fn verify_binary(_path: &Path, _expected: Version) -> Result<(), AppError> {
-    unimplemented!("verify downloaded binary")
+pub fn verify_binary(path: &Path, expected: Version) -> Result<(), AppError> {
+    let stdout = process::version_output(path).map_err(|_| error::verification_failed())?;
+
+    verify_output(&stdout, expected)
 }
 
 /// 纯文本校验，便于单测。
-pub fn verify_output(_stdout: &str, _expected: Version) -> Result<(), AppError> {
-    unimplemented!("check --version output")
+pub fn verify_output(stdout: &str, expected: Version) -> Result<(), AppError> {
+    if stdout.contains(&format!("lsm {expected}")) {
+        Ok(())
+    } else {
+        Err(error::verification_failed())
+    }
 }
 
 /// 下载到 `dest` 并校验；任一步失败都删掉 `dest`。
-pub fn download_and_verify(
-    _asset: &Asset,
-    _dest: &Path,
-    _expected: Version,
-) -> Result<(), AppError> {
-    unimplemented!("download and verify")
+pub fn download_and_verify(asset: &Asset, dest: &Path, expected: Version) -> Result<(), AppError> {
+    let result = net::download_asset(&asset.url, dest)
+        .map_err(|err| error::download_failed(&asset.name, err))
+        .and_then(|()| verify_binary(dest, expected));
+
+    if result.is_err() {
+        fsops::discard(dest);
+    }
+
+    result
 }
 
 #[cfg(test)]

@@ -144,9 +144,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
             "wait a few minutes and retry, or download the binary manually from the releases page"
         }
         MsgKey::UpgradeDownloadFailed => "cannot download {0}: {1}",
-        MsgKey::UpgradeDownloadFailedHint => {
-            "download the binary manually from the releases page"
-        }
+        MsgKey::UpgradeDownloadFailedHint => "download the binary manually from the releases page",
         MsgKey::UpgradeVerifyFailed => "downloaded binary failed verification",
         MsgKey::UpgradeVerifyFailedHint => "check the release assets and try again later",
     }

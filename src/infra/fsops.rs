@@ -161,6 +161,11 @@ pub fn remove_entry_atomically(target: &Path) -> Result<RemoveReport, FsError> {
     Ok(RemoveReport { leftover_temp })
 }
 
+/// 删除文件，忽略「不存在」与删除失败（升级临时文件清理用）。
+pub fn discard(path: &Path) {
+    let _ = std::fs::remove_file(path);
+}
+
 enum SourceType {
     Directory,
     File,

@@ -27,8 +27,22 @@ impl fmt::Display for ProcessError {
 }
 
 /// 执行 `<exe> --version`，返回 stdout。
-pub fn version_output(_exe: &Path) -> Result<String, ProcessError> {
-    unimplemented!("run --version")
+pub fn version_output(exe: &Path) -> Result<String, ProcessError> {
+    let output = std::process::Command::new(exe)
+        .arg("--version")
+        .output()
+        .map_err(|err| ProcessError::Spawn {
+            path: exe.to_path_buf(),
+            detail: err.to_string(),
+        })?;
+
+    if !output.status.success() {
+        return Err(ProcessError::Failed {
+            code: output.status.code(),
+        });
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 #[cfg(test)]

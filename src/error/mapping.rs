@@ -193,19 +193,53 @@ impl From<VersionError> for AppError {
 impl From<NetError> for AppError {
     fn from(err: NetError) -> Self {
         match err {
-            NetError::RateLimited => AppError::runtime(MsgKey::UpgradeRateLimited)
-                .with_hint(MsgKey::UpgradeRateLimitedHint),
-            NetError::Status { code } => fetch_failed(format!("HTTP {code}")),
-            NetError::Network { detail } => fetch_failed(detail),
+            NetError::RateLimited => rate_limited(),
             NetError::Parse { source } => release_error(source),
+            other => fetch_failed(net_failure_detail(&other)),
         }
     }
+}
+
+fn rate_limited() -> AppError {
+    AppError::runtime(MsgKey::UpgradeRateLimited).with_hint(MsgKey::UpgradeRateLimitedHint)
 }
 
 fn fetch_failed(detail: String) -> AppError {
     AppError::runtime(MsgKey::UpgradeFetchFailed)
         .with_args([detail])
         .with_hint(MsgKey::UpgradeFetchFailedHint)
+}
+
+/// 下载失败：带上资产名，便于用户按名字手动下载。
+pub(crate) fn download_failed(asset: &str, err: NetError) -> AppError {
+    match err {
+        NetError::RateLimited => rate_limited(),
+        other => AppError::runtime(MsgKey::UpgradeDownloadFailed)
+            .with_args([asset.to_string(), net_failure_detail(&other)])
+            .with_hint(MsgKey::UpgradeDownloadFailedHint),
+    }
+}
+
+/// 冒烟校验失败：文案固定，不暴露子进程细节（`upgrade.md` §7）。
+pub(crate) fn verification_failed() -> AppError {
+    AppError::runtime(MsgKey::UpgradeVerifyFailed).with_hint(MsgKey::UpgradeVerifyFailedHint)
+}
+
+fn net_failure_detail(err: &NetError) -> String {
+    match err {
+        NetError::Status { code } => format!("HTTP {code}"),
+        NetError::Network { detail } => detail.clone(),
+        NetError::RateLimited => "HTTP 403".to_string(),
+        NetError::Parse { source } => match source {
+            ReleaseError::Json { detail } => detail.clone(),
+            ReleaseError::MissingField { field } => format!("missing field `{field}`"),
+            ReleaseError::InvalidField { field } => format!("invalid field `{field}`"),
+            ReleaseError::InvalidTag { source } => format!("invalid release version: {source:?}"),
+            ReleaseError::UnsupportedPlatform { os, arch } => {
+                format!("unsupported platform {os}-{arch}")
+            }
+        },
+    }
 }
 
 /// 元数据本身的问题都归到「取不到 release」，只有 tag 不合法有专门文案。
