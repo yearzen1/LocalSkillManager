@@ -42,11 +42,11 @@ case "$(uname -s)" in
     ;;
 esac
 
-step="1/9 cargo test"
+step="1/10 cargo test"
 cargo test --quiet
 ok
 
-step="2/9 cargo build --release"
+step="2/10 cargo build --release"
 cargo build --release --quiet
 if [[ -x "$root/target/release/lsm.exe" ]]; then
   lsm="$root/target/release/lsm.exe"
@@ -62,29 +62,29 @@ export LSM_HOME="$(win "$tmp/agents")"
 export LSM_CONFIG_DIR="$(win "$tmp/config")"
 unset LSM_LANG LSM_UPGRADE_API
 
-step="3/9 add sample to global"
+step="3/10 add sample to global"
 "$lsm" add "$root/docs/sample.md" global >/dev/null
 [[ -f "$tmp/agents/skills/sample/SKILL.md" ]] \
   || fail "missing $tmp/agents/skills/sample/SKILL.md"
 ok
 
-step="4/9 list global"
+step="4/10 list global"
 out=$("$lsm" list global)
 [[ "$out" == *"sample"* ]] || fail "list global does not mention sample, got: $out"
 ok
 
-step="5/9 localized help"
+step="5/10 localized help"
 out=$("$lsm" --lang zh --help)
 [[ "$out" != *"Usage:"* ]] || fail "--lang zh --help is still English: $out"
 ok
 
-step="6/9 persist language"
+step="6/10 persist language"
 "$lsm" config set lang zh >/dev/null
 out=$("$lsm" config get lang)
 [[ "$out" == "zh" ]] || fail "config get lang expected zh, got: $out"
 ok
 
-step="7/9 copy into a project"
+step="7/10 copy into a project"
 out=$("$lsm" list global)
 # The English header must be gone: proves config.toml took effect.
 [[ "$out" != *"NAME"* ]] || fail "list global is still English after config set lang zh: $out"
@@ -96,17 +96,27 @@ out=$("$lsm" list project)
 [[ "$out" == *"sample"* ]] || fail "list project does not mention sample, got: $out"
 ok
 
-step="8/9 copy --all skips existing"
+step="8/10 copy --all skips existing"
 out=$(LSM_LANG=en "$lsm" copy --all)
 [[ "$out" == *"skipped 1"* ]] || fail "copy --all did not skip the existing skill, got: $out"
 ok
 
-step="9/9 remove from project"
+step="9/10 remove from project"
 LSM_LANG=en "$lsm" remove sample project >/dev/null
 [[ ! -d "$tmp/demo/.agents/skills/sample" ]] \
   || fail "remove left $tmp/demo/.agents/skills/sample behind"
 out=$("$lsm" list project)
 [[ "$out" != *"sample"* ]] || fail "list project still mentions sample, got: $out"
+ok
+
+# Offline only: the real GitHub round-trip is a manual release step. Exercises
+# the new subcommand without touching the network.
+step="10/10 upgrade help and unknown flags (offline)"
+out=$("$lsm" upgrade --help)
+[[ "$out" == *"--check"* ]] || fail "upgrade --help does not list --check: $out"
+code=0
+"$lsm" upgrade --bogus >/dev/null 2>&1 || code=$?
+[[ "$code" -eq 2 ]] || fail "upgrade --bogus exited $code, expected 2"
 ok
 
 printf 'PASS\n'

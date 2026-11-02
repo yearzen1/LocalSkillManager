@@ -93,13 +93,22 @@ cd <demo-project> && lsm copy sample && lsm list project
 lsm copy --all                                  # 目标已存在时跳过，退出码 0
 lsm remove sample project && lsm list project   # 列表里不再有 sample
 
-# [planned] upgrade 冒烟（`upgrade` 未实现前跳过）：复制一份再执行，确认替换的不是正在使用的二进制
-# cp ./target/release/lsm /tmp/lsm-check
-# /tmp/lsm-check upgrade --check          # 只查不装：打印已最新，或新版本提示（含当前版本）
-# rm -f /tmp/lsm-check
+# 离线：只验子命令存在与非法参数，不联网
+lsm upgrade --help                              # 列出 --check / --force，退出 0
+lsm upgrade --bogus                             # 退出 2
 ```
 
-`[planned]`：`upgrade` 实现前跳过这一段；实现后它是这里唯一的联网步骤，不要对日常使用的 `lsm` 直接跑 `upgrade` 做验收。Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
+外部可达时还有一次**手工联网**验收（不进脚本、不进 `cargo test`）：
+
+```bash
+cp ./target/release/lsm /tmp/lsm-check
+/tmp/lsm-check upgrade --check    # 只查不装：打印已最新，或新版本提示（含当前版本）
+rm -f /tmp/lsm-check
+```
+
+- 这一段是唯一的联网步骤，且只对**副本**执行：`upgrade` 会替换 `current_exe()`，不要对日常使用的 `lsm` 直接跑。
+- Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
+- 发布前的 `upgrade --force` 手工验收见 [progress.md](../progress.md) D10：先复制副本，确认替换后 `--version` 正常。
 
 上面这串步骤的执行入口是 `scripts/acceptance.sh`：Windows 用 Git Bash 调用（`"D:/Git/bin/bash.exe" scripts/acceptance.sh`），**不要用 WSL 的 `bash`**——它会把 Linux 路径原样传给 Windows 二进制，测试会在错误目录里跑出假绿。Linux/macOS 直接 `bash scripts/acceptance.sh`。脚本与本节的步骤不一致时以脚本为准，并在同一提交内改本节。
 
