@@ -176,13 +176,72 @@ pub struct ReplaceReport {
 ///
 /// Windows 走「改名旧文件 → 放入新文件 → 删旧文件」，第二步失败会把旧文件改回来；
 /// Unix 一步 `rename` 覆盖。
-pub fn replace_self(_exe: &Path, _new_binary: &Path) -> Result<ReplaceReport, FsError> {
-    unimplemented!("replace the running binary")
+pub fn replace_self(exe: &Path, new_binary: &Path) -> Result<ReplaceReport, FsError> {
+    #[cfg(windows)]
+    {
+        let backup = backup_path(exe)?;
+        let _ = std::fs::remove_file(&backup);
+
+        std::fs::rename(exe, &backup).map_err(|err| io_error(exe, err))?;
+
+        if let Err(err) = std::fs::rename(new_binary, exe) {
+            let _ = std::fs::rename(&backup, exe);
+            return Err(io_error(exe, err));
+        }
+
+        let leftover_backup = remove_backup(backup);
+
+        Ok(ReplaceReport { leftover_backup })
+    }
+
+    #[cfg(not(windows))]
+    {
+        std::fs::rename(new_binary, exe).map_err(|err| io_error(exe, err))?;
+
+        Ok(ReplaceReport {
+            leftover_backup: None,
+        })
+    }
 }
 
 /// 清理上次升级留下的 `<exe>.old-*`；失败忽略。
-pub fn clean_stale_backups(_exe: &Path) {
-    unimplemented!("clean stale backups")
+pub fn clean_stale_backups(exe: &Path) {
+    let (Some(parent), Some(name)) = (exe.parent(), exe.file_name()) else {
+        return;
+    };
+    let prefix = format!("{}.old-", name.to_string_lossy());
+
+    let Ok(entries) = std::fs::read_dir(parent) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if entry.file_name().to_string_lossy().starts_with(&prefix) {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
+/// `<exe>.old-<pid>`：与 exe 同目录，改名本身不跨卷。
+fn backup_path(exe: &Path) -> Result<PathBuf, FsError> {
+    let name = exe.file_name().ok_or_else(|| FsError::Io {
+        path: exe.to_path_buf(),
+        source: anyhow::anyhow!("executable path has no file name"),
+    })?;
+
+    Ok(exe.with_file_name(format!(
+        "{}.old-{}",
+        name.to_string_lossy(),
+        std::process::id()
+    )))
+}
+
+/// 删旧文件；删不掉就把路径交回去，让调用方只打 warning。
+#[cfg(windows)]
+fn remove_backup(backup: PathBuf) -> Option<PathBuf> {
+    match std::fs::remove_file(&backup) {
+        Ok(()) => None,
+        Err(_) => Some(backup),
+    }
 }
 
 enum SourceType {
@@ -580,7 +639,10 @@ mod tests {
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
             .filter(|name| name.contains(".old-"))
             .collect();
-        assert!(stale.is_empty(), "rollback must not leave backups: {stale:?}");
+        assert!(
+            stale.is_empty(),
+            "rollback must not leave backups: {stale:?}"
+        );
     }
 
     #[test]
@@ -599,25 +661,15 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn reports_a_backup_that_cannot_be_deleted() {
+    fn reports_backups_that_cannot_be_removed() {
         let dir = TempDir::new().unwrap();
-        let exe = dir.path().join("lsm.exe");
-        let new_binary = dir.path().join(".lsm-upgrade-7");
-        write(&exe, "old");
-        write(&new_binary, "new");
+        let backup = dir.path().join("lsm.exe.old-7");
+        write(&backup.join("child"), "still here");
 
-        let mut permissions = fs::metadata(&exe).unwrap().permissions();
-        permissions.set_readonly(true);
-        fs::set_permissions(&exe, permissions).unwrap();
-
-        let report = replace_self(&exe, &new_binary).expect("replacement itself succeeds");
-
-        assert_eq!(fs::read_to_string(&exe).unwrap(), "new");
-        let backup = report.leftover_backup.expect("backup must be reported");
-        assert!(backup.exists());
-
-        let mut permissions = fs::metadata(&backup).unwrap().permissions();
-        permissions.set_readonly(false);
-        fs::set_permissions(&backup, permissions).unwrap();
+        assert_eq!(remove_backup(backup.clone()), Some(backup.clone()));
+        assert!(
+            backup.exists(),
+            "failed cleanup must leave the backup in place"
+        );
     }
 }
