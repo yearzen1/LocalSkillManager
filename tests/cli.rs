@@ -1099,20 +1099,20 @@ fn invalid_yaml_hints_how_to_fix() {
 #[test]
 fn invalid_subcommand_reports_only_the_name() {
     lsm()
-        .args(["--lang", "zh", "upgrade"])
+        .args(["--lang", "zh", "symlink"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("非法的子命令 'upgrade'"))
+        .stderr(predicate::str::contains("非法的子命令 'symlink'"))
         .stderr(predicate::str::contains("unrecognized").not());
 }
 
 #[test]
 fn invalid_subcommand_reports_only_the_name_in_english() {
     lsm()
-        .args(["--lang", "en", "upgrade"])
+        .args(["--lang", "en", "symlink"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("invalid subcommand 'upgrade'"))
+        .stderr(predicate::str::contains("invalid subcommand 'symlink'"))
         .stderr(predicate::str::contains("unrecognized").not());
 }
 
@@ -1160,7 +1160,6 @@ fn cli_reference_table_matches_binary() {
     );
 
     let mut implemented = 0;
-    let mut planned = 0;
 
     for (command, status) in &rows {
         let mut parts: Vec<&str> = command.split_whitespace().collect();
@@ -1176,7 +1175,6 @@ fn cli_reference_table_matches_binary() {
                     .stdout(predicate::str::contains("Usage:"));
             }
             "planned" => {
-                planned += 1;
                 lsm()
                     .arg(parts[0])
                     .assert()
@@ -1188,10 +1186,7 @@ fn cli_reference_table_matches_binary() {
     }
 
     assert!(implemented > 0, "no implemented rows parsed");
-    assert!(
-        planned > 0,
-        "no planned rows parsed; unimplemented commands must be marked planned"
-    );
+    // `planned` 行仍按未知子命令校验；当前没有 planned 命令时不做额外要求。
 }
 
 /// 解析 §2.1 的选项表，返回 (命令或 `全局`, 选项单元格)。
@@ -1364,4 +1359,282 @@ fn cli_option_table_matches_help() {
             );
         }
     }
+}
+
+// ---- upgrade（`quality.md` 37–44）----
+
+use std::io::{Read, Write};
+use std::net::TcpListener;
+use std::path::{Path, PathBuf};
+use std::thread::{self, JoinHandle};
+
+/// 起一个只回一次的 HTTP 桩，返回端点与线程句柄。
+fn serve_stub(body: impl Into<Vec<u8>>) -> (String, JoinHandle<()>) {
+    let body = body.into();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind stub");
+    let address = listener.local_addr().expect("stub address");
+
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut buffer = [0_u8; 4096];
+        let _ = stream.read(&mut buffer).expect("read request");
+        let header = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        );
+        stream.write_all(header.as_bytes()).expect("write header");
+        stream.write_all(&body).expect("write body");
+        stream.flush().expect("flush");
+    });
+
+    (format!("http://{address}/metadata"), handle)
+}
+
+/// 复制一份 `lsm` 到临时目录，避免升级替换掉构建产物（Q42）。
+fn upgrade_copy(dir: &TempDir) -> PathBuf {
+    let name = if cfg!(windows) {
+        "lsm-copy.exe"
+    } else {
+        "lsm-copy"
+    };
+    let dest = dir.path().join(name);
+    fs::copy(env!("CARGO_BIN_EXE_lsm"), &dest).expect("copy binary");
+    dest
+}
+
+fn current_tag() -> String {
+    format!("v{}", env!("CARGO_PKG_VERSION"))
+}
+
+fn platform_asset() -> String {
+    lsm::domain::release::asset_name(std::env::consts::OS, std::env::consts::ARCH)
+        .expect("current platform must be in the asset table")
+}
+
+fn release_json(tag: &str, assets: &[(String, String)]) -> String {
+    let assets: Vec<String> = assets
+        .iter()
+        .map(|(name, url)| format!(r#"{{ "name": "{name}", "browser_download_url": "{url}" }}"#))
+        .collect();
+    format!(
+        r#"{{ "tag_name": "{tag}", "assets": [{}] }}"#,
+        assets.join(", ")
+    )
+}
+
+fn upgrade_cmd(exe: &Path, endpoint: &str, home: &Path) -> Command {
+    let mut cmd = Command::new(exe);
+    cmd.env("LSM_UPGRADE_API", endpoint)
+        .env("LSM_HOME", home)
+        .env_remove("LSM_LANG")
+        .env("LSM_CONFIG_DIR", home.join("config"));
+    cmd
+}
+
+fn names_in(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .expect("read dir")
+        .map(|entry| {
+            entry
+                .expect("entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn upgrade_check_reports_up_to_date_without_writing() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let before = names_in(dir.path());
+    let (endpoint, handle) = serve_stub(release_json(&current_tag(), &[]));
+
+    upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--check"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("up to date"))
+        .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
+
+    handle.join().unwrap();
+    assert_eq!(names_in(dir.path()), before, "--check must not write");
+}
+
+#[test]
+fn upgrade_check_reports_a_newer_release_without_downloading() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let before = names_in(dir.path());
+    let (endpoint, handle) = serve_stub(release_json("v99.0.0", &[]));
+
+    upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--check"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("new version available: v99.0.0"))
+        .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
+
+    handle.join().unwrap();
+    assert_eq!(names_in(dir.path()), before, "--check must not download");
+}
+
+#[test]
+fn upgrade_force_replaces_the_binary_in_place() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let mut payload = fs::read(&exe).unwrap();
+    payload.push(0);
+    let (asset_url, asset_handle) = serve_stub(payload.clone());
+    let asset = platform_asset();
+    let (endpoint, meta_handle) = serve_stub(release_json(&current_tag(), &[(asset, asset_url)]));
+
+    upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--force"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("upgraded lsm"));
+
+    meta_handle.join().unwrap();
+    asset_handle.join().unwrap();
+
+    assert_eq!(fs::metadata(&exe).unwrap().len(), payload.len() as u64);
+
+    let names = names_in(dir.path());
+    assert!(
+        names.iter().all(|name| !name.starts_with(".lsm-upgrade-")),
+        "download temp file must be cleaned: {names:?}"
+    );
+    assert_eq!(names[0], exe.file_name().unwrap().to_string_lossy());
+
+    // Windows 上正在运行的映像改名后仍被占用，旧文件留给下次升级清理（upgrade.md §5）。
+    #[cfg(windows)]
+    assert!(
+        names.iter().all(|name| !name.contains(".old-")
+            || name.starts_with(&*exe.file_name().unwrap().to_string_lossy())),
+        "{names:?}"
+    );
+    #[cfg(not(windows))]
+    assert_eq!(names.len(), 1, "{names:?}");
+}
+
+#[test]
+fn upgrade_reports_a_missing_asset() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let (endpoint, handle) = serve_stub(release_json("v99.0.0", &[]));
+
+    let expected = platform_asset();
+    upgrade_cmd(&exe, &endpoint, dir.path())
+        .arg("upgrade")
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("v99.0.0"))
+        .stderr(predicate::str::contains(expected));
+
+    handle.join().unwrap();
+}
+
+#[test]
+fn upgrade_maps_metadata_failures_to_hints() {
+    for (status, body) in [(404_u16, ""), (200, "not json"), (403, "")] {
+        let dir = TempDir::new().unwrap();
+        let exe = upgrade_copy(&dir);
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap().to_string();
+        let body = body.to_string();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buffer = [0_u8; 4096];
+            let _ = stream.read(&mut buffer).unwrap();
+            let header = format!(
+                "HTTP/1.1 {status} Stub\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            stream.write_all(header.as_bytes()).unwrap();
+            stream.write_all(body.as_bytes()).unwrap();
+            stream.flush().unwrap();
+        });
+
+        upgrade_cmd(&exe, &format!("http://{address}/metadata"), dir.path())
+            .arg("upgrade")
+            .assert()
+            .code(1)
+            .stderr(predicate::str::contains("releases"));
+
+        handle.join().unwrap();
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_fails_cleanly_when_the_directory_is_not_writable() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let before = fs::read(&exe).unwrap();
+    let mut payload = before.clone();
+    payload.push(0);
+    let (asset_url, asset_handle) = serve_stub(payload);
+    let asset = platform_asset();
+    let (endpoint, meta_handle) = serve_stub(release_json(&current_tag(), &[(asset, asset_url)]));
+
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o555)).unwrap();
+    let assert = upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--force"])
+        .assert()
+        .code(1);
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
+
+    assert.stderr(predicate::str::contains("cannot replace"));
+    assert_eq!(fs::read(&exe).unwrap(), before);
+    let _ = meta_handle.join();
+    let _ = asset_handle.join();
+}
+
+#[test]
+fn upgrade_help_is_localized_and_unknown_flags_exit_two() {
+    lsm()
+        .args(["upgrade", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--check"))
+        .stdout(predicate::str::contains("--force"));
+    lsm()
+        .args(["--lang", "zh", "upgrade", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--check"));
+    lsm().arg("-u").assert().code(2);
+    lsm().args(["upgrade", "--bogus"]).assert().code(2);
+}
+
+#[test]
+fn upgrade_check_after_upgrade_reports_up_to_date() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let mut payload = fs::read(&exe).unwrap();
+    payload.push(0);
+    let (asset_url, asset_handle) = serve_stub(payload);
+    let asset = platform_asset();
+    let (endpoint, meta_handle) = serve_stub(release_json(&current_tag(), &[(asset, asset_url)]));
+
+    upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--force"])
+        .assert()
+        .success();
+    meta_handle.join().unwrap();
+    asset_handle.join().unwrap();
+
+    let (endpoint, handle) = serve_stub(release_json(&current_tag(), &[]));
+    upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--check"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("up to date"));
+    handle.join().unwrap();
 }

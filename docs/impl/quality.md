@@ -66,17 +66,17 @@
 34. 手写注释与未知键（如 `theme = "dark"`）+ `config set lang zh` → 注释与未知键仍在，`lang` 被更新。
 35. `config set lang zh-CN` → 文件内落盘为 `zh`；`config set lang fr` → 退出码 2。
 36. `lsm config`（无子命令）→ help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
-37. [planned] `upgrade --check` 已最新 → 退出 0，stdout 含 `up to date`，磁盘无任何新文件。
-38. [planned] 桩返回更高 tag → `upgrade --check` 打印 `new version available`，退出 0，不下载、不写盘。
-39. [planned] `upgrade --force`（桩 tag = 当前版本）→ 二进制被替换，**路径与文件名不变**，内容等于下载载荷，`.old-*` 已清理。
-40. [planned] 当前平台资产缺失 → 退出 1，stderr 含期望资产名与 tag。
-41. [planned] 桩返回 404 / 非 JSON / 403 → 退出 1，hint 指向镜像或手动下载。
-42. [planned] exe 所在目录不可写 → 退出 1，原文件字节不变。
-43. [planned] `upgrade --help` 两种语言均输出到 stdout 且退出 0；`lsm -u`、`upgrade --bogus` → 退出 2。
-44. [planned] 升级成功后再次执行 `upgrade --check`（桩 tag 不变）→ 退出 0 且报告已最新。
+37. `upgrade --check` 已最新 → 退出 0，stdout 含 `up to date`，磁盘无任何新文件。
+38. 桩返回更高 tag → `upgrade --check` 打印 `new version available`，退出 0，不下载、不写盘。
+39. `upgrade --force`（桩 tag = 当前版本）→ 二进制被替换，**路径与文件名不变**，内容等于下载载荷，`.lsm-upgrade-*` 已清理；Windows 上运行中的旧映像删不掉，允许留下 `<exe>.old-*` 由下次升级清理（[upgrade.md](upgrade.md) §5）。
+40. 当前平台资产缺失 → 退出 1，stderr 含期望资产名与 tag。
+41. 桩返回 404 / 非 JSON / 403 → 退出 1，hint 指向镜像或手动下载。
+42. exe 所在目录不可写 → 退出 1，原文件字节不变（仅 Unix 可稳定复现，Windows 上不造 ACL）。
+43. `upgrade --help` 两种语言均输出到 stdout 且退出 0；`lsm -u`、`upgrade --bogus` → 退出 2。
+44. 升级成功后再次执行 `upgrade --check`（桩 tag 不变）→ 退出 0 且报告已最新。
 45. 真源一致性：`docs/impl/cli.md` §2.1 表的 `implemented` 行必须 `lsm <command> --help` 退出 0，`planned` 行必须被视为未知子命令（退出 2）——由 `tests/cli.rs::cli_reference_table_matches_binary` 强制。
 
-`[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列。
+`[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
 ### 1.3 手工验收（三平台）
 
