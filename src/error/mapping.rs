@@ -3,11 +3,13 @@
 use crate::domain::lang::LangError;
 use crate::domain::meta::MetaError;
 use crate::domain::name::NameError;
+use crate::domain::release::ReleaseError;
 use crate::domain::version::VersionError;
 use crate::i18n::MsgKey;
 use crate::infra::config::ConfigError;
 use crate::infra::frontmatter::FrontmatterError;
 use crate::infra::fsops::FsError;
+use crate::infra::net::NetError;
 use crate::infra::paths::PathError;
 
 use super::AppError;
@@ -187,6 +189,39 @@ impl From<VersionError> for AppError {
     }
 }
 
+/// 取元数据失败：限流单独提示，其余带上原因。
+impl From<NetError> for AppError {
+    fn from(err: NetError) -> Self {
+        match err {
+            NetError::RateLimited => AppError::runtime(MsgKey::UpgradeRateLimited)
+                .with_hint(MsgKey::UpgradeRateLimitedHint),
+            NetError::Status { code } => fetch_failed(format!("HTTP {code}")),
+            NetError::Network { detail } => fetch_failed(detail),
+            NetError::Parse { source } => release_error(source),
+        }
+    }
+}
+
+fn fetch_failed(detail: String) -> AppError {
+    AppError::runtime(MsgKey::UpgradeFetchFailed)
+        .with_args([detail])
+        .with_hint(MsgKey::UpgradeFetchFailedHint)
+}
+
+/// 元数据本身的问题都归到「取不到 release」，只有 tag 不合法有专门文案。
+fn release_error(err: ReleaseError) -> AppError {
+    match err {
+        ReleaseError::InvalidTag { source } => source.into(),
+        ReleaseError::Json { detail } => fetch_failed(detail),
+        ReleaseError::MissingField { field } => fetch_failed(format!("missing field `{field}`")),
+        ReleaseError::InvalidField { field } => fetch_failed(format!("invalid field `{field}`")),
+        // 资产选择尚未接入，先按取元数据失败处理，等拼接资产名时再细化。
+        ReleaseError::UnsupportedPlatform { os, arch } => {
+            fetch_failed(format!("unsupported platform {os}-{arch}"))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -344,5 +379,37 @@ mod tests {
         }
         .into();
         assert_eq!(app.msg.args, ["v18446744073709551616.0.0"]);
+    }
+
+    #[test]
+    fn rate_limits_get_their_own_message() {
+        let app: AppError = NetError::RateLimited.into();
+
+        assert_eq!(app.exit_code(), 1);
+        assert_eq!(app.msg.key, MsgKey::UpgradeRateLimited);
+        assert_eq!(
+            app.hint.as_ref().map(|hint| hint.key),
+            Some(MsgKey::UpgradeRateLimitedHint)
+        );
+    }
+
+    #[test]
+    fn other_fetch_failures_carry_the_reason() {
+        let app: AppError = NetError::Status { code: 404 }.into();
+        assert_eq!(app.msg.key, MsgKey::UpgradeFetchFailed);
+        assert_eq!(app.msg.args, ["HTTP 404"]);
+        assert_eq!(
+            app.hint.as_ref().map(|hint| hint.key),
+            Some(MsgKey::UpgradeFetchFailedHint)
+        );
+
+        let app: AppError = NetError::Parse {
+            source: ReleaseError::MissingField {
+                field: "tag_name".to_string(),
+            },
+        }
+        .into();
+        assert_eq!(app.msg.key, MsgKey::UpgradeFetchFailed);
+        assert_eq!(app.msg.args, ["missing field `tag_name`"]);
     }
 }

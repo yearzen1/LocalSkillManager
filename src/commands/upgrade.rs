@@ -6,6 +6,7 @@ use crate::domain::lang::Lang;
 use crate::domain::version::Version;
 use crate::error::AppError;
 use crate::i18n::{tr_args, MsgKey};
+use crate::infra::net;
 use crate::Ctx;
 
 /// 版本比较的结论（`upgrade.md` §1）。
@@ -25,18 +26,39 @@ pub fn current_version() -> Version {
 }
 
 /// `--check`：取最新 release 后比版本，不下载、不写盘。
-pub fn check(_ctx: &Ctx) -> Result<Check, AppError> {
-    unimplemented!("check latest release")
+pub fn check(ctx: &Ctx) -> Result<Check, AppError> {
+    let current = current_version();
+    let release = net::fetch_latest_release(ctx.env.upgrade_api.as_deref(), current)?;
+
+    Ok(decide(current, release.tag()))
 }
 
 /// 纯比较：不联网、不排版。
-pub fn decide(_current: Version, _latest: Version) -> Check {
-    unimplemented!("compare versions")
+pub fn decide(current: Version, latest: Version) -> Check {
+    match latest.cmp(&current) {
+        Ordering::Greater => Check::Available { current, latest },
+        Ordering::Equal => Check::UpToDate { current },
+        Ordering::Less => Check::CurrentIsNewer { current, latest },
+    }
 }
 
 /// 结论对应的单行文案。
-pub fn render(_check: Check, _lang: Lang) -> String {
-    unimplemented!("render check result")
+pub fn render(check: Check, lang: Lang) -> String {
+    match check {
+        Check::UpToDate { current } => {
+            tr_args(lang, MsgKey::UpgradeUpToDate, &[&current.to_string()])
+        }
+        Check::Available { current, latest } => tr_args(
+            lang,
+            MsgKey::UpgradeAvailable,
+            &[&latest.tag(), &current.to_string()],
+        ),
+        Check::CurrentIsNewer { current, latest } => tr_args(
+            lang,
+            MsgKey::UpgradeCurrentNewer,
+            &[&current.to_string(), &latest.tag()],
+        ),
+    }
 }
 
 #[cfg(test)]
@@ -132,7 +154,10 @@ mod tests {
         );
         assert_eq!(
             render(check, Lang::En),
-            format!("new version available: v99.0.0 (current {})", current_version())
+            format!(
+                "new version available: v99.0.0 (current {})",
+                current_version()
+            )
         );
 
         stub.request();
