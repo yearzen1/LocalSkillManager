@@ -132,5 +132,16 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::UpgradeInvalidVersion => "invalid release version '{0}'",
         MsgKey::UpgradeInvalidVersionHint => "expected a version like v0.3.0",
+        MsgKey::UpgradeUpToDate => "lsm {0} is up to date",
+        MsgKey::UpgradeAvailable => "new version available: {0} (current {1})",
+        MsgKey::UpgradeCurrentNewer => "lsm {0} is newer than {1}",
+        MsgKey::UpgradeFetchFailed => "cannot fetch latest release: {0}",
+        MsgKey::UpgradeFetchFailedHint => {
+            "set LSM_UPGRADE_API to a mirror or download the binary manually from the releases page"
+        }
+        MsgKey::UpgradeRateLimited => "github api rate limit reached",
+        MsgKey::UpgradeRateLimitedHint => {
+            "wait a few minutes and retry, or download the binary manually from the releases page"
+        }
     }
 }

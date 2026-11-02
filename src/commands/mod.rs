@@ -5,6 +5,7 @@ pub mod config;
 pub mod copy;
 pub mod list;
 pub mod remove;
+pub mod upgrade;
 
 use crate::domain::action::Action;
 use crate::error::AppError;

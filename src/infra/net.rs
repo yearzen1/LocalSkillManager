@@ -81,21 +81,20 @@ fn agent(timeout: Duration) -> ureq::Agent {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod stub {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::thread::{self, JoinHandle};
 
-    use super::*;
-
     /// 单次响应桩：接一个连接，读完请求头后回固定响应。
-    struct Stub {
+    pub(crate) struct Stub {
         endpoint: String,
         handle: JoinHandle<String>,
     }
 
     impl Stub {
-        fn start(status: u16, body: &'static str) -> Self {
+        pub(crate) fn start(status: u16, body: impl Into<String>) -> Self {
+            let body = body.into();
             let listener = TcpListener::bind("127.0.0.1:0").expect("bind stub");
             let address = listener.local_addr().expect("stub address");
 
@@ -120,14 +119,23 @@ mod tests {
             }
         }
 
-        fn endpoint(&self) -> &str {
+        pub(crate) fn endpoint(&self) -> &str {
             &self.endpoint
         }
 
-        fn request(self) -> String {
+        /// 等桩线程结束，返回它收到的请求。
+        pub(crate) fn request(self) -> String {
             self.handle.join().expect("stub thread")
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::TcpListener;
+
+    use super::stub::Stub;
+    use super::*;
 
     fn current() -> Version {
         Version::parse("0.3.0").expect("valid version")

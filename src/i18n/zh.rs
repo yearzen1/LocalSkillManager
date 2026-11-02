@@ -128,5 +128,12 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::UpgradeInvalidVersion => "release 版本号不合法：'{0}'",
         MsgKey::UpgradeInvalidVersionHint => "期望形如 v0.3.0 的版本号",
+        MsgKey::UpgradeUpToDate => "lsm {0} 已是最新版本",
+        MsgKey::UpgradeAvailable => "有新版本可用：{0}（当前 {1}）",
+        MsgKey::UpgradeCurrentNewer => "lsm {0} 比 {1} 更新",
+        MsgKey::UpgradeFetchFailed => "无法获取最新 release：{0}",
+        MsgKey::UpgradeFetchFailedHint => "设置 LSM_UPGRADE_API 指向镜像，或从 release 页手动下载",
+        MsgKey::UpgradeRateLimited => "GitHub API 已触发限流",
+        MsgKey::UpgradeRateLimitedHint => "请等几分钟后重试，或从 release 页手动下载",
     }
 }

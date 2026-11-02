@@ -145,6 +145,13 @@ keys!(
     // upgrade
     UpgradeInvalidVersion,
     UpgradeInvalidVersionHint,
+    UpgradeUpToDate,
+    UpgradeAvailable,
+    UpgradeCurrentNewer,
+    UpgradeFetchFailed,
+    UpgradeFetchFailedHint,
+    UpgradeRateLimited,
+    UpgradeRateLimitedHint,
 );
 
 /// 取一条文案。
