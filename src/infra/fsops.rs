@@ -166,6 +166,25 @@ pub fn discard(path: &Path) {
     let _ = std::fs::remove_file(path);
 }
 
+/// 原地替换的结果：旧文件删不掉时把路径带回给调用方打 warning。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplaceReport {
+    pub leftover_backup: Option<PathBuf>,
+}
+
+/// 用 `new_binary` 原地替换 `exe`：路径与文件名不变（Q31）。
+///
+/// Windows 走「改名旧文件 → 放入新文件 → 删旧文件」，第二步失败会把旧文件改回来；
+/// Unix 一步 `rename` 覆盖。
+pub fn replace_self(_exe: &Path, _new_binary: &Path) -> Result<ReplaceReport, FsError> {
+    unimplemented!("replace the running binary")
+}
+
+/// 清理上次升级留下的 `<exe>.old-*`；失败忽略。
+pub fn clean_stale_backups(_exe: &Path) {
+    unimplemented!("clean stale backups")
+}
+
 enum SourceType {
     Directory,
     File,
@@ -523,5 +542,82 @@ mod tests {
 
         let err = copy_recursive(&src, &dir.path().join("dst")).unwrap_err();
         assert!(matches!(err, FsError::SymlinkUnsupported { .. }));
+    }
+
+    #[test]
+    fn replaces_the_binary_in_place_without_renaming_it() {
+        let dir = TempDir::new().unwrap();
+        let exe = dir.path().join("myskillmgr.exe");
+        let new_binary = dir.path().join(".lsm-upgrade-1234");
+        write(&exe, "old");
+        write(&new_binary, "new");
+
+        let report = replace_self(&exe, &new_binary).expect("should replace");
+
+        assert_eq!(fs::read_to_string(&exe).unwrap(), "new");
+        assert!(report.leftover_backup.is_none());
+        assert!(!new_binary.exists(), "temp binary must be consumed");
+        let names: Vec<String> = fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, ["myskillmgr.exe"], "no versioned leftovers");
+    }
+
+    #[test]
+    fn rolls_back_when_the_new_binary_is_missing() {
+        let dir = TempDir::new().unwrap();
+        let exe = dir.path().join("lsm.exe");
+        write(&exe, "old");
+        let missing = dir.path().join(".lsm-upgrade-404");
+
+        let err = replace_self(&exe, &missing).expect_err("should fail");
+
+        assert!(matches!(err, FsError::Io { .. }));
+        assert_eq!(fs::read_to_string(&exe).unwrap(), "old");
+        let stale: Vec<String> = fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains(".old-"))
+            .collect();
+        assert!(stale.is_empty(), "rollback must not leave backups: {stale:?}");
+    }
+
+    #[test]
+    fn cleans_backups_left_by_an_earlier_upgrade() {
+        let dir = TempDir::new().unwrap();
+        let exe = dir.path().join("lsm.exe");
+        write(&exe, "current");
+        write(&dir.path().join("lsm.exe.old-99"), "stale");
+        write(&dir.path().join("unrelated.txt"), "keep");
+
+        clean_stale_backups(&exe);
+
+        assert!(!dir.path().join("lsm.exe.old-99").exists());
+        assert!(dir.path().join("unrelated.txt").exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn reports_a_backup_that_cannot_be_deleted() {
+        let dir = TempDir::new().unwrap();
+        let exe = dir.path().join("lsm.exe");
+        let new_binary = dir.path().join(".lsm-upgrade-7");
+        write(&exe, "old");
+        write(&new_binary, "new");
+
+        let mut permissions = fs::metadata(&exe).unwrap().permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&exe, permissions).unwrap();
+
+        let report = replace_self(&exe, &new_binary).expect("replacement itself succeeds");
+
+        assert_eq!(fs::read_to_string(&exe).unwrap(), "new");
+        let backup = report.leftover_backup.expect("backup must be reported");
+        assert!(backup.exists());
+
+        let mut permissions = fs::metadata(&backup).unwrap().permissions();
+        permissions.set_readonly(false);
+        fs::set_permissions(&backup, permissions).unwrap();
     }
 }
