@@ -153,7 +153,7 @@
 | D4 | 2026-11-05 | ☑ | 40 min | 模块名用 `infra::net`（计划写 `infra/http.rs`，以 §3/§8 与 `quality.md` 为准）；`ureq` 3 已落；超时用例未写——固定 30 秒超时无法在单测里等，留手工人为验证；`NetError → AppError` 映射留到 D5 |
 | D5 | 2026-11-06 | ☑ | 35 min | `check` 返回 `Check`，打印留给 D8；`--force` 尚未进签名，等于天然忽略；新增 7 条 upgrade 文案与 `NetError`/`ReleaseError` 映射；`UnsupportedPlatform` 暂时并入取元数据失败，D7 再细分 |
 | D6 | 2026-11-09 | ☑ | 45 min | 新增 `infra::process`（跑 `<exe> --version`）；下载走后 `body.as_reader()` 流式写盘；集成测试 `tests/upgrade.rs` 用真实二进制当载荷，覆盖不匹配与不可执行两种清理路径 |
-| D7 | 2026-11-10 | ☐ | | |
+| D7 | 2026-11-10 | ☑ | 40 min | `replace_self` + `clean_stale_backups`；只读文件在现在的 Windows 上已不阻止删除，剩余分支改用「备份路径是目录」直接测 `remove_backup`，真实「被占用」场景未模拟 |
 | D8 | 2026-11-11 | ☐ | | |
 | D9 | 2026-11-12 | ☐ | | |
 | D10 | 2026-11-13 | ☐ | | |
