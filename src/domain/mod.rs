@@ -6,5 +6,6 @@ pub mod entry;
 pub mod lang;
 pub mod meta;
 pub mod name;
+pub mod release;
 pub mod scope;
 pub mod version;
