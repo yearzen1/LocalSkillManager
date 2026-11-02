@@ -7,3 +7,4 @@ pub mod lang;
 pub mod meta;
 pub mod name;
 pub mod scope;
+pub mod version;
