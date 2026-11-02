@@ -1,8 +1,10 @@
 //! `upgrade`：比较当前版本与最新 release。下载与替换在后续切片接入。
 
 use std::cmp::Ordering;
+use std::path::Path;
 
 use crate::domain::lang::Lang;
+use crate::domain::release::Asset;
 use crate::domain::version::Version;
 use crate::error::AppError;
 use crate::i18n::{tr_args, MsgKey};
@@ -59,6 +61,25 @@ pub fn render(check: Check, lang: Lang) -> String {
             &[&current.to_string(), &latest.tag()],
         ),
     }
+}
+
+/// 冒烟校验：`<新文件> --version` 的 stdout 必须含 `lsm <期望版本>`。
+pub fn verify_binary(_path: &Path, _expected: Version) -> Result<(), AppError> {
+    unimplemented!("verify downloaded binary")
+}
+
+/// 纯文本校验，便于单测。
+pub fn verify_output(_stdout: &str, _expected: Version) -> Result<(), AppError> {
+    unimplemented!("check --version output")
+}
+
+/// 下载到 `dest` 并校验；任一步失败都删掉 `dest`。
+pub fn download_and_verify(
+    _asset: &Asset,
+    _dest: &Path,
+    _expected: Version,
+) -> Result<(), AppError> {
+    unimplemented!("download and verify")
 }
 
 #[cfg(test)]
@@ -192,5 +213,28 @@ mod tests {
         assert_eq!(err.exit_code(), 1);
         assert_eq!(err.msg.key, MsgKey::UpgradeRateLimited);
         stub.request();
+    }
+
+    #[test]
+    fn accepts_version_output_that_carries_the_expected_version() {
+        let expected = current_version();
+
+        assert!(verify_output(&format!("lsm {expected}\n"), expected).is_ok());
+    }
+
+    #[test]
+    fn rejects_version_output_with_another_version() {
+        let err = verify_output("lsm 0.0.1\n", Version::parse("v0.0.2").unwrap())
+            .expect_err("should reject");
+
+        assert_eq!(err.exit_code(), 1);
+        assert_eq!(err.msg.key, MsgKey::UpgradeVerifyFailed);
+    }
+
+    #[test]
+    fn rejects_empty_version_output() {
+        let err = verify_output("", current_version()).expect_err("should reject");
+
+        assert_eq!(err.msg.key, MsgKey::UpgradeVerifyFailed);
     }
 }

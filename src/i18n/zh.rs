@@ -135,5 +135,9 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UpgradeFetchFailedHint => "设置 LSM_UPGRADE_API 指向镜像，或从 release 页手动下载",
         MsgKey::UpgradeRateLimited => "GitHub API 已触发限流",
         MsgKey::UpgradeRateLimitedHint => "请等几分钟后重试，或从 release 页手动下载",
+        MsgKey::UpgradeDownloadFailed => "无法下载 {0}：{1}",
+        MsgKey::UpgradeDownloadFailedHint => "请从 release 页手动下载",
+        MsgKey::UpgradeVerifyFailed => "下载的二进制未通过校验",
+        MsgKey::UpgradeVerifyFailedHint => "请检查 release 资产后重试",
     }
 }

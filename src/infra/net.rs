@@ -1,5 +1,6 @@
 //! 升级的网络出口：取 release 元数据。只有本模块允许访问网络。
 
+use std::path::Path;
 use std::time::Duration;
 
 use crate::domain::release::{Release, ReleaseError};
@@ -58,6 +59,11 @@ pub fn fetch_latest_release(endpoint: Option<&str>, current: Version) -> Result<
         })?;
 
     Release::parse_metadata(&body).map_err(|source| NetError::Parse { source })
+}
+
+/// 下载资产到 `dest`，超时 5 分钟（Q36）；内容校验由调用方负责。
+pub fn download_asset(_url: &str, _dest: &Path) -> Result<(), NetError> {
+    unimplemented!("download release asset")
 }
 
 /// 空串与 `None` 回落到默认端点；其余必须是绝对 `http(s)` URL。
@@ -243,5 +249,46 @@ mod tests {
                 Err(NetError::Network { .. })
             ));
         }
+    }
+
+    #[test]
+    fn downloads_bytes_to_the_destination() {
+        let dir = tempfile::TempDir::new().expect("temp dir");
+        let dest = dir.path().join("payload");
+        let stub = Stub::start(200, "binary-payload");
+
+        download_asset(stub.endpoint(), &dest).expect("should download");
+
+        assert_eq!(std::fs::read(&dest).expect("dest"), b"binary-payload");
+        stub.request();
+    }
+
+    #[test]
+    fn reports_download_status_codes() {
+        let dir = tempfile::TempDir::new().expect("temp dir");
+        let dest = dir.path().join("payload");
+        let stub = Stub::start(404, "");
+
+        assert_eq!(
+            download_asset(stub.endpoint(), &dest),
+            Err(NetError::Status { code: 404 })
+        );
+        assert!(!dest.exists(), "failed download must not leave a file");
+        stub.request();
+    }
+
+    #[test]
+    fn reports_unreachable_download_hosts() {
+        let dir = tempfile::TempDir::new().expect("temp dir");
+        let dest = dir.path().join("payload");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let address = listener.local_addr().expect("address");
+        drop(listener);
+
+        assert!(matches!(
+            download_asset(&format!("http://{address}/asset"), &dest),
+            Err(NetError::Network { .. })
+        ));
+        assert!(!dest.exists());
     }
 }

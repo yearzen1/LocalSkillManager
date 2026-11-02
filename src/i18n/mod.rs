@@ -152,6 +152,10 @@ keys!(
     UpgradeFetchFailedHint,
     UpgradeRateLimited,
     UpgradeRateLimitedHint,
+    UpgradeDownloadFailed,
+    UpgradeDownloadFailedHint,
+    UpgradeVerifyFailed,
+    UpgradeVerifyFailedHint,
 );
 
 /// 取一条文案。
