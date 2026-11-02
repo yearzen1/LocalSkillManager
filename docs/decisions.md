@@ -46,6 +46,7 @@
 | Q39 | 跨平台验证与 CI | v0.2.0 不做 GitHub Actions 矩阵、不做预编译产物、不做 Linux/macOS 实测，以 Windows 实测为唯一交付依据；触发条件=出现平台相关 issue，届时单独立计划，不并入 13 天节奏 |
 | Q40 | `copy --all` 批量语义 | `--all` 与 `<name>` 互斥（同时给出退 2）；逐条复用 `copy <name>` 的校验与原子安装，单条失败不中断：目标已存在且无 `--force` 算**跳过**（不算失败），源非法或 I/O 失败算**失败**并逐条报错；结束打印成功/跳过/失败计数，任一失败退 1，只有跳过或全部成功退 0，全局为空退 0 并提示无可复制内容 |
 | Q41 | `remove` 卸载语义 | 签名 `remove <name> <scope> [--force]`，scope 必填（与 `add`/`list` 一致），短选项 `-r <name> -g/-p`；无 `--force` 只删「目录名等于 name、含合法 `SKILL.md`、且 frontmatter name 与目录名一致」的目录，其余必须显式 `--force`；删除方式为「rename 到同级 `.tmp-remove-*` → 递归删临时目录」，rename 失败原目录不动；目标不存在退 1；不做批量删除 |
+| Q42 | upgrade 的测试方式 | 测试与桩只走回环：`LSM_UPGRADE_API` 可指向任意 `http://127.0.0.1:<port>/...` 桩（沿用 Q32 的覆盖入口，不为测试另开开关或 `#[cfg(test)]` 分支）；桩用标准库 `std::net::TcpListener` 手写 HTTP 响应，不引 `httpmock`/`wiremock` 等测试依赖；集成测试一律先把已构建的 `lsm` 复制到临时目录再运行副本，`current_exe()` 指向副本，绝不替换 `target/` 下正在使用的二进制；真实 GitHub 请求只在发布前手工验收跑一次（`upgrade --check`），不进 `cargo test`、不进 `scripts/acceptance.sh`；不推翻 Q39（仍不做 CI 矩阵与 Linux/macOS 实测） |
 
 ## 维护规则
 

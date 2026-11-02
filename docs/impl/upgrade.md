@@ -153,15 +153,15 @@ lsm upgrade [--check] [--force]
 
 - `domain::version`：合法/非法 tag、前导 `v`、三段比较、前导零、降级判断。
 - `domain::release`：资产选择（命中/缺失/同名重复/压缩包不匹配）、平台映射（三平台 + 未知组合）。
-- `infra::net`：用 `std::net::TcpListener` 起本地桩，覆盖 200、302 跳转、404、403、非 JSON、超时；断言请求头含 `User-Agent`。
+- `infra::net`：用 `std::net::TcpListener` 起本地桩，覆盖 200、302 跳转、404、403、非 JSON、超时；断言请求头含 `User-Agent`；桩手写 HTTP 响应，不引额外测试依赖（Q42）。
 - `infra::fsops`（自更新部分）：临时目录内替换成功、权限位保留、备份清理、回滚（新文件缺失时旧文件仍可执行）。
 - `commands::upgrade`：已最新、有新版本、`--check` 不落盘、`--force` 同版本重装与降级、不可写目录报错。
 - 集成测试（`tests/cli.rs`）：
-  - 把已构建的 `lsm` 二进制复制到临时目录后运行该副本，`current_exe()` 自然指向副本，**绝不替换 `target/` 下的真实构建产物**；
-  - 用 `LSM_UPGRADE_API` 指向本地桩，桩同时提供元数据与二进制（载荷为同一二进制追加 1 字节的副本）；
+  - 把已构建的 `lsm` 二进制复制到临时目录后运行该副本，`current_exe()` 自然指向副本，**绝不替换 `target/` 下的真实构建产物**（Q42）；
+  - 用 `LSM_UPGRADE_API` 指向本地回环桩，桩同时提供元数据与二进制（载荷为同一二进制追加 1 字节的副本）；
   - 断言：`--check` 只打印不写盘；`upgrade --force` 后路径与文件名不变、内容长度等于载荷、`.old-*` 已清理；
   - 覆盖资产缺失、404、限流、未知参数、`--help` 两种语言。
-- 不做真实 GitHub 的联网测试；发布前手工验收见 [quality.md](quality.md)「手工验收」。
+- 不做真实 GitHub 的联网测试（真实请求只在发布前手工验收跑一次，Q42）；发布前手工验收见 [quality.md](quality.md)「手工验收」。
 
 ## 9. 明确不做
 
@@ -177,5 +177,6 @@ lsm upgrade [--check] [--force]
 - Q30：自更新范围与命令形态。
 - Q31：校验与原地替换（文件名不变）。
 - Q32：网络端点、`LSM_UPGRADE_API`、资产名契约。
+- Q42：测试桩只走回环、集成测试只操作临时副本、真实联网只手工验收一次。
 
 完整决策见 [decisions.md](../decisions.md)。
