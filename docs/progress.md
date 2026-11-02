@@ -151,7 +151,7 @@
 | D2 | 2026-11-03 | ☑ | 30 min | `domain::version` 纯函数；新增 `UpgradeInvalidVersion(+Hint)` 两条文案，`upgrade.md` §7 补 tag 非法一行；顺手修掉 Q42 之前留下的「32 项」计数 |
 | D3 | 2026-11-04 | ☑ | 30 min | `domain::release`：六组合映射 + 元数据解析；重复资产按文档取首个并记录（计划写的是「独立错误」，以 §2.3 为准）；未接 `AppError`，留到 D5 |
 | D4 | 2026-11-05 | ☑ | 40 min | 模块名用 `infra::net`（计划写 `infra/http.rs`，以 §3/§8 与 `quality.md` 为准）；`ureq` 3 已落；超时用例未写——固定 30 秒超时无法在单测里等，留手工人为验证；`NetError → AppError` 映射留到 D5 |
-| D5 | 2026-11-06 | ☐ | | |
+| D5 | 2026-11-06 | ☑ | 35 min | `check` 返回 `Check`，打印留给 D8；`--force` 尚未进签名，等于天然忽略；新增 7 条 upgrade 文案与 `NetError`/`ReleaseError` 映射；`UnsupportedPlatform` 暂时并入取元数据失败，D7 再细分 |
 | D6 | 2026-11-09 | ☐ | | |
 | D7 | 2026-11-10 | ☐ | | |
 | D8 | 2026-11-11 | ☐ | | |
