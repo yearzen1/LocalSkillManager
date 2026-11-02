@@ -79,6 +79,7 @@ lsm list <global|project> [--json]
 lsm copy <name> [--force]
 lsm copy --all [--force]
 lsm remove <name> <global|project> [--force]
+lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
@@ -134,6 +135,15 @@ my-skill     一句话说明。
 - `lsm remove <name> <global|project>` 卸载 skill。无 `--force` 时只删合法 skill 目录（存在 `SKILL.md` 且其 `name` 与目录名一致），其余必须显式加 `--force`。
 - 删除是原子的：先把目标 rename 到同级 `.tmp-remove-*`，再递归删除；rename 失败时原目录保持完整。
 - 目标不存在退出码 1；`name` 在拼任何路径之前完成校验，`..` 与保留设备名以退出码 2 失败。
+
+### upgrade
+
+- `lsm upgrade` 取最新 GitHub release，与当前版本比较后**原地替换**二进制：路径与文件名都不变（`lsm.exe`，或你改名后的名字）。
+- `--check` 只报告——`已是最新版本` 或 `有新版本可用`——不下载、不写盘。发现新版本不算失败：退出码 0。
+- `--force` 允许同版本重装，也允许 release 比当前版本旧时降级。
+- 下载后先跑 `<新文件> --version`，输出必须包含 release tag 的版本号才算通过；校验失败会删掉临时文件，原可执行文件不动。
+- 可执行文件所在目录必须可写；替换失败会回滚，旧二进制仍然可以运行。
+- 只有显式执行 `upgrade` 才联网。HTTP 403/429 按限流提示，`LSM_UPGRADE_API` 可指向返回同样 JSON 的镜像。
 
 ## 语言
 

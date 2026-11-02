@@ -79,6 +79,7 @@ lsm list <global|project> [--json]
 lsm copy <name> [--force]
 lsm copy --all [--force]
 lsm remove <name> <global|project> [--force]
+lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
 lsm --lang <en|zh> <command> ...
@@ -134,6 +135,15 @@ my-skill     One-line description.
 - `lsm remove <name> <global|project>` uninstalls a skill. Without `--force` only a valid skill directory is deleted (`SKILL.md` present and its `name` matching the directory); anything else needs `--force`.
 - Deletion is atomic: the target is renamed to a sibling `.tmp-remove-*` first, then removed. If the rename fails, the original directory stays intact.
 - A missing target exits with code 1; `name` is validated before any path is built, so `..` and reserved device names exit with code 2.
+
+### upgrade
+
+- `lsm upgrade` fetches the latest GitHub release, compares it with the running version, and replaces the binary **in place**: the path and file name stay the same (`lsm.exe`, or whatever you renamed it to).
+- `--check` only reports — `up to date` or `new version available` — and never downloads or writes. A newer release is not an error: exit code 0.
+- `--force` reinstalls the same version and also allows a downgrade when the release is older than the running build.
+- The download is verified by running `<new file> --version` and requiring the release tag's version. Failed verification deletes the temp file and leaves the original executable alone.
+- The directory holding the executable must be writable; a failed replacement rolls back, so the old binary stays runnable.
+- Network is touched only when you run `upgrade`. HTTP 403/429 are reported as rate limiting, and `LSM_UPGRADE_API` can point at a mirror serving the same JSON shape.
 
 ## Language
 
