@@ -156,7 +156,7 @@
 | D7 | 2026-11-24 | ☑ | 40 min | `search`/`push` 转 `implemented`；`copy`/`remove` 参数列同步；help 样例更新为 0.4.0 |
 | D8 | 2026-11-25 | ☑ | 35 min | 两份 README 同步 search/push/多 name；验收脚本扩到 13 步，`PASS` |
 | D9 | 2026-11-26 | ☑ | 50 min | 四道门禁全绿（181 单测 + 90 CLI + 11 config + 5 upgrade）；`Cargo.toml` 0.4.0 |
-| D10 | 2026-11-27 | ☐ | | 本地 release 构建已是 0.4.0；tag / push / GitHub release 待确认后执行 |
+| D10 | 2026-11-27 | ☑ | 25 min | 四道门禁全绿；tag `v0.4.0` 已推；release 资产 `lsm-windows-x64.exe` 字节数一致（3,722,752）；发布后副本 `upgrade --check` 报「已是最新版本」 |
 
 ## 5. 风险与应对
 
