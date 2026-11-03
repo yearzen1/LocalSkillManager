@@ -1,6 +1,6 @@
 # Local Skill Manager（`lsm`）
 
-把 agent skill 安装到 `~/.agents/skills` 或 `<项目>/.agents/skills`，把全局 skill 复制到当前项目，也能更新 `lsm` 自身二进制。
+把 agent skill 安装到 `~/.agents/skills` 或 `<项目>/.agents/skills`，把全局 skill 拉取到当前项目、把项目 skill 推送到全局，也能更新 `lsm` 自身二进制。
 
 [English](README.md) | 中文
 
@@ -32,8 +32,8 @@ EOF
 # 2. 安装到全局
 lsm add my-skill.md global
 
-# 3. 复制到当前项目
-lsm copy my-skill
+# 3. 拉取到当前项目
+lsm pull my-skill
 ```
 
 ## 目录约定
@@ -77,8 +77,8 @@ description: 审查 diff 的正确性与风格。
 lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
 lsm search <query> <global|project> [--json]
-lsm copy <name>... [--force]
-lsm copy --all [--force]
+lsm pull <name>... [--force]
+lsm pull --all [--force]
 lsm push <name>... [--force]
 lsm push --all [--force]
 lsm remove <name>... <global|project> [--force]
@@ -98,13 +98,12 @@ lsm --lang <en|zh> <command> ...
 | `lsm -a foo.md -p` | `lsm add foo.md project` |
 | `lsm -l -g` | `lsm list global` |
 | `lsm -l -p --json` | `lsm list project --json` |
-| `lsm -c foo` | `lsm copy foo` |
-| `lsm -c a b` | `lsm copy a b` |
-| `lsm -c --all` | `lsm copy --all` |
 | `lsm -r foo -p` | `lsm remove foo project` |
 | `lsm -r a b -p` | `lsm remove a b project` |
 
-`-g` 与 `-p` 不能同时使用、不能与 `copy` 一起用，也不能与完整子命令写法混用。`search` 与 `push` 没有短选项。
+`-g` 与 `-p` 不能同时使用、不能与 `pull` 一起用，也不能与完整子命令写法混用。`search` 与 `push` 没有短选项。`pull` 也没有短选项：`-p` 始终表示 `project`，`-c` 已在 0.5.0 移除。
+
+> **从 0.4.x 迁移**：`lsm copy ...` 现在叫 `lsm pull ...`；`lsm -c ...` 已不可用。请使用 `lsm pull <name>...` 或 `lsm pull --all`。
 
 ### add
 
@@ -134,19 +133,19 @@ my-skill     一句话说明。
 - 输出复用 `list` 表格（非法项仍标 `[invalid]`）；`--json` 复用 `list` 的 JSON 数组字段。
 - 无匹配不算失败：退出码 0，文本模式打印 `在 <scope> 中没有匹配 '<query>' 的 skill`（JSON 为 `[]`）。空查询退 2。
 
-### copy
+### pull
 
 - 源必须是合法的全局 skill：存在 `SKILL.md` 且其 `name` 与目录名一致。
 - 源与目标相同、或目标位于源内部时拒绝；目标已存在需要 `--force`。
-- `name` 在拼任何路径之前完成校验，`..`、`/`、`\` 与保留设备名都以退出码 2 失败。多个 name 时先全部校验，任一个非法则一条都不复制。
+- `name` 在拼任何路径之前完成校验，`..`、`/`、`\` 与保留设备名都以退出码 2 失败。多个 name 时先全部校验，任一个非法则一条都不拉取。
 - 多个 name 时单条失败不中断：目标已存在且无 `--force` 算跳过，源缺失/非法算失败，结束打印 `成功 N 个，跳过 M 个，失败 K 个`。任一失败退 1，只有跳过退 0。
-- `--all` 复制全部合法全局 skill。目标已存在时默认跳过（`--force` 覆盖）；非法 skill 逐条报错但不中断。跳过不算失败：只有真的复制失败才退出码 1。
+- `--all` 拉取全部合法全局 skill。目标已存在时默认跳过（`--force` 覆盖）；非法 skill 逐条报错但不中断。跳过不算失败：只有真的拉取失败才退出码 1。
 
 ### push
 
-- `lsm push <name>...` 是 `copy` 的反向操作：project（当前目录）→ global。源必须是合法项目 skill，目录名与 `SKILL.md` 的 `name` 一致。
-- 目标已存在需要 `--force`；`--all` 推送全部合法项目 skill，成功/跳过/失败语义与 `copy --all` 相同。
-- 多个 name、先校验后执行、汇总行的行为与 `copy` 完全一致。
+- `lsm push <name>...` 是 `pull` 的反向操作：project（当前目录）→ global。源必须是合法项目 skill，目录名与 `SKILL.md` 的 `name` 一致。
+- 目标已存在需要 `--force`；`--all` 推送全部合法项目 skill，成功/跳过/失败语义与 `pull --all` 相同。
+- 多个 name、先校验后执行、汇总行的行为与 `pull` 完全一致。
 - 源不存在时 hint 指向 `lsm list project`；没有短选项。
 
 ### remove
