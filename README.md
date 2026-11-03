@@ -76,9 +76,12 @@ Limits are never truncated or auto-fixed: violating them is an error.
 ```
 lsm add <source> <global|project> [--force]
 lsm list <global|project> [--json]
-lsm copy <name> [--force]
+lsm search <query> <global|project> [--json]
+lsm copy <name>... [--force]
 lsm copy --all [--force]
-lsm remove <name> <global|project> [--force]
+lsm push <name>... [--force]
+lsm push --all [--force]
+lsm remove <name>... <global|project> [--force]
 lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
@@ -96,10 +99,12 @@ Short forms (separate arguments only — `-lg` is not supported):
 | `lsm -l -g` | `lsm list global` |
 | `lsm -l -p --json` | `lsm list project --json` |
 | `lsm -c foo` | `lsm copy foo` |
+| `lsm -c a b` | `lsm copy a b` |
 | `lsm -c --all` | `lsm copy --all` |
 | `lsm -r foo -p` | `lsm remove foo project` |
+| `lsm -r a b -p` | `lsm remove a b project` |
 
-`-g`/`-p` may not be combined, may not be used with `copy`, and may not be mixed with the long subcommand form.
+`-g`/`-p` may not be combined, may not be used with `copy`, and may not be mixed with the long subcommand form. `search` and `push` have no short forms.
 
 ### add
 
@@ -123,18 +128,33 @@ my-skill     One-line description.
 - invalid skill directories are marked `[invalid]` and never abort the listing;
 - `--json` prints a single JSON array (pretty-printed, `[]` when empty) with `name`, `description`, `path`, `valid`, and `error` for invalid entries. Warnings never go to stdout.
 
+### search
+
+- `lsm search <query> <global|project>` matches `name` and `description` case-insensitively; `scope` is required and only one scope is searched at a time.
+- Output reuses the `list` table (invalid entries keep the `[invalid]` marker) or the `list` JSON array with `--json`.
+- No matches is not an error: the command exits 0 and prints `No skills matched '<query>' in <scope>` (JSON: `[]`). An empty query exits 2.
+
 ### copy
 
 - The source must be a valid global skill: `SKILL.md` present and its `name` must match the directory.
 - Copying onto the same path, or into the source itself, is refused; an existing target needs `--force`.
-- `name` is validated before any path is built, so `..`, `/`, `\` and reserved device names exit with code 2.
+- `name` is validated before any path is built, so `..`, `/`, `\` and reserved device names exit with code 2. With several names, every name is validated before anything is copied.
+- Multiple names keep going after a failure: existing targets without `--force` are skipped, invalid/missing sources fail, and a final line reports `copied N, skipped M, failed K`. Any failure exits 1; only skips exit 0.
 - `--all` copies every valid global skill. Existing targets are skipped unless `--force`; invalid skills are reported and the batch keeps going. Skipped skills are not failures: the command exits 1 only when a skill actually failed to copy.
+
+### push
+
+- `lsm push <name>...` is the reverse of `copy`: project (cwd) → global. The source must be a valid project skill and the directory name must match `SKILL.md`.
+- Existing global targets need `--force`; `--all` pushes every valid project skill with the same success/skip/failure semantics as `copy --all`.
+- Multiple names, validation-before-work, and the summary line behave exactly like `copy`.
+- A missing source points at `lsm list project`; the command has no short form.
 
 ### remove
 
-- `lsm remove <name> <global|project>` uninstalls a skill. Without `--force` only a valid skill directory is deleted (`SKILL.md` present and its `name` matching the directory); anything else needs `--force`.
+- `lsm remove <name>... <global|project>` uninstalls one or more skills. Without `--force` only a valid skill directory is deleted (`SKILL.md` present and its `name` matching the directory); anything else needs `--force`.
 - Deletion is atomic: the target is renamed to a sibling `.tmp-remove-*` first, then removed. If the rename fails, the original directory stays intact.
-- A missing target exits with code 1; `name` is validated before any path is built, so `..` and reserved device names exit with code 2.
+- With several names, all names are validated first, then each is removed; failures do not stop the batch and a final line reports `removed N, failed M`. Any failure exits 1.
+- A missing target exits with code 1 and the hint points at `lsm search`; `name` is validated before any path is built, so `..` and reserved device names exit with code 2.
 
 ### upgrade
 
