@@ -20,7 +20,8 @@ const ELLIPSIS: &str = "...";
 /// 非法项的固定标记。
 const INVALID_MARKER: &str = "[invalid]";
 
-/// 渲染文本表格。description 压成单行后按 60 显示列换行，续行悬挂缩进到描述列。
+/// 渲染文本表格。description 压成单行后按 60 显示列换行，续行悬挂缩进到描述列；
+/// 相邻条目之间空一行，表头后与末尾都不空。
 pub fn render_text(lang: Lang, entries: &[SkillEntry]) -> String {
     let name_width = entries
         .iter()
@@ -38,7 +39,12 @@ pub fn render_text(lang: Lang, entries: &[SkillEntry]) -> String {
     text.push_str(&format!("{}  {}\n", "-".repeat(name_width), "-".repeat(42)));
 
     let indent = " ".repeat(name_width + 2);
-    for entry in entries {
+    for (position, entry) in entries.iter().enumerate() {
+        // 条目之间空一行，折行后的 description 不会和下一个条目粘在一起。
+        if position > 0 {
+            text.push('\n');
+        }
+
         let description = match &entry.error {
             Some(error) => format!("{INVALID_MARKER} {error}"),
             None => entry.description.clone(),
@@ -345,8 +351,40 @@ mod tests {
     fn description_rows(text: &str) -> Vec<String> {
         text.lines()
             .skip(2)
+            .filter(|line| !line.is_empty())
             .map(|line| line.chars().skip(12).collect::<String>())
             .collect()
+    }
+
+    #[test]
+    fn separates_entries_with_a_blank_line() {
+        let text = render_text(
+            Lang::En,
+            &[entry("alpha", "First."), entry("beta", "Second.")],
+        );
+        let lines: Vec<&str> = text.lines().collect();
+
+        // 表头、分隔线、alpha、空行、beta：表头后与末尾都不加空行
+        assert_eq!(lines.len(), 5);
+        assert!(lines[2].starts_with("alpha"));
+        assert!(lines[3].is_empty());
+        assert!(lines[4].starts_with("beta"));
+        assert!(!text.ends_with("\n\n"), "no trailing blank line: {text:?}");
+    }
+
+    #[test]
+    fn separates_wrapped_description_from_next_entry() {
+        let text = render_text(
+            Lang::En,
+            &[entry("alpha", &"a".repeat(70)), entry("beta", "Second.")],
+        );
+        let lines: Vec<&str> = text.lines().collect();
+
+        // alpha 占两行，续行之后才是分隔空行
+        assert_eq!(lines.len(), 6);
+        assert_eq!(lines[3].trim_start(), "a".repeat(10));
+        assert!(lines[4].is_empty());
+        assert!(lines[5].starts_with("beta"));
     }
 
     #[test]

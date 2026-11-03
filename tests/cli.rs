@@ -606,6 +606,11 @@ fn list_sorts_by_name_and_wraps_long_descriptions() {
     let alpha_at = text.find("alpha").unwrap();
     let zeta_at = text.find("zeta").unwrap();
     assert!(alpha_at < zeta_at, "entries must be sorted by name");
+    // 条目之间空一行，换行后的 description 不会和下一个条目粘在一起
+    assert!(
+        text.contains("first\n\nzeta"),
+        "entries must be separated by a blank line: {text:?}"
+    );
     // 60 列换行后剩 10 个 z，续行从描述列（10 + 2）开始，不顶到第 0 列
     assert!(text.contains(&"z".repeat(60)));
     assert!(text.contains(&format!("            {}", "z".repeat(10))));
