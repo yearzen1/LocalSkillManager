@@ -37,7 +37,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - 文案按语言拆到 `i18n/en.rs`、`i18n/zh.rs`，`mod.rs` 只做分发。
 - 所有 `error:` / `hint:` / 成功提示 / help 正文都从消息表取，禁止在业务代码里写死文案。
 - 中文前缀用 `错误:` / `提示:`，英文用 `error:` / `hint:`。
-- 版本号 `lsm 0.3.0`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
+- 版本号 `lsm 0.4.0`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
 
 ### 1.3 help 与参数错误
 
@@ -45,7 +45,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - clap 自带的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）与结尾提示，在渲染后按语言替换为 `用法:`、`命令:`、`选项:`、`参数:` 等；自带的 `-h/--help` 与 `-V/--version` 说明同样是英文，因此改为自建参数注入本地化文案。
 - 参数解析错误按 `clap::error::ErrorKind` 映射常用类型：缺参数、非法值、未知参数、多余参数、缺子命令、非法子命令，并带上 clap 记录的出错参数名；未覆盖的类型回退英文原文。
 - `DisplayHelp` / `DisplayVersion` 直接输出并退出 0。
-- 实测 help（v0.3.0，与 `cli/spec.rs` 一致）：
+- 实测 help（v0.4.0，与 `cli/spec.rs` 一致）：
 
 ```
 $ lsm --lang zh --help
@@ -56,7 +56,9 @@ $ lsm --lang zh --help
 命令:
   add      安装 skill 到 global 或 project
   list     列出已安装的 skill
+  search   按名称或描述搜索已安装的 skill
   copy     把全局 skill 复制到当前项目
+  push     把项目 skill 推送到全局目录
   remove   从 global 或 project 卸载 skill
   upgrade  更新 lsm 自身
   config   查看或修改持久化配置
@@ -86,8 +88,10 @@ $ lsm --lang zh --help
 |---|---|---|
 | `add` | `<SOURCE> <SCOPE> [--force]` | implemented |
 | `list` | `<SCOPE> [--json]` | implemented |
-| `copy` | `<NAME> 或 --all [--force]` | implemented |
-| `remove` | `<NAME> <SCOPE> [--force]` | implemented |
+| `search` | `<QUERY> <SCOPE> [--json]` | implemented |
+| `copy` | `<NAME>... 或 --all [--force]` | implemented |
+| `push` | `<NAME>... 或 --all [--force]` | implemented |
+| `remove` | `<NAME>... <SCOPE> [--force]` | implemented |
 | `config get` | `lang` | implemented |
 | `config set` | `lang <LANG>` | implemented |
 | `upgrade` | `[--check] [--force]` | implemented |
@@ -95,6 +99,7 @@ $ lsm --lang zh --help
 - `<SCOPE>`：`global` 或 `project`，大小写敏感。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
+- `search` / `push` 与多 name 的 `copy`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47。
 
 选项：
 
@@ -105,8 +110,11 @@ $ lsm --lang zh --help
 | 根命令 | `-V`, `--version` | — | — | 输出 `lsm <版本>`，退出 0，子命令不支持 |
 | `add` | `--force` | — | 关闭 | 目标已存在时覆盖：备份 → 安装 → 删备份 |
 | `list` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
+| `search` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
 | `copy` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
-| `copy` | `--all` | — | 关闭 | 复制全局全部 skill，与 `<NAME>` 互斥 |
+| `copy` | `--all` | — | 关闭 | 复制全局全部 skill，与 `<NAME>...` 互斥 |
+| `push` | `--force` | — | 关闭 | 同 `copy` 的覆盖流程 |
+| `push` | `--all` | — | 关闭 | 把项目全部 skill 推到 global，与 `<NAME>...` 互斥 |
 | `remove` | `--force` | — | 关闭 | 允许删除非合法 skill 目录 |
 | `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0 |
 | `upgrade` | `--force` | — | 关闭 | 允许同版本重装与降级 |
@@ -129,8 +137,10 @@ $ lsm --lang zh --help
 | `lsm -l -p` | `lsm list project` |
 | `lsm -l -g --json` | `lsm list global --json` |
 | `lsm -c foo` | `lsm copy foo` |
+| `lsm -c a b` | `lsm copy a b` |
 | `lsm -c --all` | `lsm copy --all` |
 | `lsm -r foo -p` | `lsm remove foo project` |
+| `lsm -r a b -p` | `lsm remove a b project` |
 | `lsm --add foo.md --global` | `lsm add foo.md global` |
 
 归一化规则：
@@ -162,7 +172,7 @@ $ lsm --lang zh --help
 ### 2.4 无参数与帮助行为
 
 - `lsm --help` / `-h` / `lsm <command> --help`：本地化 help 输出到 **stdout**，退出码 0。
-- `lsm --version` / `-V`：输出 `lsm 0.3.0` 到 stdout，退出码 0。
+- `lsm --version` / `-V`：输出 `lsm 0.4.0` 到 stdout，退出码 0。
 - `lsm` 无子命令，或只有全局参数（如 `lsm --lang zh`）：本地化 help 输出到 **stderr**，退出码 2。
 - 嵌套子命令沿用同一规则：`lsm config` 无子命令 → help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
 - `lsm upgrade --help` 与 `lsm upgrade --check --help` 同样走 stdout、退出码 0，且不联网、不写盘。

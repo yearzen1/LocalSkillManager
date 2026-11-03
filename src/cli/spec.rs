@@ -28,7 +28,9 @@ pub fn build(lang: Lang) -> Command {
         )
         .subcommand(add_command(lang))
         .subcommand(list_command(lang))
+        .subcommand(search_command(lang))
         .subcommand(copy_command(lang))
+        .subcommand(push_command(lang))
         .subcommand(remove_command(lang))
         .subcommand(upgrade_command(lang))
         .subcommand(config_command(lang));
@@ -99,11 +101,38 @@ fn list_command(lang: Lang) -> Command {
     with_help_flag(command, lang)
 }
 
+fn search_command(lang: Lang) -> Command {
+    let command = Command::new("search")
+        .about(tr(lang, MsgKey::SearchAbout))
+        .arg(
+            Arg::new("query")
+                .required(true)
+                .value_name("QUERY")
+                .help(tr(lang, MsgKey::SearchQueryArg)),
+        )
+        .arg(
+            Arg::new("scope")
+                .required(true)
+                .value_name("SCOPE")
+                .value_parser(SCOPE_VALUES)
+                .help(tr(lang, MsgKey::SearchScopeArg)),
+        )
+        .arg(
+            Arg::new("json")
+                .long("json")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::SearchJsonFlag)),
+        );
+
+    with_help_flag(command, lang)
+}
+
 fn copy_command(lang: Lang) -> Command {
     let command = Command::new("copy")
         .about(tr(lang, MsgKey::CopyAbout))
         .arg(
             Arg::new("name")
+                .num_args(1..)
                 .value_name("NAME")
                 .help(tr(lang, MsgKey::CopyNameArg)),
         )
@@ -123,12 +152,38 @@ fn copy_command(lang: Lang) -> Command {
     with_help_flag(command, lang)
 }
 
+fn push_command(lang: Lang) -> Command {
+    let command = Command::new("push")
+        .about(tr(lang, MsgKey::PushAbout))
+        .arg(
+            Arg::new("name")
+                .num_args(1..)
+                .value_name("NAME")
+                .help(tr(lang, MsgKey::PushNameArg)),
+        )
+        .arg(
+            Arg::new("all")
+                .long("all")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::PushAllFlag)),
+        )
+        .arg(
+            Arg::new("force")
+                .long("force")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::PushForceFlag)),
+        );
+
+    with_help_flag(command, lang)
+}
+
 fn remove_command(lang: Lang) -> Command {
     let command = Command::new("remove")
         .about(tr(lang, MsgKey::RemoveAbout))
         .arg(
             Arg::new("name")
                 .required(true)
+                .num_args(1..)
                 .value_name("NAME")
                 .help(tr(lang, MsgKey::RemoveNameArg)),
         )

@@ -73,7 +73,12 @@ pub fn normalize(argv: Vec<OsString>) -> Result<Vec<OsString>, NormalizeError> {
     let has_subcommand = passthrough
         .iter()
         .filter_map(|token| token.to_str())
-        .any(|token| matches!(token, "add" | "list" | "copy" | "remove"));
+        .any(|token| {
+            matches!(
+                token,
+                "add" | "list" | "search" | "copy" | "push" | "remove"
+            )
+        });
     if has_subcommand && !(actions.is_empty() && scopes.is_empty()) {
         return Err(NormalizeError::MixedForms);
     }
@@ -99,10 +104,18 @@ pub fn normalize(argv: Vec<OsString>) -> Result<Vec<OsString>, NormalizeError> {
     if let Some(value) = value {
         normalized.push(value);
     }
-    if let Some(scope) = scopes.first() {
-        normalized.push(OsString::from(*scope));
+    // `remove <name>... <scope>`：scope 必须留在最后一个位置参数。
+    if action == "remove" {
+        normalized.extend(passthrough);
+        if let Some(scope) = scopes.first() {
+            normalized.push(OsString::from(*scope));
+        }
+    } else {
+        if let Some(scope) = scopes.first() {
+            normalized.push(OsString::from(*scope));
+        }
+        normalized.extend(passthrough);
     }
-    normalized.extend(passthrough);
 
     Ok(normalized)
 }
@@ -186,7 +199,11 @@ mod tests {
         );
         assert_eq!(
             run(&["-r", "foo", "-g", "--force"]).unwrap(),
-            ["remove", "foo", "global", "--force"]
+            ["remove", "foo", "--force", "global"]
+        );
+        assert_eq!(
+            run(&["-r", "a", "b", "-p"]).unwrap(),
+            ["remove", "a", "b", "project"]
         );
     }
 

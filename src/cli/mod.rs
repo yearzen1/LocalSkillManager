@@ -91,9 +91,30 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
             scope: scope_of(&required(sub, "scope")),
             json: sub.get_flag("json"),
         },
+        "search" => {
+            let query = required(sub, "query");
+            let query = query.trim().to_string();
+            if query.is_empty() {
+                return Err(
+                    AppError::usage(MsgKey::UsageEmptyQuery).with_hint(MsgKey::UsageHelpHint)
+                );
+            }
+            Action::Search {
+                query,
+                scope: scope_of(&required(sub, "scope")),
+                json: sub.get_flag("json"),
+            }
+        }
         "copy" => {
-            let target = copy_target(sub)?;
+            let target = copy_target(sub, "copy")?;
             Action::Copy {
+                target,
+                force: sub.get_flag("force"),
+            }
+        }
+        "push" => {
+            let target = copy_target(sub, "push")?;
+            Action::Push {
                 target,
                 force: sub.get_flag("force"),
             }
@@ -101,7 +122,7 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
         "config" => Action::Config(parse_config(sub)?),
         "remove" => Action::Remove {
             scope: scope_of(&required(sub, "scope")),
-            name: SkillName::parse(&required(sub, "name"))?,
+            names: skill_names(sub)?,
             force: sub.get_flag("force"),
         },
         "upgrade" => Action::Upgrade {
@@ -114,21 +135,33 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
     Ok(Outcome::Action(action))
 }
 
-/// `copy` 的复制对象：`<NAME>` 与 `--all` 必须二选一。
-fn copy_target(matches: &ArgMatches) -> Result<CopyTarget, AppError> {
-    let name = matches.get_one::<String>("name");
+/// `copy` / `push` 的复制对象：`<NAME>...` 与 `--all` 必须二选一。
+fn copy_target(matches: &ArgMatches, command: &'static str) -> Result<CopyTarget, AppError> {
+    let names = skill_names(matches)?;
     let all = matches.get_flag("all");
 
-    match (name, all) {
-        (Some(name), false) => Ok(CopyTarget::One(SkillName::parse(name)?)),
-        (None, true) => Ok(CopyTarget::All),
-        (Some(_), true) => {
-            Err(AppError::usage(MsgKey::UsageCopyTargetConflict).with_hint(MsgKey::UsageHelpHint))
-        }
-        (None, false) => {
-            Err(AppError::usage(MsgKey::UsageCopyTargetMissing).with_hint(MsgKey::UsageHelpHint))
+    match (names.is_empty(), all) {
+        (false, false) => Ok(CopyTarget::Many(names)),
+        (true, true) => Ok(CopyTarget::All),
+        (false, true) => Err(AppError::usage(MsgKey::UsageCopyTargetConflict)
+            .with_args([command])
+            .with_hint(MsgKey::UsageHelpHint)),
+        (true, false) => Err(AppError::usage(MsgKey::UsageCopyTargetMissing)
+            .with_args([command])
+            .with_hint(MsgKey::UsageHelpHint)),
+    }
+}
+
+/// 读取全部 `name` 并校验；重复 name 去重，保留首次出现的顺序。
+fn skill_names(matches: &ArgMatches) -> Result<Vec<SkillName>, AppError> {
+    let mut names = Vec::new();
+    for raw in matches.get_many::<String>("name").into_iter().flatten() {
+        let name = SkillName::parse(raw)?;
+        if !names.contains(&name) {
+            names.push(name);
         }
     }
+    Ok(names)
 }
 
 fn parse_config(matches: &ArgMatches) -> Result<ConfigCommand, AppError> {

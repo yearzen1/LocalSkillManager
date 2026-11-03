@@ -4,7 +4,9 @@ pub mod add;
 pub mod config;
 pub mod copy;
 pub mod list;
+pub mod push;
 pub mod remove;
+pub mod search;
 pub mod upgrade;
 
 use crate::domain::action::Action;
@@ -21,8 +23,14 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
         } => add::run(ctx, source, scope, force),
         Action::Config(command) => config::run(ctx, command),
         Action::List { scope, json } => list::run(ctx, scope, json),
+        Action::Search { query, scope, json } => search::run(ctx, &query, scope, json),
         Action::Copy { target, force } => copy::run(ctx, target, force),
-        Action::Remove { scope, name, force } => remove::run(ctx, scope, name, force),
+        Action::Push { target, force } => push::run(ctx, target, force),
+        Action::Remove {
+            scope,
+            names,
+            force,
+        } => remove::run(ctx, scope, names, force),
         Action::Upgrade { check, force } => upgrade::run(ctx, check, force),
     }
 }

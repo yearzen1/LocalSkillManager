@@ -794,7 +794,7 @@ fn copy_missing_skill_points_at_list() {
         .assert()
         .code(1)
         .stderr(predicate::str::contains("not found in global"))
-        .stderr(predicate::str::contains("lsm list global"));
+        .stderr(predicate::str::contains("lsm search nope global"));
 }
 
 #[test]
@@ -1637,4 +1637,380 @@ fn upgrade_check_after_upgrade_reports_up_to_date() {
         .success()
         .stdout(predicate::str::contains("up to date"));
     handle.join().unwrap();
+}
+
+// ---------- v0.4.0: search ----------
+
+#[test]
+fn search_matches_name_and_description_case_insensitively() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "code-review", "Review a diff for correctness.");
+    install_global(&home, "docs", "Write project documentation.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["search", "REVIEW", "global"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("code-review"))
+        .stdout(predicate::str::contains("docs").not());
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["search", "documentation", "global"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("docs"))
+        .stdout(predicate::str::contains("code-review").not());
+}
+
+#[test]
+fn search_json_reuses_list_fields() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "code-review", "Review a diff.");
+
+    let output = lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["search", "code", "global", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(value[0]["name"], "code-review");
+    assert_eq!(value[0]["description"], "Review a diff.");
+    assert_eq!(value[0]["valid"], true);
+}
+
+#[test]
+fn search_without_matches_exits_zero() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["search", "zzz", "global"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "No skills matched 'zzz' in global",
+        ));
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["search", "zzz", "global", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_match(r"^\[\]\s*$").unwrap());
+}
+
+#[test]
+fn search_rejects_empty_query_and_missing_scope() {
+    lsm()
+        .args(["search", "", "global"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("non-empty query"));
+
+    lsm()
+        .args(["search", "foo"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("SCOPE"));
+}
+
+// ---------- v0.4.0: push ----------
+
+#[test]
+fn push_copies_project_skill_to_global() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_project(&project, "my-skill", "Push me.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["push", "my-skill"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pushed my-skill"));
+
+    let target = home.path().join("skills/my-skill/SKILL.md");
+    assert!(target.exists());
+    assert!(fs::read_to_string(target).unwrap().contains("Push me."));
+}
+
+#[test]
+fn push_refuses_existing_global_skill_unless_forced() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_project(&project, "my-skill", "Project copy.");
+    install_global(&home, "my-skill", "Global copy.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["push", "my-skill"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("already exists"));
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["push", "my-skill", "--force"])
+        .assert()
+        .success();
+
+    let target = home.path().join("skills/my-skill/SKILL.md");
+    assert!(fs::read_to_string(target)
+        .unwrap()
+        .contains("Project copy."));
+}
+
+#[test]
+fn push_all_pushes_every_project_skill() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_project(&project, "alpha", "A.");
+    install_project(&project, "beta", "B.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["push", "--all"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pushed 2, skipped 0, failed 0"));
+
+    assert!(home.path().join("skills/alpha/SKILL.md").exists());
+    assert!(home.path().join("skills/beta/SKILL.md").exists());
+}
+
+#[test]
+fn push_missing_skill_points_at_project_list() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["push", "nope"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("not found in project"))
+        .stderr(predicate::str::contains("lsm list project"));
+}
+
+// ---------- v0.4.0: multi-name copy ----------
+
+#[test]
+fn copy_accepts_multiple_names() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    install_global(&home, "beta", "B.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "alpha", "beta"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("copied 2, skipped 0, failed 0"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+    assert!(project.path().join(".agents/skills/beta/SKILL.md").exists());
+}
+
+#[test]
+fn copy_multiple_keeps_going_and_reports_missing() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "alpha", "missing"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("not found in global"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn copy_multiple_skips_existing_without_force() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    install_global(&home, "beta", "B.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "beta"])
+        .assert()
+        .success();
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "alpha", "beta"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("copied 1, skipped 1, failed 0"))
+        .stderr(predicate::str::contains("skipped beta"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn copy_multiple_validates_all_names_before_copying() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "alpha", "../evil"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid skill name"));
+
+    assert!(!project.path().join(".agents/skills/alpha").exists());
+}
+
+#[test]
+fn copy_duplicate_names_are_deduplicated() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["copy", "alpha", "alpha"])
+        .assert()
+        .success();
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+}
+
+// ---------- v0.4.0: multi-name remove ----------
+
+#[test]
+fn remove_accepts_multiple_names() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "alpha", "A.");
+    install_project(&project, "beta", "B.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "alpha", "beta", "project"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("removed 2, failed 0"));
+
+    assert!(!project.path().join(".agents/skills/alpha").exists());
+    assert!(!project.path().join(".agents/skills/beta").exists());
+}
+
+#[test]
+fn remove_multiple_keeps_going_and_reports_missing() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_project(&project, "alpha", "A.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["remove", "alpha", "missing", "project"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("not found"));
+
+    assert!(!project.path().join(".agents/skills/alpha").exists());
+}
+
+#[test]
+fn remove_multiple_validates_all_names_before_deleting() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "alpha", "A.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "alpha", "../evil", "project"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid skill name"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn remove_short_flag_accepts_multiple_names() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "alpha", "A.");
+    install_project(&project, "beta", "B.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["-r", "alpha", "beta", "-p"])
+        .assert()
+        .success();
+
+    assert!(!project.path().join(".agents/skills/alpha").exists());
+    assert!(!project.path().join(".agents/skills/beta").exists());
+}
+
+#[test]
+fn remove_missing_skill_hints_at_search() {
+    let project = TempDir::new().unwrap();
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "nope", "project"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("lsm search nope project"));
+}
+
+// ---------- v0.4.0: help ----------
+
+#[test]
+fn search_and_push_help_exit_zero_and_unknown_flags_exit_two() {
+    lsm().args(["search", "--help"]).assert().success();
+    lsm().args(["push", "--help"]).assert().success();
+
+    lsm()
+        .args(["search", "query", "global", "--bogus"])
+        .assert()
+        .code(2);
+    lsm().args(["push", "name", "--bogus"]).assert().code(2);
 }

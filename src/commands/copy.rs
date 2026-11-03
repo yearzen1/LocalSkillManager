@@ -14,9 +14,57 @@ use crate::Ctx;
 
 pub fn run(ctx: &Ctx, target: CopyTarget, force: bool) -> Result<(), AppError> {
     match target {
-        CopyTarget::One(name) => copy_one(ctx, &name, force),
+        CopyTarget::Many(names) => copy_many(ctx, &names, force),
         CopyTarget::All => copy_all(ctx, force),
     }
+}
+
+/// 逐条复制多个 name；单条失败只记账，不中断（Q44）。
+fn copy_many(ctx: &Ctx, names: &[SkillName], force: bool) -> Result<(), AppError> {
+    // 单 name 保持既有输出与退出码：目标已存在仍是错误。
+    if let [name] = names {
+        return copy_one(ctx, name, force);
+    }
+
+    let mut copied = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
+
+    for name in names {
+        let destination = paths::skill_dir(&ctx.env, Scope::Project, &ctx.cwd, name)?;
+        if !force && fsops::is_present(&destination) {
+            skipped += 1;
+            output::warn(
+                ctx.lang,
+                &Msg::with_args(MsgKey::CopyAllSkipped, [name.as_str()]),
+            );
+            continue;
+        }
+
+        match copy_one(ctx, name, force) {
+            Ok(()) => copied += 1,
+            Err(err) => {
+                failed += 1;
+                output::emit_stderr(&error_output::render(&err, ctx.lang));
+            }
+        }
+    }
+
+    output::emit_line(
+        ctx.lang,
+        &Msg::with_args(
+            MsgKey::CopyAllSummary,
+            [copied.to_string(), skipped.to_string(), failed.to_string()],
+        ),
+    );
+
+    if failed > 0 {
+        return Err(AppError::runtime(MsgKey::CopyBatchFailed)
+            .with_args([failed.to_string()])
+            .with_hint(MsgKey::CopyBatchFailedHint));
+    }
+
+    Ok(())
 }
 
 /// 逐条复制全局目录下的全部 skill；单条失败只记账，不中断。
@@ -98,7 +146,7 @@ fn copy_one(ctx: &Ctx, name: &SkillName, force: bool) -> Result<(), AppError> {
     if !fsops::is_present(&source) {
         return Err(AppError::runtime(MsgKey::CopyNotFound)
             .with_args([name.as_str()])
-            .with_hint(MsgKey::CopyNotFoundHint));
+            .with_hint_args(MsgKey::CopyNotFoundHint, [name.as_str()]));
     }
 
     ensure_valid_source(&source, name)?;
