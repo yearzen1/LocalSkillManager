@@ -42,11 +42,11 @@ case "$(uname -s)" in
     ;;
 esac
 
-step="1/13 cargo test"
+step="1/14 cargo test"
 cargo test --quiet
 ok
 
-step="2/13 cargo build --release"
+step="2/14 cargo build --release"
 cargo build --release --quiet
 if [[ -x "$root/target/release/lsm.exe" ]]; then
   lsm="$root/target/release/lsm.exe"
@@ -62,56 +62,56 @@ export LSM_HOME="$(win "$tmp/agents")"
 export LSM_CONFIG_DIR="$(win "$tmp/config")"
 unset LSM_LANG LSM_UPGRADE_API
 
-step="3/13 add sample to global"
+step="3/14 add sample to global"
 "$lsm" add "$root/docs/sample.md" global >/dev/null
 [[ -f "$tmp/agents/skills/sample/SKILL.md" ]] \
   || fail "missing $tmp/agents/skills/sample/SKILL.md"
 ok
 
-step="4/13 list global"
+step="4/14 list global"
 out=$("$lsm" list global)
 [[ "$out" == *"sample"* ]] || fail "list global does not mention sample, got: $out"
 ok
 
-step="5/13 localized help"
+step="5/14 localized help"
 out=$("$lsm" --lang zh --help)
 [[ "$out" != *"Usage:"* ]] || fail "--lang zh --help is still English: $out"
 ok
 
-step="6/13 persist language"
+step="6/14 persist language"
 "$lsm" config set lang zh >/dev/null
 out=$("$lsm" config get lang)
 [[ "$out" == "zh" ]] || fail "config get lang expected zh, got: $out"
 ok
 
-step="7/13 copy into a project and search"
+step="7/14 pull into a project and search"
 out=$("$lsm" list global)
 # The English header must be gone: proves config.toml took effect.
 [[ "$out" != *"NAME"* ]] || fail "list global is still English after config set lang zh: $out"
 
 mkdir -p "$tmp/demo"
 cd "$tmp/demo"
-"$lsm" copy sample >/dev/null
+"$lsm" pull sample >/dev/null
 out=$(LSM_LANG=en "$lsm" list project)
 [[ "$out" == *"sample"* ]] || fail "list project does not mention sample, got: $out"
 out=$(LSM_LANG=en "$lsm" search sample project)
 [[ "$out" == *"sample"* ]] || fail "search did not find sample, got: $out"
 ok
 
-step="8/13 copy multiple names"
+step="8/14 pull multiple names"
 printf -- '---\nname: beta\ndescription: Second skill.\n---\n\n# Body\n' >"$tmp/beta.md"
 "$lsm" add "$tmp/beta.md" global >/dev/null
-out=$(LSM_LANG=en "$lsm" copy beta sample)
-[[ "$out" == *"copied 1, skipped 1"* ]] || fail "multi copy summary unexpected, got: $out"
-[[ -d "$tmp/demo/.agents/skills/beta" ]] || fail "multi copy did not install beta"
+out=$(LSM_LANG=en "$lsm" pull beta sample)
+[[ "$out" == *"pulled 1, skipped 1"* ]] || fail "multi pull summary unexpected, got: $out"
+[[ -d "$tmp/demo/.agents/skills/beta" ]] || fail "multi pull did not install beta"
 ok
 
-step="9/13 copy --all skips existing"
-out=$(LSM_LANG=en "$lsm" copy --all)
-[[ "$out" == *"skipped 2"* ]] || fail "copy --all did not skip existing skills, got: $out"
+step="9/14 pull --all skips existing"
+out=$(LSM_LANG=en "$lsm" pull --all)
+[[ "$out" == *"skipped 2"* ]] || fail "pull --all did not skip existing skills, got: $out"
 ok
 
-step="10/13 push a project skill"
+step="10/14 push a project skill"
 printf -- '---\nname: gamma\ndescription: Project only.\n---\n\n# Body\n' >"$tmp/gamma.md"
 "$lsm" add "$tmp/gamma.md" project >/dev/null
 "$lsm" push gamma >/dev/null
@@ -120,12 +120,12 @@ out=$(LSM_LANG=en "$lsm" list global)
 [[ "$out" == *"gamma"* ]] || fail "list global does not mention pushed gamma, got: $out"
 ok
 
-step="11/13 push --all skips existing"
+step="11/14 push --all skips existing"
 out=$(LSM_LANG=en "$lsm" push --all)
 [[ "$out" == *"skipped 3"* ]] || fail "push --all did not skip existing global skills, got: $out"
 ok
 
-step="12/13 remove multiple names"
+step="12/14 remove multiple names"
 LSM_LANG=en "$lsm" remove sample beta gamma project >/dev/null
 out=$(LSM_LANG=en "$lsm" list project)
 [[ "$out" != *"sample"* && "$out" != *"beta"* && "$out" != *"gamma"* ]] \
@@ -134,12 +134,21 @@ ok
 
 # Offline only: the real GitHub round-trip is a manual release step. Exercises
 # the new subcommand without touching the network.
-step="13/13 upgrade help and unknown flags (offline)"
+step="13/14 upgrade help and unknown flags (offline)"
 out=$("$lsm" upgrade --help)
 [[ "$out" == *"--check"* ]] || fail "upgrade --help does not list --check: $out"
 code=0
 "$lsm" upgrade --bogus >/dev/null 2>&1 || code=$?
 [[ "$code" -eq 2 ]] || fail "upgrade --bogus exited $code, expected 2"
+ok
+
+step="14/14 copy command and -c flag are removed"
+code=0
+LSM_LANG=en "$lsm" copy sample >/dev/null 2>&1 || code=$?
+[[ "$code" -eq 2 ]] || fail "copy exited $code, expected 2"
+code=0
+LSM_LANG=en "$lsm" -c sample >/dev/null 2>&1 || code=$?
+[[ "$code" -eq 2 ]] || fail "-c exited $code, expected 2"
 ok
 
 printf 'PASS\n'
