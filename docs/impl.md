@@ -33,7 +33,7 @@
 4. `upgrade`：从 GitHub Releases 取最新版本并原地替换 lsm 自身二进制，**不改变 exe 的路径与文件名**。
 5. `remove`（v0.2.0）：卸载指定作用域下由 `add` 安装的 skill，未加 `--force` 时只删合法的 skill 目录。
 
-非目标（v0.3.0 不做）：
+非目标（v0.3.0 未做，v0.4.0 待定）：
 
 - 不做自动/后台检查更新（`upgrade` 只在显式调用时联网）。
 - 不做符号链接（Windows 上不可靠），一律物理复制。
@@ -312,7 +312,7 @@ pub struct Ctx {
 验收范围：第 1 条的三平台只在 Windows 实测，其余条目均在本机通过。
 
 - [x] `lsm --version`、`lsm --help` 正常（Windows 实测；Linux/macOS 未实测）。
-- [x] 需求中的前 5 条命令、2 条 `config` 命令与 5 个短选项全部可用（第 6 条 `upgrade` 见 8.1）。
+- [x] 需求中的 6 条命令、2 条 `config` 命令与 5 个短选项全部可用（`upgrade` 见 8.1）。
 - [x] `.md` 与目录两种输入都能安装；目录不做任何排除，`.git` 完整复制并告警。
 - [x] 目标位于源目录内时硬报错，不发生递归复制。
 - [x] 非法 SKILL.md 被拦截：格式、64 / 1024 长度限制全部生效。
@@ -332,10 +332,10 @@ pub struct Ctx {
 - [x] `docs/impl.md`、`docs/impl/*.md`、`docs/decisions.md` 的相对链接全部有效，规则无重复。
 - [x] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿。
 
-### 8.1 upgrade（规则已定，代码未实现）
+### 8.1 upgrade（v0.3.0 已实现）
 
-- [ ] `lsm upgrade --check` 在「已最新」与「有新版本」两种情况下都退出 0，且不写盘。
-- [ ] `lsm upgrade` 成功后 exe 的路径与文件名不变，`.old-*` 不残留；失败路径上原 exe 仍可执行。
-- [ ] 当前平台无资产、网络失败、限流（403/429）、目录不可写均退出 1 并带 hint。
-- [ ] `upgrade` 的 en/zh 文案齐全，`upgrade --help` 两种语言正常，未知参数退出 2。
+- [x] `lsm upgrade --check` 在「已最新」与「有新版本」两种情况下都退出 0，且不写盘。
+- [x] `lsm upgrade` 成功后 exe 的路径与文件名不变，`.old-*` 不残留；失败路径上原 exe 仍可执行。
+- [x] 当前平台无资产、网络失败、限流（403/429）、目录不可写均退出 1 并带 hint。
+- [x] `upgrade` 的 en/zh 文案齐全，`upgrade --help` 两种语言正常，未知参数退出 2。
 
