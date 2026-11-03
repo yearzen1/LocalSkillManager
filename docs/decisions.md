@@ -53,6 +53,7 @@
 | Q46 | `push` 语义 | 新增 `push <name>... [--all] [--force]`：project（cwd）→ global；复用 copy 的单条校验、同路径/自包含检查、原子安装与 `.git` 警告；`--all` 扫描项目作用域并按 Q40 的成功/跳过/失败语义汇总；输出 `pushed <name> -> <global path>`；不加短选项、不参与归一化 |
 | Q47 | not-found 提示 | `copy`/`remove`/`push` 找不到 skill 时只改 hint 指向 `lsm search`（copy/remove 用对应 scope，push 用 `lsm list project`），**不自动执行 search**；输出仍是错误体、退出码仍为 1 |
 | Q48 | `copy` 改名为 `pull` | v0.5.0 起 `lsm pull <name>...` / `pull --all` 取代 `copy`；**不保留 `copy` 别名**，**移除 `-c/--copy` 短选项**（`-p` 仍表示 project，`pull` 不加短选项）；不做 “已改名” 特殊拦截，`copy` / `-c` 按未知子命令 / 未知参数退 2；breaking change 按 0.5.0 发布，迁移说明置顶 release notes |
+| Q49 | `list` 条目之间空行 | 文本表格在**相邻条目之间插入一个空行**，折叠换行后的 description 不会和下一个条目的 name 粘在一起；表头与第一条之间、最后一条之后都不加空行，stdout 仍以单个换行收尾；空列表与单条输出完全不变；`search` 复用同一渲染器，因此同步生效；JSON 输出不受影响 |
 
 ## 维护规则
 

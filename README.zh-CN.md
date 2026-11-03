@@ -118,11 +118,14 @@ lsm --lang <en|zh> <command> ...
 名称         描述
 -----------  ------------------------------------------
 broken       [invalid] missing SKILL.md
+
 code-review  审查 diff 的正确性与风格，标出合并前需要确认的风险点，并给出
              具体修改建议。
+
 my-skill     一句话说明。
 ```
 
+- 条目之间空一行，表头后与末尾不空，折行后的 description 不会和下一个条目粘在一起；
 - description 会压成单行，按 60 个显示列换行（宽字符按 2 列计），续行悬挂缩进到描述列；最多 3 行，第 3 行末尾补 `...`；
 - 非法 skill 目录标记 `[invalid]`，不会中断整体输出；
 - `--json` 输出单个 JSON 数组（2 空格缩进，空目录为 `[]`），含 `name`、`description`、`path`、`valid`，非法项额外带 `error`；warning 永远不会写进 stdout。

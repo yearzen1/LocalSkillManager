@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.5.0 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48）
+> 状态：v0.5.1 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49）
 > 最后更新：2026-11-13
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
@@ -69,7 +69,7 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 description = "Install, pull, and push agent skills under .agents/skills"
 license = "MIT"
@@ -278,6 +278,7 @@ pub struct Ctx {
 | v0.3.0 范围 | 只做 `upgrade`（`--check` / `--force`）；原地替换、文件名不变；测试只打回环桩、只动临时副本 | [decisions.md](decisions.md) Q30 / Q31 / Q32 / Q42 |
 | v0.4.0 范围 | 多 name `copy`/`remove`、`search`、`push`；批量沿用 Q40 的成功/跳过/失败语义；不做日志、不自动执行 search | [decisions.md](decisions.md) Q43–Q47 |
 | v0.5.0 范围 | `copy` 改名为 `pull`，移除 `copy` 与 `-c`；`-p` 仍表示 project；breaking change | [decisions.md](decisions.md) Q48 |
+| v0.5.1 范围 | `list`（含 `search`）文本表格相邻条目之间空一行；不改 JSON、不改空/单条输出 | [decisions.md](decisions.md) Q49 |
 
 ## 6. 文档维护规则
 
@@ -367,4 +368,11 @@ pub struct Ctx {
 - [x] `lsm pull -g` 退 2，提示 pull 不接受作用域。
 - [x] `-p` 仍表示 project；`pull` 没有短选项。
 - [x] 两份 README、`impl/cli.md`、`storage.md`、`quality.md` 与验收脚本同步，release notes 置顶迁移说明。
+
+### 8.4 v0.5.1 list 行距（已实现）
+
+- [x] 文本表格相邻条目之间插入一个空行（Q49）；表头后与末尾不加空行。
+- [x] 空列表与单条列表输出不变；`--json` 输出不变；`search` 复用同一渲染器，同步生效。
+- [x] 两份 README、`impl/storage.md` 的示例与规则同步。
+- [x] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test`、`scripts/acceptance.sh` 全绿。
 

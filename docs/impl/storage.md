@@ -220,14 +220,16 @@ lsm list <scope> [--json]
    - 缺失、非法或 `name` 与目录名不一致 → `valid = false`，`name` 用目录名，`description` 为空，并记录 `error`（不一致时 `error = "name mismatch: <dir> vs <name>"`）。
 4. 按 `name` 字典序排序。
 
-文本输出（描述列 60 列宽，超宽换行并悬挂缩进，最多 3 行）：
+文本输出（描述列 60 列宽，超宽换行并悬挂缩进，最多 3 行；相邻条目之间空一行）：
 
 ```
 NAME         DESCRIPTION
 -----------  ------------------------------------------
 broken       [invalid] missing SKILL.md
+
 code-review  Review a diff for correctness and style, flagging risky
              changes before they reach main.
+
 my-skill     One-line description.
 ```
 
@@ -236,6 +238,7 @@ my-skill     One-line description.
 - 续行用空格补齐到描述列起点，不顶到第 0 列。
 - 空格后的词放得下一整行时在空格处断行；放不下（如整段无空格的中文）则按列宽硬断填满当前行。
 - name 列宽取 `max(10, 最长名称字符数)`，分隔线随列宽生成。
+- 相邻条目之间插入一个空行（Q49）；表头后与末尾都不加，输出仍以单个换行收尾。
 - 非法项标记 `[invalid]`，不中断整体输出。
 
 JSON 输出：
