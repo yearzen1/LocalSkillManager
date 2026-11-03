@@ -29,7 +29,7 @@ pub fn build(lang: Lang) -> Command {
         .subcommand(add_command(lang))
         .subcommand(list_command(lang))
         .subcommand(search_command(lang))
-        .subcommand(copy_command(lang))
+        .subcommand(pull_command(lang))
         .subcommand(push_command(lang))
         .subcommand(remove_command(lang))
         .subcommand(upgrade_command(lang))
@@ -127,26 +127,26 @@ fn search_command(lang: Lang) -> Command {
     with_help_flag(command, lang)
 }
 
-fn copy_command(lang: Lang) -> Command {
-    let command = Command::new("copy")
-        .about(tr(lang, MsgKey::CopyAbout))
+fn pull_command(lang: Lang) -> Command {
+    let command = Command::new("pull")
+        .about(tr(lang, MsgKey::PullAbout))
         .arg(
             Arg::new("name")
                 .num_args(1..)
                 .value_name("NAME")
-                .help(tr(lang, MsgKey::CopyNameArg)),
+                .help(tr(lang, MsgKey::PullNameArg)),
         )
         .arg(
             Arg::new("all")
                 .long("all")
                 .action(clap::ArgAction::SetTrue)
-                .help(tr(lang, MsgKey::CopyAllFlag)),
+                .help(tr(lang, MsgKey::PullAllFlag)),
         )
         .arg(
             Arg::new("force")
                 .long("force")
                 .action(clap::ArgAction::SetTrue)
-                .help(tr(lang, MsgKey::CopyForceFlag)),
+                .help(tr(lang, MsgKey::PullForceFlag)),
         );
 
     with_help_flag(command, lang)

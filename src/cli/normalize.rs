@@ -1,4 +1,4 @@
-//! 短选项归一化：`-a/-l/-c/-g/-p` → 完整子命令形式。纯函数，不碰 I/O。
+//! 短选项归一化：`-a/-l/-r/-g/-p` → 完整子命令形式。纯函数，不碰 I/O。
 
 use std::ffi::OsString;
 
@@ -7,14 +7,12 @@ use std::ffi::OsString;
 pub enum NormalizeError {
     /// 多个动作标志同时出现。
     MultipleActions,
-    /// `-a` / `-c` 缺少参数。
+    /// `-a` / `-r` 缺少参数。
     MissingActionValue { flag: &'static str },
     /// `-g` 与 `-p` 同时出现。
     MultipleScopes,
-    /// `add` / `list` 缺少作用域。
+    /// `add` / `list` / `remove` 缺少作用域。
     MissingScope { action: &'static str },
-    /// `-c` 与 `-g` / `-p` 同现。
-    CopyWithScope,
     /// 短选项与完整子命令混用。
     MixedForms,
 }
@@ -38,12 +36,6 @@ pub fn normalize(argv: Vec<OsString>) -> Result<Vec<OsString>, NormalizeError> {
                     .next()
                     .ok_or(NormalizeError::MissingActionValue { flag: "-a" })?;
                 actions.push(("add", Some(value)));
-            }
-            Some("-c") | Some("--copy") => {
-                let value = tokens
-                    .next()
-                    .ok_or(NormalizeError::MissingActionValue { flag: "-c" })?;
-                actions.push(("copy", Some(value)));
             }
             Some("-r") | Some("--remove") => {
                 let value = tokens
@@ -76,7 +68,7 @@ pub fn normalize(argv: Vec<OsString>) -> Result<Vec<OsString>, NormalizeError> {
         .any(|token| {
             matches!(
                 token,
-                "add" | "list" | "search" | "copy" | "push" | "remove"
+                "add" | "list" | "search" | "pull" | "push" | "remove"
             )
         });
     if has_subcommand && !(actions.is_empty() && scopes.is_empty()) {
@@ -92,11 +84,7 @@ pub fn normalize(argv: Vec<OsString>) -> Result<Vec<OsString>, NormalizeError> {
         return Ok(passthrough);
     };
 
-    if action == "copy" && !scopes.is_empty() {
-        return Err(NormalizeError::CopyWithScope);
-    }
-
-    if action != "copy" && scopes.is_empty() {
+    if scopes.is_empty() {
         return Err(NormalizeError::MissingScope { action });
     }
 
@@ -158,27 +146,9 @@ mod tests {
     }
 
     #[test]
-    fn maps_copy_without_scope() {
-        assert_eq!(run(&["-c", "foo"]).unwrap(), ["copy", "foo"]);
-        assert_eq!(
-            run(&["-c", "foo", "--force"]).unwrap(),
-            ["copy", "foo", "--force"]
-        );
-    }
-
-    #[test]
-    fn maps_copy_all() {
-        assert_eq!(run(&["-c", "--all"]).unwrap(), ["copy", "--all"]);
-        assert_eq!(
-            run(&["-c", "--all", "--force"]).unwrap(),
-            ["copy", "--all", "--force"]
-        );
-    }
-
-    #[test]
     fn rejects_multiple_actions() {
         assert_eq!(
-            run(&["-l", "-c", "foo"]).unwrap_err(),
+            run(&["-l", "-r", "foo"]).unwrap_err(),
             NormalizeError::MultipleActions
         );
     }
@@ -214,10 +184,6 @@ mod tests {
             NormalizeError::MissingActionValue { flag: "-a" }
         );
         assert_eq!(
-            run(&["-c"]).unwrap_err(),
-            NormalizeError::MissingActionValue { flag: "-c" }
-        );
-        assert_eq!(
             run(&["-r"]).unwrap_err(),
             NormalizeError::MissingActionValue { flag: "-r" }
         );
@@ -240,11 +206,10 @@ mod tests {
     }
 
     #[test]
-    fn rejects_scope_for_copy() {
-        assert_eq!(
-            run(&["-c", "foo", "-g"]).unwrap_err(),
-            NormalizeError::CopyWithScope
-        );
+    fn leaves_removed_copy_flag_untouched() {
+        // `-c` 随 `copy` 一起移除：归一化不再识别，交给 clap 报未知参数。
+        assert_eq!(run(&["-c", "foo"]).unwrap(), ["-c", "foo"]);
+        assert_eq!(run(&["-c", "--all"]).unwrap(), ["-c", "--all"]);
     }
 
     #[test]

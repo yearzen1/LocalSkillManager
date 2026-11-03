@@ -24,12 +24,12 @@ pub enum Action {
         scope: Scope,
         json: bool,
     },
-    Copy {
-        target: CopyTarget,
+    Pull {
+        target: TransferTarget,
         force: bool,
     },
     Push {
-        target: CopyTarget,
+        target: TransferTarget,
         force: bool,
     },
     Remove {
@@ -44,9 +44,9 @@ pub enum Action {
     },
 }
 
-/// `copy` / `push` 的复制对象：一个或多个 skill，或整个作用域。
+/// `pull` / `push` 的目标：一个或多个 skill，或整个作用域。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CopyTarget {
+pub enum TransferTarget {
     Many(Vec<SkillName>),
     All,
 }

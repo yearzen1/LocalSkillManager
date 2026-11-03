@@ -1,8 +1,8 @@
-//! `push`：把当前项目的 skill 推送到全局目录（`copy` 的反向操作）。
+//! `push`：把当前项目的 skill 推送到全局目录（`pull` 的反向操作）。
 
 use std::path::Path;
 
-use crate::domain::action::CopyTarget;
+use crate::domain::action::TransferTarget;
 use crate::domain::entry::SkillEntry;
 use crate::domain::name::SkillName;
 use crate::domain::scope::Scope;
@@ -14,10 +14,10 @@ use crate::output;
 use crate::output::error as error_output;
 use crate::Ctx;
 
-pub fn run(ctx: &Ctx, target: CopyTarget, force: bool) -> Result<(), AppError> {
+pub fn run(ctx: &Ctx, target: TransferTarget, force: bool) -> Result<(), AppError> {
     match target {
-        CopyTarget::Many(names) => push_many(ctx, &names, force),
-        CopyTarget::All => push_all(ctx, force),
+        TransferTarget::Many(names) => push_many(ctx, &names, force),
+        TransferTarget::All => push_all(ctx, force),
     }
 }
 

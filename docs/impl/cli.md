@@ -37,7 +37,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - 文案按语言拆到 `i18n/en.rs`、`i18n/zh.rs`，`mod.rs` 只做分发。
 - 所有 `error:` / `hint:` / 成功提示 / help 正文都从消息表取，禁止在业务代码里写死文案。
 - 中文前缀用 `错误:` / `提示:`，英文用 `error:` / `hint:`。
-- 版本号 `lsm 0.4.0`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
+- 版本号 `lsm 0.5.0`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
 
 ### 1.3 help 与参数错误
 
@@ -49,7 +49,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 
 ```
 $ lsm --lang zh --help
-在 .agents/skills 下安装与复制 agent skill
+在 .agents/skills 下安装、拉取与推送 agent skill
 
 用法: lsm [OPTIONS] <COMMAND>
 
@@ -57,7 +57,7 @@ $ lsm --lang zh --help
   add      安装 skill 到 global 或 project
   list     列出已安装的 skill
   search   按名称或描述搜索已安装的 skill
-  copy     把全局 skill 复制到当前项目
+  pull     把全局 skill 拉取到当前项目
   push     把项目 skill 推送到全局目录
   remove   从 global 或 project 卸载 skill
   upgrade  更新 lsm 自身
@@ -89,7 +89,7 @@ $ lsm --lang zh --help
 | `add` | `<SOURCE> <SCOPE> [--force]` | implemented |
 | `list` | `<SCOPE> [--json]` | implemented |
 | `search` | `<QUERY> <SCOPE> [--json]` | implemented |
-| `copy` | `<NAME>... 或 --all [--force]` | implemented |
+| `pull` | `<NAME>... 或 --all [--force]` | implemented |
 | `push` | `<NAME>... 或 --all [--force]` | implemented |
 | `remove` | `<NAME>... <SCOPE> [--force]` | implemented |
 | `config get` | `lang` | implemented |
@@ -99,7 +99,7 @@ $ lsm --lang zh --help
 - `<SCOPE>`：`global` 或 `project`，大小写敏感。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
-- `search` / `push` 与多 name 的 `copy`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47。
+- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。
 
 选项：
 
@@ -111,9 +111,9 @@ $ lsm --lang zh --help
 | `add` | `--force` | — | 关闭 | 目标已存在时覆盖：备份 → 安装 → 删备份 |
 | `list` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
 | `search` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
-| `copy` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
-| `copy` | `--all` | — | 关闭 | 复制全局全部 skill，与 `<NAME>...` 互斥 |
-| `push` | `--force` | — | 关闭 | 同 `copy` 的覆盖流程 |
+| `pull` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
+| `pull` | `--all` | — | 关闭 | 拉取全局全部 skill，与 `<NAME>...` 互斥 |
+| `push` | `--force` | — | 关闭 | 同 `pull` 的覆盖流程 |
 | `push` | `--all` | — | 关闭 | 把项目全部 skill 推到 global，与 `<NAME>...` 互斥 |
 | `remove` | `--force` | — | 关闭 | 允许删除非合法 skill 目录 |
 | `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0 |
@@ -121,7 +121,7 @@ $ lsm --lang zh --help
 
 - 选项表**不单列状态**：选项的存在性跟随命令表。
 - `全局` 选项对根命令与每个子命令都生效；`根命令` 选项只对 `lsm` 本身生效（`lsm add --version` 是用法错误）。
-- `-a` / `-l` / `-c` / `-r` / `-g` / `-p` **不是** clap 选项，是 §2.2 的前置归一化别名，不进本表。
+- `-a` / `-l` / `-r` / `-g` / `-p` **不是** clap 选项，是 §2.2 的前置归一化别名，不进本表。`-c` 在 v0.5.0 随 `copy` 一起移除。
 - 选项文案、取值说明与 help 同源，全部来自消息表（§1.2）。
 
 ### 2.2 缩减版
@@ -136,24 +136,20 @@ $ lsm --lang zh --help
 | `lsm -l -g` | `lsm list global` |
 | `lsm -l -p` | `lsm list project` |
 | `lsm -l -g --json` | `lsm list global --json` |
-| `lsm -c foo` | `lsm copy foo` |
-| `lsm -c a b` | `lsm copy a b` |
-| `lsm -c --all` | `lsm copy --all` |
 | `lsm -r foo -p` | `lsm remove foo project` |
 | `lsm -r a b -p` | `lsm remove a b project` |
 | `lsm --add foo.md --global` | `lsm add foo.md global` |
 
 归一化规则：
 
-1. 识别动作标志 `-a/--add`、`-l/--list`、`-c/--copy`、`-r/--remove`（`-a`/`-c`/`-r` 吞掉下一个参数；`-c --all` 归一化为 `copy --all`，`--all` 不做 name 校验）。
+1. 识别动作标志 `-a/--add`、`-l/--list`、`-r/--remove`（`-a`/`-r` 吞掉下一个参数）。
 2. 识别作用域标志 `-g/--global`、`-p/--project`，转换为位置参数。
 3. 未出现任何动作标志时原样交给 clap，走完整版语法。
 4. 以下情况直接报用法错误（退出码 2），并打印两种正确写法：
    - `-g` 与 `-p` 同时出现；
    - 多个动作标志同时出现；
-   - `-a` / `-c` / `-r` 缺少参数；
+   - `-a` / `-r` 缺少参数；
    - `add` / `list` 缺少作用域；
-   - `-c` 与 `-g` / `-p` 同现；
    - 混用形式（如 `lsm add foo.md -g`）。
 5. `-h`、`-V` 不参与归一化，交给 clap。
 6. `config` 子命令不参与短选项归一化，永远原样交给 clap。
@@ -172,7 +168,7 @@ $ lsm --lang zh --help
 ### 2.4 无参数与帮助行为
 
 - `lsm --help` / `-h` / `lsm <command> --help`：本地化 help 输出到 **stdout**，退出码 0。
-- `lsm --version` / `-V`：输出 `lsm 0.4.0` 到 stdout，退出码 0。
+- `lsm --version` / `-V`：输出 `lsm 0.5.0` 到 stdout，退出码 0。
 - `lsm` 无子命令，或只有全局参数（如 `lsm --lang zh`）：本地化 help 输出到 **stderr**，退出码 2。
 - 嵌套子命令沿用同一规则：`lsm config` 无子命令 → help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
 - `lsm upgrade --help` 与 `lsm upgrade --check --help` 同样走 stdout、退出码 0，且不联网、不写盘。
@@ -184,7 +180,7 @@ $ lsm --lang zh --help
 
 1. **取值写法**：长选项收 `--lang zh` 与 `--lang=zh` 两种；短选项只收分离写法，`-lz`、`-lg` 一律按用法错误退 2（Q7 / Q14）。
 2. **布尔与取值**：`--flag` 只表示布尔，不接受 `--flag=true`；带值的选项必须声明取值形态（`--opt <VALUE>`），合法集合由 clap `value_parser` 限定。
-3. **短选项冻结**：新命令不新增短选项；`-a` / `-l` / `-c` / `-g` / `-p` 是历史别名，由 `cli::normalize` 处理，永久冻结（Q7 / Q30）。
+3. **短选项冻结**：新命令不新增短选项；`-a` / `-l` / `-r` / `-g` / `-p` 是历史别名，由 `cli::normalize` 处理，永久冻结（Q7 / Q30 / Q48）；`-c` 已随 `copy` 移除。
 4. **破坏性操作**：覆盖、删除、替换默认拒绝，必须显式 `--force`，且 `--force` 不给短选项（Q5 / Q30）。
 5. **机器可读输出**：只有一个开关 `--json`；开启后 stdout 只放数据，warning 与错误仍走 stderr。
 6. **结束符**：`--` 之后的参数全部按位置参数处理（clap 默认行为）；参数本身可能以 `-` 开头时必须使用。
@@ -196,7 +192,7 @@ $ lsm --lang zh --help
 |---|---|---|
 | 0 | 成功 | `list` 为空、`upgrade --check` 发现新版本、`upgrade` 已是最新 |
 | 1 | 运行时错误 | 文件不存在、frontmatter 非法、目标冲突、配置文件损坏、`upgrade` 网络/资产/校验/替换失败 |
-| 2 | 用法错误 | 参数缺失、`-g` 与 `-p` 互斥、非法 `--lang`、非法 `copy` name、非法 `config` 键/值、`upgrade` 未知参数、无子命令 |
+| 2 | 用法错误 | 参数缺失、`-g` 与 `-p` 互斥、非法 `--lang`、非法 `pull` name、非法 `config` 键/值、`upgrade` 未知参数、无子命令 |
 
 - 正常结果、显式 help、version 走 stdout；错误、warning、无子命令时的 help 走 stderr。
 - `upgrade` 的成功/警告/错误同样全部来自消息表；具体文案、`--check` 不写盘的约束与替换规则见 [upgrade.md](upgrade.md)「输出与退出码」。
@@ -254,7 +250,7 @@ impl AppError {
 
 - `lsm::run(args: impl Iterator<Item = OsString>) -> ExitCode`：只接参数迭代器（`main` 已 `skip(1)` 去掉程序名），`run` 自己不再读 `std::env::args()`，便于单测注入参数。
 
-- 用法错误由归一化阶段 / clap 错误映射统一 `exit(2)`；`copy` 的 name 在 `cli::parse` 构造 `Action` 时用 `SkillName::parse` 校验，同样返回 2，且绝不先拼路径再校验。
+- 用法错误由归一化阶段 / clap 错误映射统一 `exit(2)`；`pull` 的 name 在 `cli::parse` 构造 `Action` 时用 `SkillName::parse` 校验，同样返回 2，且绝不先拼路径再校验。
 - `--json` 模式下 stdout 只允许 JSON；warning 仍然只走 stderr。
 
 ## 4. 相关决策

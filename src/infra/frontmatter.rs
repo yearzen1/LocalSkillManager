@@ -100,7 +100,7 @@ fn string_field<'a>(value: &'a serde_yaml_ng::Value, field: &str) -> Option<&'a 
     value.get(field).and_then(serde_yaml_ng::Value::as_str)
 }
 
-/// 把解析错误压成一句话，供 `list --json` 与 `copy` 的源校验复用。固定英文，不参与 i18n。
+/// 把解析错误压成一句话，供 `list --json` 与 `pull` 的源校验复用。固定英文，不参与 i18n。
 pub fn describe(err: &FrontmatterError) -> String {
     match err {
         FrontmatterError::Io { source, .. } => match source.downcast_ref::<std::io::Error>() {

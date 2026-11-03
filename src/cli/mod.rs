@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use clap::ArgMatches;
 
-use crate::domain::action::{Action, ConfigCommand, CopyTarget};
+use crate::domain::action::{Action, ConfigCommand, TransferTarget};
 use crate::domain::config::ConfigKey;
 use crate::domain::lang::Lang;
 use crate::domain::name::SkillName;
@@ -56,7 +56,6 @@ impl From<NormalizeError> for AppError {
             NormalizeError::MissingScope { action } => {
                 AppError::usage(MsgKey::UsageMissingScope).with_args([action])
             }
-            NormalizeError::CopyWithScope => AppError::usage(MsgKey::UsageCopyWithScope),
             NormalizeError::MixedForms => {
                 AppError::usage(MsgKey::UsageMixedForms).with_hint(MsgKey::UsageHintForms)
             }
@@ -105,15 +104,15 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
                 json: sub.get_flag("json"),
             }
         }
-        "copy" => {
-            let target = copy_target(sub, "copy")?;
-            Action::Copy {
+        "pull" => {
+            let target = transfer_target(sub, "pull")?;
+            Action::Pull {
                 target,
                 force: sub.get_flag("force"),
             }
         }
         "push" => {
-            let target = copy_target(sub, "push")?;
+            let target = transfer_target(sub, "push")?;
             Action::Push {
                 target,
                 force: sub.get_flag("force"),
@@ -135,18 +134,21 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
     Ok(Outcome::Action(action))
 }
 
-/// `copy` / `push` 的复制对象：`<NAME>...` 与 `--all` 必须二选一。
-fn copy_target(matches: &ArgMatches, command: &'static str) -> Result<CopyTarget, AppError> {
+/// `pull` / `push` 的目标：`<NAME>...` 与 `--all` 必须二选一。
+fn transfer_target(
+    matches: &ArgMatches,
+    command: &'static str,
+) -> Result<TransferTarget, AppError> {
     let names = skill_names(matches)?;
     let all = matches.get_flag("all");
 
     match (names.is_empty(), all) {
-        (false, false) => Ok(CopyTarget::Many(names)),
-        (true, true) => Ok(CopyTarget::All),
-        (false, true) => Err(AppError::usage(MsgKey::UsageCopyTargetConflict)
+        (false, false) => Ok(TransferTarget::Many(names)),
+        (true, true) => Ok(TransferTarget::All),
+        (false, true) => Err(AppError::usage(MsgKey::UsagePullTargetConflict)
             .with_args([command])
             .with_hint(MsgKey::UsageHelpHint)),
-        (true, false) => Err(AppError::usage(MsgKey::UsageCopyTargetMissing)
+        (true, false) => Err(AppError::usage(MsgKey::UsagePullTargetMissing)
             .with_args([command])
             .with_hint(MsgKey::UsageHelpHint)),
     }

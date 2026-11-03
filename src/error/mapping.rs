@@ -25,7 +25,7 @@ impl From<LangError> for AppError {
     }
 }
 
-/// `copy` 的 name 入参校验：用法错误。
+/// `pull` 的 name 入参校验：用法错误。
 impl From<NameError> for AppError {
     fn from(err: NameError) -> Self {
         match err {
@@ -88,7 +88,7 @@ impl From<FrontmatterError> for AppError {
     }
 }
 
-/// frontmatter 里的 name 非法属于运行时错误（文件内容问题），与 `copy` 入参的用法错误区分。
+/// frontmatter 里的 name 非法属于运行时错误（文件内容问题），与 `pull` 入参的用法错误区分。
 fn name_error_runtime(err: NameError) -> AppError {
     match err {
         NameError::Format { input } => AppError::runtime(MsgKey::SkillNameInvalid)
@@ -289,7 +289,7 @@ mod tests {
     use crate::error::ErrorKind;
 
     #[test]
-    fn copy_name_errors_are_usage_errors() {
+    fn pull_name_errors_are_usage_errors() {
         let app: AppError = NameError::Format {
             input: "..".to_string(),
         }

@@ -2,8 +2,8 @@
 
 pub mod add;
 pub mod config;
-pub mod copy;
 pub mod list;
+pub mod pull;
 pub mod push;
 pub mod remove;
 pub mod search;
@@ -24,7 +24,7 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
         Action::Config(command) => config::run(ctx, command),
         Action::List { scope, json } => list::run(ctx, scope, json),
         Action::Search { query, scope, json } => search::run(ctx, &query, scope, json),
-        Action::Copy { target, force } => copy::run(ctx, target, force),
+        Action::Pull { target, force } => pull::run(ctx, target, force),
         Action::Push { target, force } => push::run(ctx, target, force),
         Action::Remove {
             scope,

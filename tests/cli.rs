@@ -114,12 +114,12 @@ fn conflicting_scopes_exit_two() {
 }
 
 #[test]
-fn copy_rejects_scope_flag() {
+fn pull_rejects_scope_flag() {
     lsm()
-        .args(["-c", "foo", "-g"])
+        .args(["pull", "foo", "-g"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("copy does not take -g or -p"));
+        .stderr(predicate::str::contains("-g"));
 }
 
 #[test]
@@ -143,13 +143,13 @@ fn short_flag_without_value_exits_two() {
 }
 
 #[test]
-fn copy_name_validation_blocks_path_traversal() {
+fn pull_name_validation_blocks_path_traversal() {
     let project = TempDir::new().unwrap();
 
     for name in ["../evil", ".", "a/b", "My-Skill"] {
         lsm()
             .current_dir(project.path())
-            .args(["copy", name])
+            .args(["pull", name])
             .assert()
             .code(2)
             .stderr(predicate::str::contains("invalid skill name"));
@@ -157,7 +157,7 @@ fn copy_name_validation_blocks_path_traversal() {
 
     lsm()
         .current_dir(project.path())
-        .args(["copy", "con"])
+        .args(["pull", "con"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("reserved on Windows"));
@@ -683,7 +683,7 @@ fn list_json_stdout_contains_only_json() {
     assert!(serde_json::from_slice::<serde_json::Value>(&stdout).is_ok());
 }
 
-// ---------- copy ----------
+// ---------- pull ----------
 
 fn install_global(home: &TempDir, name: &str, description: &str) {
     let work = TempDir::new().unwrap();
@@ -697,7 +697,7 @@ fn install_global(home: &TempDir, name: &str, description: &str) {
 }
 
 #[test]
-fn copy_moves_global_skill_into_project() {
+fn pull_moves_global_skill_into_project() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "my-skill", "Copy me.");
@@ -705,10 +705,10 @@ fn copy_moves_global_skill_into_project() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "my-skill"])
+        .args(["pull", "my-skill"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("copied my-skill"));
+        .stdout(predicate::str::contains("pulled my-skill"));
 
     let copied = project.path().join(".agents/skills/my-skill/SKILL.md");
     assert!(copied.exists());
@@ -716,7 +716,7 @@ fn copy_moves_global_skill_into_project() {
 }
 
 #[test]
-fn copy_short_flag_works() {
+fn copy_short_flag_is_removed() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "my-skill", "Copy me.");
@@ -726,12 +726,13 @@ fn copy_short_flag_works() {
         .current_dir(project.path())
         .args(["-c", "my-skill"])
         .assert()
-        .success()
-        .stdout(predicate::str::contains("copied my-skill"));
+        .code(2);
+
+    assert!(!project.path().join(".agents/skills/my-skill").exists());
 }
 
 #[test]
-fn copy_all_output_is_localized() {
+fn pull_all_output_is_localized() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "my-skill", "Copy me.");
@@ -739,32 +740,32 @@ fn copy_all_output_is_localized() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["--lang", "zh", "copy", "--all"])
+        .args(["--lang", "zh", "pull", "--all"])
         .assert()
         .success()
         .stdout(predicate::str::contains("成功 1 个，跳过 0 个，失败 0 个"));
 }
 
 #[test]
-fn copy_rejects_name_together_with_all() {
+fn pull_rejects_name_together_with_all() {
     lsm()
-        .args(["copy", "foo", "--all"])
+        .args(["pull", "foo", "--all"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("not both"));
 }
 
 #[test]
-fn copy_requires_name_or_all() {
+fn pull_requires_name_or_all() {
     lsm()
-        .args(["copy"])
+        .args(["pull"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("needs a skill name or --all"));
 }
 
 #[test]
-fn copy_all_short_flag_copies_everything() {
+fn copy_all_short_flag_is_removed() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "my-skill", "Copy me.");
@@ -774,23 +775,29 @@ fn copy_all_short_flag_copies_everything() {
         .current_dir(project.path())
         .args(["-c", "--all"])
         .assert()
-        .success();
+        .code(2);
 
-    assert!(project
-        .path()
-        .join(".agents/skills/my-skill/SKILL.md")
-        .exists());
+    assert!(!project.path().join(".agents/skills/my-skill").exists());
 }
 
 #[test]
-fn copy_missing_skill_points_at_list() {
+fn copy_command_is_removed() {
+    lsm()
+        .args(["copy", "my-skill"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("copy"));
+}
+
+#[test]
+fn pull_missing_skill_points_at_list() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
 
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "nope"])
+        .args(["pull", "nope"])
         .assert()
         .code(1)
         .stderr(predicate::str::contains("not found in global"))
@@ -798,7 +805,7 @@ fn copy_missing_skill_points_at_list() {
 }
 
 #[test]
-fn copy_rejects_invalid_source_skill() {
+fn pull_rejects_invalid_source_skill() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     fs::create_dir_all(home.path().join("skills/broken")).unwrap();
@@ -806,7 +813,7 @@ fn copy_rejects_invalid_source_skill() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "broken"])
+        .args(["pull", "broken"])
         .assert()
         .code(1)
         .stderr(predicate::str::contains("is invalid"))
@@ -814,7 +821,7 @@ fn copy_rejects_invalid_source_skill() {
 }
 
 #[test]
-fn copy_rejects_source_name_mismatch() {
+fn pull_rejects_source_name_mismatch() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     write_skill_md(
@@ -826,14 +833,14 @@ fn copy_rejects_source_name_mismatch() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "dir-name"])
+        .args(["pull", "dir-name"])
         .assert()
         .code(1)
         .stderr(predicate::str::contains("name mismatch"));
 }
 
 #[test]
-fn copy_refuses_existing_target_unless_forced() {
+fn pull_refuses_existing_target_unless_forced() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "my-skill", "First.");
@@ -846,7 +853,7 @@ fn copy_refuses_existing_target_unless_forced() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "my-skill"])
+        .args(["pull", "my-skill"])
         .assert()
         .code(1)
         .stderr(predicate::str::contains("already exists"));
@@ -854,7 +861,7 @@ fn copy_refuses_existing_target_unless_forced() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "my-skill", "--force"])
+        .args(["pull", "my-skill", "--force"])
         .assert()
         .success();
 
@@ -863,7 +870,7 @@ fn copy_refuses_existing_target_unless_forced() {
 }
 
 #[test]
-fn copy_rejects_same_source_and_destination() {
+fn pull_rejects_same_source_and_destination() {
     let root = TempDir::new().unwrap();
     let project = root.path().join("demo-project");
     let home = project.join(".agents");
@@ -872,14 +879,14 @@ fn copy_rejects_same_source_and_destination() {
     lsm()
         .env("LSM_HOME", &home)
         .current_dir(&project)
-        .args(["copy", "my-skill"])
+        .args(["pull", "my-skill"])
         .assert()
         .code(1)
         .stderr(predicate::str::contains("same path"));
 }
 
 #[test]
-fn copy_warns_about_git_directories() {
+fn pull_warns_about_git_directories() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     let skill = home.path().join("skills/my-skill");
@@ -890,7 +897,7 @@ fn copy_warns_about_git_directories() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "my-skill"])
+        .args(["pull", "my-skill"])
         .assert()
         .success()
         .stderr(predicate::str::contains("warning"));
@@ -902,7 +909,7 @@ fn copy_warns_about_git_directories() {
 }
 
 #[test]
-fn copy_all_copies_every_global_skill() {
+fn pull_all_copies_every_global_skill() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "First.");
@@ -911,10 +918,10 @@ fn copy_all_copies_every_global_skill() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "--all"])
+        .args(["pull", "--all"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("copied 2, skipped 0, failed 0"));
+        .stdout(predicate::str::contains("pulled 2, skipped 0, failed 0"));
 
     for name in ["alpha", "beta"] {
         let copied = project
@@ -925,23 +932,23 @@ fn copy_all_copies_every_global_skill() {
 }
 
 #[test]
-fn copy_all_with_empty_global_succeeds_without_touching_project() {
+fn pull_all_with_empty_global_succeeds_without_touching_project() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
 
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "--all"])
+        .args(["pull", "--all"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("no global skills to copy"));
+        .stdout(predicate::str::contains("no global skills to pull"));
 
     assert!(!project.path().join(".agents/skills").exists());
 }
 
 #[test]
-fn copy_all_reports_conflicts_and_keeps_going() {
+fn pull_all_reports_conflicts_and_keeps_going() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "From global.");
@@ -955,10 +962,10 @@ fn copy_all_reports_conflicts_and_keeps_going() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "--all"])
+        .args(["pull", "--all"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("copied 1, skipped 1, failed 0"))
+        .stdout(predicate::str::contains("pulled 1, skipped 1, failed 0"))
         .stderr(predicate::str::contains("skipped alpha"));
 
     // 冲突不中断：后面的 skill 照常复制，冲突目标保持原样。
@@ -971,7 +978,7 @@ fn copy_all_reports_conflicts_and_keeps_going() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "--all", "--force"])
+        .args(["pull", "--all", "--force"])
         .assert()
         .success();
 
@@ -1810,10 +1817,10 @@ fn push_missing_skill_points_at_project_list() {
         .stderr(predicate::str::contains("lsm list project"));
 }
 
-// ---------- v0.4.0: multi-name copy ----------
+// ---------- v0.4.0: multi-name pull ----------
 
 #[test]
-fn copy_accepts_multiple_names() {
+fn pull_accepts_multiple_names() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
@@ -1822,10 +1829,10 @@ fn copy_accepts_multiple_names() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "alpha", "beta"])
+        .args(["pull", "alpha", "beta"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("copied 2, skipped 0, failed 0"));
+        .stdout(predicate::str::contains("pulled 2, skipped 0, failed 0"));
 
     assert!(project
         .path()
@@ -1835,7 +1842,7 @@ fn copy_accepts_multiple_names() {
 }
 
 #[test]
-fn copy_multiple_keeps_going_and_reports_missing() {
+fn pull_multiple_keeps_going_and_reports_missing() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
@@ -1843,7 +1850,7 @@ fn copy_multiple_keeps_going_and_reports_missing() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "alpha", "missing"])
+        .args(["pull", "alpha", "missing"])
         .assert()
         .code(1)
         .stderr(predicate::str::contains("not found in global"));
@@ -1855,7 +1862,7 @@ fn copy_multiple_keeps_going_and_reports_missing() {
 }
 
 #[test]
-fn copy_multiple_skips_existing_without_force() {
+fn pull_multiple_skips_existing_without_force() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
@@ -1864,17 +1871,17 @@ fn copy_multiple_skips_existing_without_force() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "beta"])
+        .args(["pull", "beta"])
         .assert()
         .success();
 
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "alpha", "beta"])
+        .args(["pull", "alpha", "beta"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("copied 1, skipped 1, failed 0"))
+        .stdout(predicate::str::contains("pulled 1, skipped 1, failed 0"))
         .stderr(predicate::str::contains("skipped beta"));
 
     assert!(project
@@ -1884,7 +1891,7 @@ fn copy_multiple_skips_existing_without_force() {
 }
 
 #[test]
-fn copy_multiple_validates_all_names_before_copying() {
+fn pull_multiple_validates_all_names_before_pulling() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
@@ -1892,7 +1899,7 @@ fn copy_multiple_validates_all_names_before_copying() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "alpha", "../evil"])
+        .args(["pull", "alpha", "../evil"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("invalid skill name"));
@@ -1901,7 +1908,7 @@ fn copy_multiple_validates_all_names_before_copying() {
 }
 
 #[test]
-fn copy_duplicate_names_are_deduplicated() {
+fn pull_duplicate_names_are_deduplicated() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
@@ -1909,7 +1916,7 @@ fn copy_duplicate_names_are_deduplicated() {
     lsm()
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["copy", "alpha", "alpha"])
+        .args(["pull", "alpha", "alpha"])
         .assert()
         .success();
 
