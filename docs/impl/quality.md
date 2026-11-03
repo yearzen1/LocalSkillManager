@@ -42,19 +42,19 @@
 10. `list global --json` 空目录输出合法 `[]`。
 11. `list global --json` 可被解析，字段齐全；非法项含 `error`。
 12. 非法 skill 目录在文本输出标记 `[invalid]`。
-13. `copy foo`：global → project 成功。
-14. `copy foo` 目标已存在 → 失败；`--force` → 成功。
-15. `copy missing` → 失败，提示 `lsm list global`。
-16. 短选项：`-a ... -g`、`-a ... -p`、`-l -g`、`-l -p`、`-c foo` 全部通过。
-17. 非法组合：`-g -p`、`-c foo -g`、`lsm add foo.md -g` → 退出码 2。
+13. `pull foo`：global → project 成功。
+14. `pull foo` 目标已存在 → 失败；`--force` → 成功。
+15. `pull missing` → 失败，提示 `lsm search missing global`。
+16. 短选项：`-a ... -g`、`-a ... -p`、`-l -g`、`-l -p`、`-r foo -p` 全部通过；`-c foo` 退 2（已移除）。
+17. 非法组合：`-g -p`、`lsm add foo.md -g` → 退出码 2。
 18. 默认 help 为英文（含 `Usage:`），`--lang zh --help` 为中文（含 `用法:`）。
 19. `LSM_LANG=zh` 时错误消息为中文；命令行 `--lang en` 覆盖环境变量。
 20. `--json` 输出中不混入 warning / 提示文本。
 21. 安装失败后目标目录不存在残留（构造只读/冲突场景）。
 22. `lsm` 无参数 → 本地化 help 到 stderr、退出码 2；`lsm --help` → stdout、退出码 0。
-23. `copy ../evil`、`copy .`、`copy a/b` → 退出码 2，且磁盘上不产生任何新目录。
-24. 目录名与 frontmatter `name` 不一致 → `list` 标 `[invalid]`，`copy` 该目录报错。
-25. 保留设备名：`add`（frontmatter `name: con`）→ 退出码 1；`copy con` → 退出码 2。
+23. `pull ../evil`、`pull .`、`pull a/b` → 退出码 2，且磁盘上不产生任何新目录。
+24. 目录名与 frontmatter `name` 不一致 → `list` 标 `[invalid]`，`pull` 该目录报错。
+25. 保留设备名：`add`（frontmatter `name: con`）→ 退出码 1；`pull con` → 退出码 2。
 26. 源目录含符号链接 → 退出码 1，错误信息含 `symbolic links` 与具体路径。
 27. `--lang zh` 下 warning 与错误前缀分别为 `警告:` / `错误:`。
 28. `config set lang zh` 后另起进程执行 `list global` → 默认中文输出（无需 `--lang`）。
@@ -78,10 +78,10 @@
 
 v0.4.0 新增（Q43–Q47）：
 
-46. `copy a b` 两个都成功 → 退出 0，两个目录都在，stdout 含成功计数。
-47. `copy a missing` → 退出 1；`a` 已复制，`missing` 的错误体在 stderr。
-48. `copy a b` 其中 `b` 目标已存在且无 `--force` → 跳过并 warning，退出 0。
-49. `copy a ../evil` → 退出 2，且 `a` 也没有被复制（全量预校验）。
+46. `pull a b` 两个都成功 → 退出 0，两个目录都在，stdout 含成功计数。
+47. `pull a missing` → 退出 1；`a` 已复制，`missing` 的错误体在 stderr。
+48. `pull a b` 其中 `b` 目标已存在且无 `--force` → 跳过并 warning，退出 0。
+49. `pull a ../evil` → 退出 2，且 `a` 也没有被复制（全量预校验）。
 50. `remove a b project` → 两个都删，退出 0。
 51. `remove a missing project` → `a` 被删，`missing` 报错，退出 1。
 52. `remove a ../evil project` → 退出 2，`a` 仍在。
@@ -93,8 +93,10 @@ v0.4.0 新增（Q43–Q47）：
 58. `push a` → 项目 skill 进入 global；目标已存在无 `--force` → 失败；`--force` 覆盖。
 59. `push --all` 汇总成功/跳过/失败；项目为空 → 退出 0 并提示。
 60. `push a ../evil` → 退出 2，`a` 未推送。
-61. not-found hint：`copy`/`remove` 指向 `lsm search <name> <scope>`，`push` 指向 `lsm list project`；不自动执行 search。
+61. not-found hint：`pull`/`remove` 指向 `lsm search <name> <scope>`，`push` 指向 `lsm list project`；不自动执行 search。
 62. `search --help` / `push --help` 双语输出到 stdout 且退出 0；未知参数退 2。
+63. `copy foo`、`copy --all` → 退出 2（未知子命令），不保留别名。
+64. `-c foo`、`--copy foo` → 退出 2（未知参数），`-c` 已随 `copy` 移除。
 
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
@@ -109,10 +111,10 @@ cargo build --release
 lsm config set lang zh
 lsm config get lang
 lsm list global          # 应为中文
-cd <demo-project> && lsm copy sample && lsm list project
+cd <demo-project> && lsm pull sample && lsm list project
 lsm search sample project                       # 按 name / description 搜索
-lsm copy sample                                # 多 name 也可以：lsm copy a b（a 已存在则跳过）
-lsm copy --all                                 # 目标已存在时跳过，退出码 0
+lsm pull sample                                # 多 name 也可以：lsm pull a b（a 已存在则跳过）
+lsm pull --all                                 # 目标已存在时跳过，退出码 0
 lsm add ../gamma.md project && lsm push gamma  # project → global
 lsm push --all                                 # 全局已有则跳过
 lsm remove sample gamma project                # 多 name：lsm remove a b project
@@ -151,7 +153,7 @@ rm -f /tmp/lsm-check
 
 1. 一句话介绍 + 语言切换链接。
 2. 安装：`cargo install --path .`、本地 release 构建。
-3. 快速开始：写一个 `my-skill.md`，`lsm add my-skill.md global`，`lsm copy my-skill`。
+3. 快速开始：写一个 `my-skill.md`，`lsm add my-skill.md global`，`lsm pull my-skill`。
 4. 目录约定：`~/.agents/skills`、`<project>/.agents/skills`；提示"在项目根目录执行"。
 5. SKILL.md 模板与字段校验规则（64 / 1024 上限）。
 6. 命令参考：完整版 + 缩减版对照表 + `--lang` + `config get/set`，并注明命令与参数的唯一真源是 [`cli.md`](cli.md) §2.1。

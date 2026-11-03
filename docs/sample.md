@@ -5,13 +5,13 @@ description: Template skill used to try out lsm end to end; replace this with on
 
 # Sample Skill
 
-This file is a working example of a skill definition. Install it, list it, copy it
+This file is a working example of a skill definition. Install it, list it, pull it
 into a project, then use it as a starting point for your own skills.
 
 ```bash
 lsm add docs/sample.md global
 lsm list global
-lsm copy sample
+lsm pull sample
 ```
 
 ## When to use

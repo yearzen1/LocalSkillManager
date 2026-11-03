@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.4.0 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47）
+> 状态：v0.5.0 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48）
 > 最后更新：2026-11-13
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
@@ -10,7 +10,7 @@
 
 | 文档 | 内容 | 何时读 |
 |---|---|---|
-| [impl/storage.md](impl/storage.md) | 作用域与路径、SKILL.md、add/list/copy、文件系统 | 实现核心功能 |
+| [impl/storage.md](impl/storage.md) | 作用域与路径、SKILL.md、add/list/pull、文件系统 | 实现核心功能 |
 | [impl/cli.md](impl/cli.md) | i18n、CLI、help、输出与错误 | 实现命令行与输出 |
 | [impl/config.md](impl/config.md) | 配置文件路径、格式、语言持久化、`config` 命令 | 实现持久化语言 |
 | [impl/quality.md](impl/quality.md) | 测试计划、README、许可证、发布 | 测试与交付 |
@@ -23,13 +23,13 @@
 
 ## 2. 目标与范围
 
-`lsm` 是一个跨平台 CLI，用于把 Agent Skill 安装到全局目录或当前项目目录，并能把全局 skill 复制到项目。
+`lsm` 是一个跨平台 CLI，用于把 Agent Skill 安装到全局目录或当前项目目录，并能在两个作用域之间拉取/推送 skill。
 
 核心能力：
 
 1. `add`：把单个 `.md` 文件或完整 skill 目录安装到 `global` / `project`。
 2. `list`：列出指定作用域下已安装的 skill。
-3. `copy`：把全局 skill 复制到当前项目的 `.agents/skills/`，支持多个 name 与 `--all`。
+3. `pull`：把全局 skill 拉取到当前项目的 `.agents/skills/`，支持多个 name 与 `--all`。
 4. `push`（v0.4.0）：把当前项目 skill 推送到全局目录，支持多个 name 与 `--all`。
 5. `search`（v0.4.0）：按 name / description 子串搜索指定作用域。
 6. `upgrade`：从 GitHub Releases 取最新版本并原地替换 lsm 自身二进制，**不改变 exe 的路径与文件名**。
@@ -41,7 +41,6 @@
 - 不在 not-found 时自动执行 `search`，只改 hint（Q47）。
 - 不做自动/后台检查更新（`upgrade` 只在显式调用时联网）。
 - 不做符号链接（Windows 上不可靠），一律物理复制。
-- 不做从 project 反向复制到 global。
 - 不代理任何 agent 私有目录（如 `.claude/skills`），只维护 `.agents/skills` 这一份事实来源。
 - 不做 GitHub Actions 发布矩阵、预编译产物与 Linux/macOS 实测（Q39）。
 
@@ -70,9 +69,9 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
-description = "Install and copy agent skills under .agents/skills"
+description = "Install, pull, and push agent skills under .agents/skills"
 license = "MIT"
 
 [lib]
@@ -138,7 +137,7 @@ LocalSkillManager/
 │   │   ├── config.rs      # ConfigKey 枚举
 │   │   ├── version.rs     # Version：升级用的版本解析与比较
 │   │   ├── release.rs     # Release / Asset / 平台资产名选择
-│   │   ├── action.rs      # Action：Add / List / Search / Copy / Push / Remove / Upgrade / Config
+│   │   ├── action.rs      # Action：Add / List / Search / Pull / Push / Remove / Upgrade / Config
 │   │   └── entry.rs       # SkillEntry：list 展示数据
 │   ├── infra/             # 所有文件系统与环境访问
 │   │   ├── mod.rs
@@ -164,7 +163,7 @@ LocalSkillManager/
 │       ├── add.rs
 │       ├── list.rs
 │       ├── search.rs    # 按 name / description 搜索
-│       ├── copy.rs
+│       ├── pull.rs      # global → project
 │       ├── push.rs      # project → global
 │       ├── remove.rs
 │       ├── upgrade.rs   # 自更新编排：查询 → 校验 → 替换 → 输出
@@ -185,7 +184,7 @@ LocalSkillManager/
 | `domain::config` | 配置键枚举 | `ConfigKey::Lang` |
 | `domain::version` | 升级版本解析与比较 | `Version::parse(&str)`、`Ord` |
 | `domain::release` | release 元数据与平台资产名 | `Release::select_asset(Platform)`、`Platform::current()` |
-| `domain::action` | 解析后的用户意图 | `Action::{Add, List, Search, Copy, Push, Remove, Upgrade, Config}` |
+| `domain::action` | 解析后的用户意图 | `Action::{Add, List, Search, Pull, Push, Remove, Upgrade, Config}` |
 | `domain::entry` | list 的展示数据 | `SkillEntry`（name/description/path/valid/error） |
 | `infra::env` | 进程环境快照（唯一读环境点） | `Env::read() -> Env`、`Env::{home, config_dir, lang, upgrade_api, exe}` |
 | `infra::paths` | 纯函数路径解析 | `skills_dir(&Env, Scope, &Path) -> Result<PathBuf, PathError>`、`config_file(&Env) -> Result<PathBuf, PathError>` |
@@ -249,8 +248,8 @@ pub struct Ctx {
 - **add**：`cli` → `Action::Add` → `paths::skills_dir(&ctx.env, ...)` → `frontmatter::parse_skill_md` → `meta::validate` → `fsops::install_skill_*` → `output`。
 - **list**：`cli` → `Action::List` → `paths::skills_dir` → `scan::scan_skills` → `output::list`（text/json）。
 - **search**：`cli` → `Action::Search` → `paths::skills_dir` → `scan::scan_skills` → 过滤匹配 → `output::list`（text/json）。
-- **copy**：`cli`（name 已由 value_parser 校验）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`；多 name 逐条执行并汇总。
-- **push**：与 copy 对称，源为 project、目标为 global。
+- **pull**：`cli`（name 已由 value_parser 校验）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`；多 name 逐条执行并汇总。
+- **push**：与 pull 对称，源为 project、目标为 global。
 - **remove**：`cli` → `Action::Remove` → `paths::skill_dir` → 可选合法性校验 → `fsops::remove_entry_atomically` → `output`；多 name 逐条执行并汇总。
 - **upgrade**：`cli` → `Action::Upgrade` → `env.exe` + 编译期版本 → `net::fetch_latest_release` → `release::select_asset` →（`--check` 到此结束）→ `net::download` → 冒烟校验 → `fsops::replace_self` → `output`。
 - **语言解析**：`lib::run` → `infra::env::read()` → `cli::lang::decide(--lang, env.lang)` →（`Decision::NeedFile` 时）`infra::config::load()` → `Lang` → `cli::spec::build(lang)`。
@@ -278,6 +277,7 @@ pub struct Ctx {
 | v0.2.0 范围 | 只做 `copy --all` 与 `remove`；`--all` 冲突跳过、失败继续、任一失败退 1；CI 与 Linux/macOS 实测延后，触发条件是平台相关 issue | [decisions.md](decisions.md) Q38 / Q39 / Q40 |
 | v0.3.0 范围 | 只做 `upgrade`（`--check` / `--force`）；原地替换、文件名不变；测试只打回环桩、只动临时副本 | [decisions.md](decisions.md) Q30 / Q31 / Q32 / Q42 |
 | v0.4.0 范围 | 多 name `copy`/`remove`、`search`、`push`；批量沿用 Q40 的成功/跳过/失败语义；不做日志、不自动执行 search | [decisions.md](decisions.md) Q43–Q47 |
+| v0.5.0 范围 | `copy` 改名为 `pull`，移除 `copy` 与 `-c`；`-p` 仍表示 project；breaking change | [decisions.md](decisions.md) Q48 |
 
 ## 6. 文档维护规则
 
@@ -328,14 +328,14 @@ pub struct Ctx {
 - [x] 目标位于源目录内时硬报错，不发生递归复制。
 - [x] 非法 SKILL.md 被拦截：格式、64 / 1024 长度限制全部生效。
 - [x] 重复安装默认失败，`--force` 原子覆盖且不残留临时目录。
-- [x] `copy` 能把全局 skill 复制到当前项目，冲突处理与 add 一致。
+- [x] `pull` 能把全局 skill 复制到当前项目，冲突处理与 add 一致。
 - [x] `list` 文本与 JSON 输出稳定；空 JSON 为 `[]`；非法项不导致崩溃。
 - [x] help、错误、成功提示支持 en/zh，`--lang` / `LSM_LANG` / 配置文件 / 默认值的四级优先级正确。
 - [x] `lsm config set lang zh` 后新进程默认输出中文；`get` 输出裸值且缺省为 `en`。
 - [x] 配置文件损坏时 `--lang` / `LSM_LANG` 仍可用，裸调用退 1 并给出路径；配置目录可用 `LSM_CONFIG_DIR` 重定向。
 - [x] `README.md`（英文）与 `README.zh-CN.md`（中文）互相链接。
-- [x] 目录名与 frontmatter `name` 不一致时，`list` 标 `[invalid]`，`copy` 拒绝。
-- [x] `copy` 的 name 校验能阻止路径穿越（`..`、`/`、`\`）与 Windows 保留设备名。
+- [x] 目录名与 frontmatter `name` 不一致时，`list` 标 `[invalid]`，`pull` 拒绝。
+- [x] `pull` 的 name 校验能阻止路径穿越（`..`、`/`、`\`）与 Windows 保留设备名。
 - [x] 无子命令 → help 到 stderr + 退出码 2；显式 `--help` → stdout + 退出码 0。
 - [x] `main.rs` 仅做接线；`domain` 零 I/O、零文案；`domain`/`infra` 不构造 `AppError`；`i18n` 不读环境与文件；`paths` 不读进程环境；`commands` 不直接调用 `std::fs`（代码审查）。
 - [x] 模块树与本文"模块划分"一致，`lib.rs` 暴露核心逻辑。
@@ -354,9 +354,17 @@ pub struct Ctx {
 
 - [x] `lsm search <query> <scope> [--json]` 按 name/description 大小写不敏感匹配，无匹配退 0，空 query 退 2。
 - [x] `lsm push <name>... [--all] [--force]` 把项目 skill 推到 global，目标已存在默认拒绝。
-- [x] `lsm copy a b` 与 `lsm remove a b project` 支持多 name，单条失败不中断并按 Q40 汇总。
+- [x] `lsm pull a b` 与 `lsm remove a b project` 支持多 name，单条失败不中断并按 Q40 汇总。
 - [x] 所有 name 在 `cli::parse` 全量预校验，任一非法退 2 且不产生任何副作用。
-- [x] `lsm -c a b` / `lsm -r a b -p` 归一化正确。
-- [x] `copy`/`remove` 的 not-found hint 指向 `lsm search`，`push` 指向 `lsm list project`。
+- [x] `lsm -r a b -p` 归一化正确；`-c` 已随 `copy` 移除。
+- [x] `pull`/`remove` 的 not-found hint 指向 `lsm search`，`push` 指向 `lsm list project`。
 - [x] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test`、`scripts/acceptance.sh` 全绿。
+
+### 8.3 v0.5.0 改名（已实现）
+
+- [x] `lsm pull <name>... [--all] [--force]` 与旧 `copy` 行为一致。
+- [x] `lsm copy ...` 与 `lsm -c ...` 均按未知子命令 / 未知参数退 2，不保留别名、不做特殊拦截。
+- [x] `lsm pull -g` 退 2，提示 pull 不接受作用域。
+- [x] `-p` 仍表示 project；`pull` 没有短选项。
+- [x] 两份 README、`impl/cli.md`、`storage.md`、`quality.md` 与验收脚本同步，release notes 置顶迁移说明。
 

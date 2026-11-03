@@ -2,7 +2,7 @@
 
 > 上级：[实现方案索引](../impl.md) ｜ 相关：[CLI 与输出](cli.md) ｜ [配置与持久化](config.md) ｜ [测试与交付](quality.md) ｜ [决策记录](../decisions.md)
 >
-> 本文拥有以下规则的完整定义：作用域与路径、SKILL.md 规范、add/list/copy、文件系统操作。其他文档只做摘要和链接。
+> 本文拥有以下规则的完整定义：作用域与路径、SKILL.md 规范、add/list/pull、文件系统操作。其他文档只做摘要和链接。
 
 ## 1. 作用域与路径
 
@@ -96,8 +96,8 @@ description: 一句话说明这个 skill 做什么、什么时候用。
 - YAML 语法非法时报错并提示修法：plain scalar 不能包含 `: `（冒号+空格），值里有就加引号或改用 `>-` 折叠块。
 - 不做正则依赖：`name` 校验用字符遍历（首尾必须是字母/数字，中间允许单个连字符）。
 - Windows 保留设备名（大小写不敏感）：`con`、`prn`、`aux`、`nul`、`com1`~`com9`、`lpt1`~`lpt9`。提前拒绝，保证三平台行为一致。
-- **目录名是 skill 的唯一身份**：`SKILL.md` 的 `name` 必须与所在目录名一致；不一致时 `list` 标记 `[invalid]`，`copy` 视为源非法。
-- `copy <name>` 的入参必须先通过同一套 name 校验（含长度、保留名），并额外拒绝 `/`、`\`、`.`、`..`，校验失败按用法错误退出 2，绝不先拼路径再校验。
+- **目录名是 skill 的唯一身份**：`SKILL.md` 的 `name` 必须与所在目录名一致；不一致时 `list` 标记 `[invalid]`，`pull` 视为源非法。
+- `pull <name>` 的入参必须先通过同一套 name 校验（含长度、保留名），并额外拒绝 `/`、`\`、`.`、`..`，校验失败按用法错误退出 2，绝不先拼路径再校验。
 
 ### 2.3 数据结构
 
@@ -256,11 +256,11 @@ JSON 输出：
 - JSON 为 2 空格缩进的 pretty 输出，末尾带一个换行；空列表输出 `[]\n`。
 - JSON 直接 `println!` 到 stdout，不带任何日志或提示语。
 
-### 3.3 copy
+### 3.3 pull
 
 ```
-lsm copy <name>... [--force]
-lsm copy --all [--force]
+lsm pull <name>... [--force]
+lsm pull --all [--force]
 ```
 
 流程（单条）：
@@ -285,7 +285,7 @@ lsm copy --all [--force]
    copied my-skill -> <cwd>/.agents/skills/my-skill
    ```
 
-copy 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）。
+pull 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）。
 
 多 name（Q44）：
 
@@ -318,7 +318,7 @@ lsm -r <name>... -g|-p [--force]
 
 流程（单条）：
 
-1. **先校验 `name`**：与 `copy` 同一套规则（含长度、保留名），不拼路径；失败退 2。
+1. **先校验 `name`**：与 `pull` 同一套规则（含长度、保留名），不拼路径；失败退 2。
 2. 目标：对应作用域 skills 目录下的 `<name>`；不存在 → 报错退 1，hint 指向 `lsm search <name> <scope>`。
 3. 无 `--force` 时只删**合法 skill 目录**：目录名等于 `<name>`、`SKILL.md` 可解析、frontmatter `name` 与目录名一致。缺 `SKILL.md`、name 不一致或根本不是目录 → 拒绝，提示加 `--force`。
 4. 删除方式：先把目标 `rename` 到同级 `.tmp-remove-<name>-<pid>`，成功后再递归删除临时目录。`rename` 失败时原目录保持完整；临时目录删不掉只留 warning（`.tmp-*` 已被 `scan` 忽略，不会污染 `list`）。
@@ -357,9 +357,9 @@ lsm push <name>... [--force]
 lsm push --all [--force]
 ```
 
-`push` 是 `copy` 的反向操作（Q46）：project（cwd）→ global。
+`push` 是 `pull` 的反向操作（Q46）：project（cwd）→ global。
 
-单条流程与 `copy` 对称：
+单条流程与 `pull` 对称：
 
 1. name 在 `cli::parse` 校验，非法退 2。
 2. 源目录：`<cwd>/.agents/skills/<name>`，不存在则报错退 1：
@@ -459,7 +459,7 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError>;
 - Q27：配置文件独立于 `LSM_HOME`，不放进 `.agents` 目录。
 - Q29：`paths` 收 `&Env` 纯函数；`fsops`/`scan` 返回 `FsError`，不构造 `AppError`。
 - Q31：自更新用原地替换，`exe` 路径与文件名不变（`fsops::replace_self` 只实现替换与回滚）。
-- Q40：`copy --all` 逐条复制、冲突跳过、失败继续，任一失败退 1。
+- Q40：`pull --all` 逐条复制、冲突跳过、失败继续，任一失败退 1（拉动方向由 Q48 从 `copy` 改名）。
 - Q41：`remove` 只删合法 skill 目录，`--force` 才放开；rename 到临时目录再递归删。
 
 完整决策见 [decisions.md](../decisions.md)。

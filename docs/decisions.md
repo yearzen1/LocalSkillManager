@@ -52,6 +52,7 @@
 | Q45 | `search` 语义 | `search <query> <scope> [--json]`，scope 必填且只搜一个作用域；匹配 name 与 description 的大小写不敏感子串，query 去首尾空白后不得为空（空串退 2）；文本输出复用 list 表格（非法项照常标 `[invalid]`），JSON 复用 list 的字段；结果按 name 排序；无匹配退 0，文本模式打印 `No skills matched ...`，JSON 模式输出 `[]` |
 | Q46 | `push` 语义 | 新增 `push <name>... [--all] [--force]`：project（cwd）→ global；复用 copy 的单条校验、同路径/自包含检查、原子安装与 `.git` 警告；`--all` 扫描项目作用域并按 Q40 的成功/跳过/失败语义汇总；输出 `pushed <name> -> <global path>`；不加短选项、不参与归一化 |
 | Q47 | not-found 提示 | `copy`/`remove`/`push` 找不到 skill 时只改 hint 指向 `lsm search`（copy/remove 用对应 scope，push 用 `lsm list project`），**不自动执行 search**；输出仍是错误体、退出码仍为 1 |
+| Q48 | `copy` 改名为 `pull` | v0.5.0 起 `lsm pull <name>...` / `pull --all` 取代 `copy`；**不保留 `copy` 别名**，**移除 `-c/--copy` 短选项**（`-p` 仍表示 project，`pull` 不加短选项）；不做 “已改名” 特殊拦截，`copy` / `-c` 按未知子命令 / 未知参数退 2；breaking change 按 0.5.0 发布，迁移说明置顶 release notes |
 
 ## 维护规则
 
