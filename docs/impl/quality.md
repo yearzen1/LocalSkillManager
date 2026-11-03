@@ -76,6 +76,26 @@
 44. 升级成功后再次执行 `upgrade --check`（桩 tag 不变）→ 退出 0 且报告已最新。
 45. 真源一致性：`docs/impl/cli.md` §2.1 表的 `implemented` 行必须 `lsm <command> --help` 退出 0，`planned` 行必须被视为未知子命令（退出 2）——由 `tests/cli.rs::cli_reference_table_matches_binary` 强制。
 
+v0.4.0 新增（Q43–Q47）：
+
+46. `copy a b` 两个都成功 → 退出 0，两个目录都在，stdout 含成功计数。
+47. `copy a missing` → 退出 1；`a` 已复制，`missing` 的错误体在 stderr。
+48. `copy a b` 其中 `b` 目标已存在且无 `--force` → 跳过并 warning，退出 0。
+49. `copy a ../evil` → 退出 2，且 `a` 也没有被复制（全量预校验）。
+50. `remove a b project` → 两个都删，退出 0。
+51. `remove a missing project` → `a` 被删，`missing` 报错，退出 1。
+52. `remove a ../evil project` → 退出 2，`a` 仍在。
+53. `-r a b -p` → 归一化为 `remove a b project`，两个都删。
+54. `search review global` 命中 name 与 description，大小写不敏感；文本表格与 `list` 同格式。
+55. `search review global --json` → 合法 JSON 数组，字段与 `list` 一致。
+56. `search zzz global` → 退出 0，文本含 `No skills matched`；`--json` 输出 `[]`。
+57. `search "" global` / `search x`（缺 scope）→ 退出 2。
+58. `push a` → 项目 skill 进入 global；目标已存在无 `--force` → 失败；`--force` 覆盖。
+59. `push --all` 汇总成功/跳过/失败；项目为空 → 退出 0 并提示。
+60. `push a ../evil` → 退出 2，`a` 未推送。
+61. not-found hint：`copy`/`remove` 指向 `lsm search <name> <scope>`，`push` 指向 `lsm list project`；不自动执行 search。
+62. `search --help` / `push --help` 双语输出到 stdout 且退出 0；未知参数退 2。
+
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
 ### 1.3 手工验收（三平台）
@@ -90,8 +110,12 @@ lsm config set lang zh
 lsm config get lang
 lsm list global          # 应为中文
 cd <demo-project> && lsm copy sample && lsm list project
-lsm copy --all                                  # 目标已存在时跳过，退出码 0
-lsm remove sample project && lsm list project   # 列表里不再有 sample
+lsm search sample project                       # 按 name / description 搜索
+lsm copy sample                                # 多 name 也可以：lsm copy a b（a 已存在则跳过）
+lsm copy --all                                 # 目标已存在时跳过，退出码 0
+lsm add ../gamma.md project && lsm push gamma  # project → global
+lsm push --all                                 # 全局已有则跳过
+lsm remove sample gamma project                # 多 name：lsm remove a b project
 
 # 离线：只验子命令存在与非法参数，不联网
 lsm upgrade --help                              # 列出 --check / --force，退出 0

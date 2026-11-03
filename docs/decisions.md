@@ -47,6 +47,11 @@
 | Q40 | `copy --all` 批量语义 | `--all` 与 `<name>` 互斥（同时给出退 2）；逐条复用 `copy <name>` 的校验与原子安装，单条失败不中断：目标已存在且无 `--force` 算**跳过**（不算失败），源非法或 I/O 失败算**失败**并逐条报错；结束打印成功/跳过/失败计数，任一失败退 1，只有跳过或全部成功退 0，全局为空退 0 并提示无可复制内容 |
 | Q41 | `remove` 卸载语义 | 签名 `remove <name> <scope> [--force]`，scope 必填（与 `add`/`list` 一致），短选项 `-r <name> -g/-p`；无 `--force` 只删「目录名等于 name、含合法 `SKILL.md`、且 frontmatter name 与目录名一致」的目录，其余必须显式 `--force`；删除方式为「rename 到同级 `.tmp-remove-*` → 递归删临时目录」，rename 失败原目录不动；目标不存在退 1；不做批量删除 |
 | Q42 | upgrade 的测试方式 | 测试与桩只走回环：`LSM_UPGRADE_API` 可指向任意 `http://127.0.0.1:<port>/...` 桩（沿用 Q32 的覆盖入口，不为测试另开开关或 `#[cfg(test)]` 分支）；桩用标准库 `std::net::TcpListener` 手写 HTTP 响应，不引 `httpmock`/`wiremock` 等测试依赖；集成测试一律先把已构建的 `lsm` 复制到临时目录再运行副本，`current_exe()` 指向副本，绝不替换 `target/` 下正在使用的二进制；真实 GitHub 请求只在发布前手工验收跑一次（`upgrade --check`），不进 `cargo test`、不进 `scripts/acceptance.sh`；不推翻 Q39（仍不做 CI 矩阵与 Linux/macOS 实测） |
+| Q43 | v0.4.0 范围 | 只做四件事：多 name 的 `copy`/`remove`、`search`、`push`（project→global）、not-found hint 指向 `search`；不做日志功能、不在 not-found 时自动执行 search、不推翻 Q39（仍不做 CI 矩阵与 Linux/macOS 实测）；四条命令面先在本表之后改 `impl/cli.md` §2.1 为 `planned`，实现后同提交转 `implemented` |
+| Q44 | 多 name 批量语义 | `copy <name>...` 与 `remove <name>... <scope>`；`--all` 与 name 互斥（同现退 2）；所有 name 在 `cli::parse` 全量预校验，任一非法即退 2 且一条都不执行；逐条复用单条流程，单条失败不中断：目标已存在且无 `--force` 算**跳过**，源非法或 I/O 失败算**失败**；结束打印成功/跳过/失败计数，任一失败退 1，只有跳过或全部成功退 0；重复 name 去重（保留首次出现）；单 name 输出保持现状，多 name 才打印汇总 |
+| Q45 | `search` 语义 | `search <query> <scope> [--json]`，scope 必填且只搜一个作用域；匹配 name 与 description 的大小写不敏感子串，query 去首尾空白后不得为空（空串退 2）；文本输出复用 list 表格（非法项照常标 `[invalid]`），JSON 复用 list 的字段；结果按 name 排序；无匹配退 0，文本模式打印 `No skills matched ...`，JSON 模式输出 `[]` |
+| Q46 | `push` 语义 | 新增 `push <name>... [--all] [--force]`：project（cwd）→ global；复用 copy 的单条校验、同路径/自包含检查、原子安装与 `.git` 警告；`--all` 扫描项目作用域并按 Q40 的成功/跳过/失败语义汇总；输出 `pushed <name> -> <global path>`；不加短选项、不参与归一化 |
+| Q47 | not-found 提示 | `copy`/`remove`/`push` 找不到 skill 时只改 hint 指向 `lsm search`（copy/remove 用对应 scope，push 用 `lsm list project`），**不自动执行 search**；输出仍是错误体、退出码仍为 1 |
 
 ## 维护规则
 

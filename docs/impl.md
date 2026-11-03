@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.3.0 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42）
+> 状态：v0.4.0 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47）
 > 最后更新：2026-11-13
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
@@ -29,12 +29,16 @@
 
 1. `add`：把单个 `.md` 文件或完整 skill 目录安装到 `global` / `project`。
 2. `list`：列出指定作用域下已安装的 skill。
-3. `copy`：把全局 skill 复制到当前项目的 `.agents/skills/`。
-4. `upgrade`：从 GitHub Releases 取最新版本并原地替换 lsm 自身二进制，**不改变 exe 的路径与文件名**。
-5. `remove`（v0.2.0）：卸载指定作用域下由 `add` 安装的 skill，未加 `--force` 时只删合法的 skill 目录。
+3. `copy`：把全局 skill 复制到当前项目的 `.agents/skills/`，支持多个 name 与 `--all`。
+4. `push`（v0.4.0）：把当前项目 skill 推送到全局目录，支持多个 name 与 `--all`。
+5. `search`（v0.4.0）：按 name / description 子串搜索指定作用域。
+6. `upgrade`：从 GitHub Releases 取最新版本并原地替换 lsm 自身二进制，**不改变 exe 的路径与文件名**。
+7. `remove`（v0.2.0）：卸载指定作用域下由 `add` 安装的 skill，支持多个 name，未加 `--force` 时只删合法的 skill 目录。
 
-非目标（v0.3.0 未做，v0.4.0 待定）：
+非目标（v0.4.0 不做）：
 
+- 不做日志功能（文件日志 / 调试开关 / 审计）。
+- 不在 not-found 时自动执行 `search`，只改 hint（Q47）。
 - 不做自动/后台检查更新（`upgrade` 只在显式调用时联网）。
 - 不做符号链接（Windows 上不可靠），一律物理复制。
 - 不做从 project 反向复制到 global。
@@ -66,7 +70,7 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Install and copy agent skills under .agents/skills"
 license = "MIT"
@@ -134,7 +138,7 @@ LocalSkillManager/
 │   │   ├── config.rs      # ConfigKey 枚举
 │   │   ├── version.rs     # Version：升级用的版本解析与比较
 │   │   ├── release.rs     # Release / Asset / 平台资产名选择
-│   │   ├── action.rs      # Action：Add / List / Copy / Upgrade / Config
+│   │   ├── action.rs      # Action：Add / List / Search / Copy / Push / Remove / Upgrade / Config
 │   │   └── entry.rs       # SkillEntry：list 展示数据
 │   ├── infra/             # 所有文件系统与环境访问
 │   │   ├── mod.rs
@@ -159,8 +163,11 @@ LocalSkillManager/
 │       ├── mod.rs         # dispatch(&Ctx, Action)
 │       ├── add.rs
 │       ├── list.rs
+│       ├── search.rs    # 按 name / description 搜索
 │       ├── copy.rs
-│       ├── upgrade.rs     # 自更新编排：查询 → 校验 → 替换 → 输出
+│       ├── push.rs      # project → global
+│       ├── remove.rs
+│       ├── upgrade.rs   # 自更新编排：查询 → 校验 → 替换 → 输出
 │       └── config.rs
 └── tests/
     ├── cli.rs
@@ -178,7 +185,7 @@ LocalSkillManager/
 | `domain::config` | 配置键枚举 | `ConfigKey::Lang` |
 | `domain::version` | 升级版本解析与比较 | `Version::parse(&str)`、`Ord` |
 | `domain::release` | release 元数据与平台资产名 | `Release::select_asset(Platform)`、`Platform::current()` |
-| `domain::action` | 解析后的用户意图 | `Action::{Add, List, Copy, Upgrade, Config}` |
+| `domain::action` | 解析后的用户意图 | `Action::{Add, List, Search, Copy, Push, Remove, Upgrade, Config}` |
 | `domain::entry` | list 的展示数据 | `SkillEntry`（name/description/path/valid/error） |
 | `infra::env` | 进程环境快照（唯一读环境点） | `Env::read() -> Env`、`Env::{home, config_dir, lang, upgrade_api, exe}` |
 | `infra::paths` | 纯函数路径解析 | `skills_dir(&Env, Scope, &Path) -> Result<PathBuf, PathError>`、`config_file(&Env) -> Result<PathBuf, PathError>` |
@@ -241,7 +248,10 @@ pub struct Ctx {
 
 - **add**：`cli` → `Action::Add` → `paths::skills_dir(&ctx.env, ...)` → `frontmatter::parse_skill_md` → `meta::validate` → `fsops::install_skill_*` → `output`。
 - **list**：`cli` → `Action::List` → `paths::skills_dir` → `scan::scan_skills` → `output::list`（text/json）。
-- **copy**：`cli`（name 已由 value_parser 校验）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`。
+- **search**：`cli` → `Action::Search` → `paths::skills_dir` → `scan::scan_skills` → 过滤匹配 → `output::list`（text/json）。
+- **copy**：`cli`（name 已由 value_parser 校验）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`；多 name 逐条执行并汇总。
+- **push**：与 copy 对称，源为 project、目标为 global。
+- **remove**：`cli` → `Action::Remove` → `paths::skill_dir` → 可选合法性校验 → `fsops::remove_entry_atomically` → `output`；多 name 逐条执行并汇总。
 - **upgrade**：`cli` → `Action::Upgrade` → `env.exe` + 编译期版本 → `net::fetch_latest_release` → `release::select_asset` →（`--check` 到此结束）→ `net::download` → 冒烟校验 → `fsops::replace_self` → `output`。
 - **语言解析**：`lib::run` → `infra::env::read()` → `cli::lang::decide(--lang, env.lang)` →（`Decision::NeedFile` 时）`infra::config::load()` → `Lang` → `cli::spec::build(lang)`。
 - **config get**：`cli` → `Action::Config(Get(Lang))` → `infra::config::load` → 裸值到 stdout（缺省 `en`）。
@@ -267,6 +277,7 @@ pub struct Ctx {
 | 测试与交付 | 用例数不写死，以 `cargo test` 输出为准；v1 不配 CI | [quality.md](impl/quality.md)「测试计划」「发布」 |
 | v0.2.0 范围 | 只做 `copy --all` 与 `remove`；`--all` 冲突跳过、失败继续、任一失败退 1；CI 与 Linux/macOS 实测延后，触发条件是平台相关 issue | [decisions.md](decisions.md) Q38 / Q39 / Q40 |
 | v0.3.0 范围 | 只做 `upgrade`（`--check` / `--force`）；原地替换、文件名不变；测试只打回环桩、只动临时副本 | [decisions.md](decisions.md) Q30 / Q31 / Q32 / Q42 |
+| v0.4.0 范围 | 多 name `copy`/`remove`、`search`、`push`；批量沿用 Q40 的成功/跳过/失败语义；不做日志、不自动执行 search | [decisions.md](decisions.md) Q43–Q47 |
 
 ## 6. 文档维护规则
 
@@ -338,4 +349,14 @@ pub struct Ctx {
 - [x] `lsm upgrade` 成功后 exe 的路径与文件名不变，`.old-*` 不残留；失败路径上原 exe 仍可执行。
 - [x] 当前平台无资产、网络失败、限流（403/429）、目录不可写均退出 1 并带 hint。
 - [x] `upgrade` 的 en/zh 文案齐全，`upgrade --help` 两种语言正常，未知参数退出 2。
+
+### 8.2 v0.4.0 命令面（已实现）
+
+- [x] `lsm search <query> <scope> [--json]` 按 name/description 大小写不敏感匹配，无匹配退 0，空 query 退 2。
+- [x] `lsm push <name>... [--all] [--force]` 把项目 skill 推到 global，目标已存在默认拒绝。
+- [x] `lsm copy a b` 与 `lsm remove a b project` 支持多 name，单条失败不中断并按 Q40 汇总。
+- [x] 所有 name 在 `cli::parse` 全量预校验，任一非法退 2 且不产生任何副作用。
+- [x] `lsm -c a b` / `lsm -r a b -p` 归一化正确。
+- [x] `copy`/`remove` 的 not-found hint 指向 `lsm search`，`push` 指向 `lsm list project`。
+- [x] `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test`、`scripts/acceptance.sh` 全绿。
 

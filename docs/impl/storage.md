@@ -259,11 +259,11 @@ JSON 输出：
 ### 3.3 copy
 
 ```
-lsm copy <name> [--force]
+lsm copy <name>... [--force]
 lsm copy --all [--force]
 ```
 
-流程：
+流程（单条）：
 
 1. **先校验 `name`**（不拼路径）：同一套 name 规则 + 拒绝 `/`、`\`、`.`、`..`。校验在 `cli::parse` 构造 `Action` 时执行，保证在命令逻辑之前失败，退出码 2：
    ```
@@ -273,7 +273,7 @@ lsm copy --all [--force]
 2. 源目录：`infra::paths::skills_dir(&ctx.env, Scope::Global, ctx.cwd)/<name>`，不存在则报错：
    ```
    error: skill 'foo' not found in global
-   hint: run `lsm list global` to see available skills
+   hint: run `lsm search foo global` to see similar skills
    ```
 3. 源目录必须有合法 `SKILL.md`，且 frontmatter `name` 与目录名一致（防止复制半成品或错位 skill）。
 4. 目标：`<cwd>/.agents/skills/<name>`。
@@ -287,7 +287,18 @@ lsm copy --all [--force]
 
 copy 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）。
 
-`--all` 与 `<name>` 互斥（同时给出退出码 2）。全量分支：
+多 name（Q44）：
+
+1. 所有 name 在 `cli::parse` 全量预校验；任一非法退 2，一条都不执行。
+2. 重复 name 去重，保留首次出现的顺序。
+3. 逐条复用上面的单条流程，单条失败不中断：
+   - **成功**：安装完成。
+   - **跳过**：目标已存在且无 `--force`，打 warning，不算失败。
+   - **失败**：源缺失/非法或 I/O 错误，逐条把错误体打到 stderr。
+4. 单 name 保持现有输出；多 name 每条形如 `copied ...`，结束再打一行成功/跳过/失败计数。
+5. 退出码：任一失败退 1；只有跳过或全部成功退 0。
+
+`--all` 与 `<name>...` 互斥（同时给出退出码 2）。全量分支：
 
 1. 扫描全局 skills 目录（`infra::scan::scan_skills`，跳过隐藏项与非目录），按名字排序逐条处理。
 2. 每条复用上面的单条流程（校验源 → 算目标 → 原子安装）。
@@ -301,21 +312,73 @@ copy 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）�
 ### 3.4 remove
 
 ```
-lsm remove <name> <global|project> [--force]
-lsm -r <name> -g|-p [--force]
+lsm remove <name>... <global|project> [--force]
+lsm -r <name>... -g|-p [--force]
 ```
 
-流程：
+流程（单条）：
 
 1. **先校验 `name`**：与 `copy` 同一套规则（含长度、保留名），不拼路径；失败退 2。
-2. 目标：对应作用域 skills 目录下的 `<name>`；不存在 → 报错退 1。
+2. 目标：对应作用域 skills 目录下的 `<name>`；不存在 → 报错退 1，hint 指向 `lsm search <name> <scope>`。
 3. 无 `--force` 时只删**合法 skill 目录**：目录名等于 `<name>`、`SKILL.md` 可解析、frontmatter `name` 与目录名一致。缺 `SKILL.md`、name 不一致或根本不是目录 → 拒绝，提示加 `--force`。
 4. 删除方式：先把目标 `rename` 到同级 `.tmp-remove-<name>-<pid>`，成功后再递归删除临时目录。`rename` 失败时原目录保持完整；临时目录删不掉只留 warning（`.tmp-*` 已被 `scan` 忽略，不会污染 `list`）。
 5. 输出：
    ```
    removed my-skill -> <cwd>/.agents/skills/my-skill
    ```
-6. `--force` 只放开第 3 步的合法性检查，不改变 name 校验，也不做批量删除。
+6. `--force` 只放开第 3 步的合法性检查，不改变 name 校验。
+
+多 name（Q44）：
+
+1. scope 永远取最后一个位置参数，前面的都是 name；至少一个 name，否则由 clap 报用法错误退 2。
+2. 所有 name 全量预校验，任一非法退 2，一条都不删。
+3. 重复 name 去重；逐条复用单条流程，单条失败不中断（不存在、非法目录、I/O 失败都算失败）。
+4. 单 name 保持现有输出；多 name 每条形如 `removed ...`，结束打印成功/失败计数。
+5. 退出码：任一失败退 1；全部成功退 0。
+
+### 3.5 search
+
+```
+lsm search <query> <scope> [--json]
+```
+
+1. scope 必填，只搜一个作用域（Q45）；`scopes` 仍由 `value_parser` 校验。
+2. query 去掉首尾空白后不得为空，空串退 2。
+3. 扫描对应 skills 目录（`infra::scan::scan_skills`），保留合法与非法项。
+4. 匹配规则：query 与 `name`、`description` 做大小写不敏感的子串匹配；非法项的 description 视为空串，只按目录名匹配。
+5. 结果按 `name` 字典序排序；无匹配时文本模式输出 `No skills matched '<query>' in <scope>`，JSON 模式输出 `[]`，退出码均为 0。
+6. 文本与 JSON 排版完全复用 `list`（`output::list::render_text` / `render_json`），非法项照常标 `[invalid]`；`--json` 的 stdout 只有 JSON。
+7. 只读，不创建目录、不写盘。
+
+### 3.6 push
+
+```
+lsm push <name>... [--force]
+lsm push --all [--force]
+```
+
+`push` 是 `copy` 的反向操作（Q46）：project（cwd）→ global。
+
+单条流程与 `copy` 对称：
+
+1. name 在 `cli::parse` 校验，非法退 2。
+2. 源目录：`<cwd>/.agents/skills/<name>`，不存在则报错退 1：
+   ```
+   error: skill 'foo' not found in project
+   hint: run `lsm list project` to see available skills
+   ```
+3. 源必须有合法 `SKILL.md`，且 frontmatter `name` 与目录名一致。
+4. 目标：`<global skills dir>/<name>`。
+5. 源与目标相同或目标在源内 → 报错；目标已存在且无 `--force` → 报错。
+6. 复用 `install_skill_dir` 原子安装，`.git` 目录照常复制并告警。
+7. 输出：
+   ```
+   pushed my-skill -> <global skills dir>/my-skill
+   ```
+
+多 name 与 `--all` 的语义完全复用 Q40 / Q44：全量预校验、去重、单条失败不中断、目标已存在无 `--force` 算跳过、结束打印成功/跳过/失败计数、任一失败退 1；`--all` 与 name 互斥；项目目录为空退 0 并提示没有可推送的 skill。
+
+`push` 不加短选项，也不参与归一化。
 
 ## 4. 文件系统细节
 
