@@ -35,6 +35,9 @@ keys!(
     VersionFlagHelp,
     // 通用参数
     LangHelp,
+    // name 解析
+    NameAmbiguous,
+    NameAmbiguousHint,
     // 用法错误
     UsageInvalidLanguage,
     UsageInvalidLanguageHint,

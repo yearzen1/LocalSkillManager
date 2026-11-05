@@ -16,6 +16,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::HelpFlagHelp => "Print help",
         MsgKey::VersionFlagHelp => "Print version",
         MsgKey::LangHelp => "Output language [en, zh]",
+        MsgKey::NameAmbiguous => "'{0}' matches more than one skill in {1}: {2}",
+        MsgKey::NameAmbiguousHint => "use a longer prefix, or run `lsm list {0}`",
 
         MsgKey::UsageInvalidLanguage => "invalid language '{0}'",
         MsgKey::UsageInvalidLanguageHint => "use one of: en, zh",

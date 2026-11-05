@@ -141,6 +141,7 @@ my-skill     One-line description.
 - The source must be a valid global skill: `SKILL.md` present and its `name` must match the directory.
 - Pulling onto the same path, or into the source itself, is refused; an existing target needs `--force`.
 - `name` is validated before any path is built, so `..`, `/`, `\` and reserved device names exit with code 2. With several names, every name is validated before anything is pulled.
+- A unique prefix is enough: when only `code-review` is installed, `lsm pull code` pulls it. If several names share the prefix, the command exits 1 and lists the candidates; an exact name always wins.
 - Multiple names keep going after a failure: existing targets without `--force` are skipped, invalid/missing sources fail, and a final line reports `pulled N, skipped M, failed K`. Any failure exits 1; only skips exit 0.
 - `--all` pulls every valid global skill. Existing targets are skipped unless `--force`; invalid skills are reported and the batch keeps going. Skipped skills are not failures: the command exits 1 only when a skill actually failed to pull.
 
@@ -148,7 +149,7 @@ my-skill     One-line description.
 
 - `lsm push <name>...` is the reverse of `pull`: project (cwd) → global. The source must be a valid project skill and the directory name must match `SKILL.md`.
 - Existing global targets need `--force`; `--all` pushes every valid project skill with the same success/skip/failure semantics as `pull --all`.
-- Multiple names, validation-before-work, and the summary line behave exactly like `pull`.
+- Multiple names, validation-before-work, and the summary line behave exactly like `pull`, including unique-prefix resolution (`lsm push code` → `code-review`).
 - A missing source points at `lsm list project`; the command has no short form.
 
 ### remove
@@ -157,6 +158,7 @@ my-skill     One-line description.
 - Deletion is atomic: the target is renamed to a sibling `.tmp-remove-*` first, then removed. If the rename fails, the original directory stays intact.
 - With several names, all names are validated first, then each is removed; failures do not stop the batch and a final line reports `removed N, failed M`. Any failure exits 1.
 - A missing target exits with code 1 and the hint points at `lsm search`; `name` is validated before any path is built, so `..` and reserved device names exit with code 2.
+- `name` also accepts a unique prefix; an ambiguous prefix exits 1 and deletes nothing for that name.
 
 ### upgrade
 

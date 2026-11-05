@@ -16,6 +16,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::HelpFlagHelp => "打印帮助",
         MsgKey::VersionFlagHelp => "打印版本",
         MsgKey::LangHelp => "输出语言 [en, zh]",
+        MsgKey::NameAmbiguous => "在 {1} 中，'{0}' 匹配到多个 skill：{2}",
+        MsgKey::NameAmbiguousHint => "请使用更长的前缀，或运行 `lsm list {0}`",
 
         MsgKey::UsageInvalidLanguage => "非法语言 '{0}'",
         MsgKey::UsageInvalidLanguageHint => "可用值：en, zh",

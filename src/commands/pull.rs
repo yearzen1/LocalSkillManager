@@ -12,6 +12,8 @@ use crate::output;
 use crate::output::error as error_output;
 use crate::Ctx;
 
+use super::resolve::resolve_name;
+
 pub fn run(ctx: &Ctx, target: TransferTarget, force: bool) -> Result<(), AppError> {
     match target {
         TransferTarget::Many(names) => pull_many(ctx, &names, force),
@@ -20,17 +22,35 @@ pub fn run(ctx: &Ctx, target: TransferTarget, force: bool) -> Result<(), AppErro
 }
 
 /// 逐条复制多个 name；单条失败只记账，不中断（Q44）。
-fn pull_many(ctx: &Ctx, names: &[SkillName], force: bool) -> Result<(), AppError> {
+fn pull_many(ctx: &Ctx, inputs: &[SkillName], force: bool) -> Result<(), AppError> {
+    let global_dir = paths::skills_dir(&ctx.env, Scope::Global, &ctx.cwd)?;
+    let available = scan::dir_names(&global_dir)?;
+
     // 单 name 保持既有输出与退出码：目标已存在仍是错误。
-    if let [name] = names {
-        return pull_one(ctx, name, force);
+    if let [input] = inputs {
+        let name = resolve_name(input, &available, Scope::Global, pull_not_found(input))?;
+        return pull_one(ctx, &name, force);
+    }
+
+    let mut names: Vec<SkillName> = Vec::new();
+    let mut failed = 0usize;
+
+    // 先解析全部 name；歧义或缺失按该条失败记账，其余照常执行。
+    for input in inputs {
+        match resolve_name(input, &available, Scope::Global, pull_not_found(input)) {
+            Ok(name) if !names.contains(&name) => names.push(name),
+            Ok(_) => {}
+            Err(err) => {
+                failed += 1;
+                output::emit_stderr(&error_output::render(&err, ctx.lang));
+            }
+        }
     }
 
     let mut pulled = 0usize;
     let mut skipped = 0usize;
-    let mut failed = 0usize;
 
-    for name in names {
+    for name in &names {
         let destination = paths::skill_dir(&ctx.env, Scope::Project, &ctx.cwd, name)?;
         if !force && fsops::is_present(&destination) {
             skipped += 1;
@@ -138,15 +158,20 @@ fn report_invalid(ctx: &Ctx, entry: &SkillEntry) {
     output::emit_stderr(&error_output::render(&err, ctx.lang));
 }
 
+/// `pull` 的 not-found 错误；hint 指向 `search`（Q47）。
+fn pull_not_found(name: &SkillName) -> AppError {
+    AppError::runtime(MsgKey::PullNotFound)
+        .with_args([name.as_str()])
+        .with_hint_args(MsgKey::PullNotFoundHint, [name.as_str()])
+}
+
 /// 复制单个 skill。
 fn pull_one(ctx: &Ctx, name: &SkillName, force: bool) -> Result<(), AppError> {
     let global_dir = paths::skills_dir(&ctx.env, Scope::Global, &ctx.cwd)?;
     let source = global_dir.join(name.as_str());
 
     if !fsops::is_present(&source) {
-        return Err(AppError::runtime(MsgKey::PullNotFound)
-            .with_args([name.as_str()])
-            .with_hint_args(MsgKey::PullNotFoundHint, [name.as_str()]));
+        return Err(pull_not_found(name));
     }
 
     ensure_valid_source(&source, name)?;

@@ -14,6 +14,8 @@ use crate::output;
 use crate::output::error as error_output;
 use crate::Ctx;
 
+use super::resolve::resolve_name;
+
 pub fn run(ctx: &Ctx, target: TransferTarget, force: bool) -> Result<(), AppError> {
     match target {
         TransferTarget::Many(names) => push_many(ctx, &names, force),
@@ -22,16 +24,34 @@ pub fn run(ctx: &Ctx, target: TransferTarget, force: bool) -> Result<(), AppErro
 }
 
 /// 逐条推送多个 name；单条失败只记账，不中断（Q44 / Q46）。
-fn push_many(ctx: &Ctx, names: &[SkillName], force: bool) -> Result<(), AppError> {
-    if let [name] = names {
-        return push_one(ctx, name, force);
+fn push_many(ctx: &Ctx, inputs: &[SkillName], force: bool) -> Result<(), AppError> {
+    let project_dir = paths::skills_dir(&ctx.env, Scope::Project, &ctx.cwd)?;
+    let available = scan::dir_names(&project_dir)?;
+
+    if let [input] = inputs {
+        let name = resolve_name(input, &available, Scope::Project, push_not_found(input))?;
+        return push_one(ctx, &name, force);
+    }
+
+    let mut names: Vec<SkillName> = Vec::new();
+    let mut failed = 0usize;
+
+    // 先解析全部 name；歧义或缺失按该条失败记账，其余照常执行。
+    for input in inputs {
+        match resolve_name(input, &available, Scope::Project, push_not_found(input)) {
+            Ok(name) if !names.contains(&name) => names.push(name),
+            Ok(_) => {}
+            Err(err) => {
+                failed += 1;
+                output::emit_stderr(&error_output::render(&err, ctx.lang));
+            }
+        }
     }
 
     let mut pushed = 0usize;
     let mut skipped = 0usize;
-    let mut failed = 0usize;
 
-    for name in names {
+    for name in &names {
         let destination = paths::skill_dir(&ctx.env, Scope::Global, &ctx.cwd, name)?;
         if !force && fsops::is_present(&destination) {
             skipped += 1;
@@ -138,15 +158,20 @@ fn report_invalid(ctx: &Ctx, entry: &SkillEntry) {
     output::emit_stderr(&error_output::render(&err, ctx.lang));
 }
 
+/// `push` 的 not-found 错误；hint 指向 `list project`（Q47）。
+fn push_not_found(name: &SkillName) -> AppError {
+    AppError::runtime(MsgKey::PushNotFound)
+        .with_args([name.as_str()])
+        .with_hint(MsgKey::PushNotFoundHint)
+}
+
 /// 推送单个 skill：project → global。
 fn push_one(ctx: &Ctx, name: &SkillName, force: bool) -> Result<(), AppError> {
     let project_dir = paths::skills_dir(&ctx.env, Scope::Project, &ctx.cwd)?;
     let source = project_dir.join(name.as_str());
 
     if !fsops::is_present(&source) {
-        return Err(AppError::runtime(MsgKey::PushNotFound)
-            .with_args([name.as_str()])
-            .with_hint(MsgKey::PushNotFoundHint));
+        return Err(push_not_found(name));
     }
 
     ensure_valid_source(&source, name)?;

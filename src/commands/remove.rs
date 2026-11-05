@@ -7,19 +7,39 @@ use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
 use crate::i18n::MsgKey;
 use crate::infra::fsops;
-use crate::infra::{frontmatter, paths};
+use crate::infra::{frontmatter, paths, scan};
 use crate::output;
 use crate::Ctx;
 
+use super::resolve::resolve_name;
+
 pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Result<(), AppError> {
-    if let [name] = names.as_slice() {
-        return remove_one(ctx, scope, name, force);
+    let directory = paths::skills_dir(&ctx.env, scope, &ctx.cwd)?;
+    let available = scan::dir_names(&directory)?;
+
+    if let [input] = names.as_slice() {
+        let name = resolve_name(input, &available, scope, remove_not_found(input, scope))?;
+        return remove_one(ctx, scope, &name, force);
+    }
+
+    let mut resolved: Vec<SkillName> = Vec::new();
+    let mut failed = 0usize;
+
+    // 先解析全部 name；歧义或缺失按该条失败记账，其余照常执行。
+    for input in &names {
+        match resolve_name(input, &available, scope, remove_not_found(input, scope)) {
+            Ok(name) if !resolved.contains(&name) => resolved.push(name),
+            Ok(_) => {}
+            Err(err) => {
+                failed += 1;
+                output::emit_stderr(&crate::output::error::render(&err, ctx.lang));
+            }
+        }
     }
 
     let mut removed = 0usize;
-    let mut failed = 0usize;
 
-    for name in &names {
+    for name in &resolved {
         match remove_one(ctx, scope, name, force) {
             Ok(()) => removed += 1,
             Err(err) => {
@@ -46,14 +66,19 @@ pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Resul
     Ok(())
 }
 
+/// `remove` 的 not-found 错误；hint 指向 `search`（Q47）。
+fn remove_not_found(name: &SkillName, scope: Scope) -> AppError {
+    AppError::runtime(MsgKey::RemoveNotFound)
+        .with_args([name.as_str(), scope.label()])
+        .with_hint_args(MsgKey::RemoveNotFoundHint, [name.as_str(), scope.label()])
+}
+
 /// 删除单个 skill；多 name 时由 [`run`] 累计成功/失败。
 fn remove_one(ctx: &Ctx, scope: Scope, name: &SkillName, force: bool) -> Result<(), AppError> {
     let target = paths::skill_dir(&ctx.env, scope, &ctx.cwd, name)?;
 
     if !fsops::is_present(&target) {
-        return Err(AppError::runtime(MsgKey::RemoveNotFound)
-            .with_args([name.as_str(), scope.label()])
-            .with_hint_args(MsgKey::RemoveNotFoundHint, [name.as_str(), scope.label()]));
+        return Err(remove_not_found(name, scope));
     }
 
     if !force {

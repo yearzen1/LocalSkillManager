@@ -6,6 +6,7 @@ pub mod list;
 pub mod pull;
 pub mod push;
 pub mod remove;
+pub mod resolve;
 pub mod search;
 pub mod upgrade;
 

@@ -16,8 +16,26 @@ pub enum Resolution {
 }
 
 /// 精确优先，其次唯一前缀；只做前缀，不做子串。
-pub fn resolve(_input: &SkillName, _available: &[String]) -> Resolution {
-    Resolution::Missing
+pub fn resolve(input: &SkillName, available: &[String]) -> Resolution {
+    if available.iter().any(|name| name == input.as_str()) {
+        return Resolution::Exact(input.clone());
+    }
+
+    let mut matches: Vec<String> = available
+        .iter()
+        .filter(|name| name.starts_with(input.as_str()))
+        .cloned()
+        .collect();
+    matches.sort();
+
+    match matches.len() {
+        0 => Resolution::Missing,
+        1 => match SkillName::parse(&matches[0]) {
+            Ok(name) => Resolution::Prefix(name),
+            Err(_) => Resolution::Missing,
+        },
+        _ => Resolution::Ambiguous(matches),
+    }
 }
 
 #[cfg(test)]

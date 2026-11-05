@@ -1,6 +1,6 @@
 //! 扫描 skills 目录，产出 `list` 用的 [`SkillEntry`]。非法项只标记，不中断。
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::domain::entry::SkillEntry;
 use crate::domain::name::SkillName;
@@ -10,13 +10,34 @@ use super::fsops::FsError;
 
 /// 扫描 `dir` 的直接子目录。目录不存在视为空。
 pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError> {
+    Ok(visible_dirs(dir)?
+        .into_iter()
+        .map(|(name, path)| build_entry(&name, &path))
+        .collect())
+}
+
+/// 列出 `dir` 下的直接子目录名：跳过隐藏项、非目录与非法 skill 名，按字典序排序。
+///
+/// 只读目录名，不解析 `SKILL.md`；供 name 前缀解析使用（Q50）。
+pub fn dir_names(dir: &Path) -> Result<Vec<String>, FsError> {
+    let mut names: Vec<String> = visible_dirs(dir)?
+        .into_iter()
+        .map(|(name, _)| name)
+        .filter(|name| SkillName::parse(name).is_ok())
+        .collect();
+    names.sort();
+    Ok(names)
+}
+
+/// 直接子目录（名字 + 路径），跳过 `list` 不展示的隐藏项；结果按名字排序。
+fn visible_dirs(dir: &Path) -> Result<Vec<(String, PathBuf)>, FsError> {
     let read_dir = match std::fs::read_dir(dir) {
         Ok(read_dir) => read_dir,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(err) => return Err(io_error(dir, err)),
     };
 
-    let mut entries = Vec::new();
+    let mut dirs = Vec::new();
     for entry in read_dir {
         let entry = entry.map_err(|err| io_error(dir, err))?;
         let name = entry.file_name().to_string_lossy().into_owned();
@@ -34,11 +55,11 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError> {
             continue;
         }
 
-        entries.push(build_entry(&name, &entry.path()));
+        dirs.push((name, entry.path()));
     }
 
-    entries.sort_by(|left, right| left.name.cmp(&right.name));
-    Ok(entries)
+    dirs.sort_by(|left, right| left.0.cmp(&right.0));
+    Ok(dirs)
 }
 
 fn build_entry(name: &str, path: &Path) -> SkillEntry {
@@ -180,5 +201,34 @@ mod tests {
             .collect();
 
         assert_eq!(names, ["alpha", "mike", "zeta"]);
+    }
+
+    #[test]
+    fn dir_names_returns_empty_for_missing_directory() {
+        let temp = TempDir::new().unwrap();
+        assert!(dir_names(&temp.path().join("nope")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn dir_names_skips_hidden_items_files_and_invalid_names() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+        fs::create_dir_all(root.join(".tmp-my-skill-1")).unwrap();
+        fs::create_dir_all(root.join("broken")).unwrap();
+        fs::create_dir_all(root.join("Not-A-Name")).unwrap();
+        fs::write(root.join("stray.txt"), "x").unwrap();
+
+        assert_eq!(dir_names(root).unwrap(), ["broken"]);
+    }
+
+    #[test]
+    fn dir_names_sorts_by_name() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+        for name in ["zeta", "alpha", "mike"] {
+            fs::create_dir_all(root.join(name)).unwrap();
+        }
+
+        assert_eq!(dir_names(root).unwrap(), ["alpha", "mike", "zeta"]);
     }
 }
