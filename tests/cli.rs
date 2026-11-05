@@ -2478,3 +2478,24 @@ fn search_help_lists_field_filters() {
         .stdout(predicate::str::contains("--name"))
         .stdout(predicate::str::contains("--description"));
 }
+
+#[test]
+fn search_help_localizes_possible_values() {
+    lsm()
+        .args(["--lang", "zh", "search", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[可选值: global, project]"))
+        .stdout(predicate::str::contains("possible values").not());
+}
+
+#[test]
+fn config_key_help_names_the_key_values() {
+    lsm()
+        .args(["--lang", "zh", "config", "get", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("配置键：lang"))
+        .stdout(predicate::str::contains("[可选值: lang]"))
+        .stdout(predicate::str::contains("possible values").not());
+}

@@ -4,11 +4,12 @@ use crate::domain::lang::Lang;
 use crate::i18n::{tr, MsgKey};
 
 /// clap 输出的英文结构片段 → 消息键，按先长后短的顺序替换。
-const STRUCTURAL: [(&str, MsgKey); 5] = [
+const STRUCTURAL: [(&str, MsgKey); 6] = [
     ("For more information, try '--help'.", MsgKey::HelpMoreInfo),
     ("Arguments:", MsgKey::HelpArguments),
     ("Commands:", MsgKey::HelpCommands),
     ("Options:", MsgKey::HelpOptions),
+    ("[possible values: ", MsgKey::HelpPossibleValues),
     ("Usage:", MsgKey::HelpUsage),
 ];
 
@@ -27,8 +28,19 @@ mod tests {
 
     #[test]
     fn keeps_english_text_unchanged() {
-        let text = "Usage: lsm <COMMAND>\n\nCommands:\n  add\n\nOptions:\n  -h";
+        let text = "Usage: lsm <COMMAND>\n\nCommands:\n  add\n\nOptions:\n  -h\n\nArguments:\n  [SCOPE]  Where to search: global or project [possible values: global, project]";
         assert_eq!(localize(text, Lang::En), text);
+    }
+
+    #[test]
+    fn translates_possible_values() {
+        let text =
+            "  [SCOPE]  Where to search: global or project [possible values: global, project]";
+        let localized = localize(text, Lang::Zh);
+
+        assert!(localized.contains("[可选值: global, project]"));
+        assert!(!localized.contains("possible values"));
+        assert!(localized.contains("[SCOPE]"));
     }
 
     #[test]

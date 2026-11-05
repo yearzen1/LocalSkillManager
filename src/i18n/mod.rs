@@ -30,6 +30,7 @@ keys!(
     HelpCommands,
     HelpOptions,
     HelpArguments,
+    HelpPossibleValues,
     HelpMoreInfo,
     HelpFlagHelp,
     VersionFlagHelp,

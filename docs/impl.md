@@ -385,3 +385,10 @@ pub struct Ctx {
 - [x] 批量执行时错误块之间、汇总行与批次总错误之间各空一行。
 - [x] 两份 README、`impl/cli.md`、`impl/storage.md`、`impl/quality.md` 与 `docs/Requirements.md` 同步。
 
+### 8.6 v0.6.1 help 汉化补全（已实现）
+
+- [x] `--lang zh` 下 `[possible values: global, project]` 显示为 `[可选值: global, project]`（`add`/`list`/`search` 的 `<SCOPE>` 与 `config get/set` 的 `<KEY>`）。
+- [x] `ConfigKeyLangHelp` 由「输出语言」改为「配置键：lang」/「Configuration key: lang」。
+- [x] `src/cli/help.rs` 单测与 `tests/cli.rs` 端到端用例覆盖；英文输出不变。
+- [x] `impl/cli.md`、`impl/config.md` 同步。
+

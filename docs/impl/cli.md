@@ -42,7 +42,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 ### 1.3 help 与参数错误
 
 - clap 用 builder API 构建，`about`、子命令 `about`、参数 `help`、`--lang` 说明全部按当前语言注入。
-- clap 自带的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）与结尾提示，在渲染后按语言替换为 `用法:`、`命令:`、`选项:`、`参数:` 等；自带的 `-h/--help` 与 `-V/--version` 说明同样是英文，因此改为自建参数注入本地化文案。
+- clap 自带的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）、受限取值的括号（`[possible values: …]`）与结尾提示，在渲染后按语言替换为 `用法:`、`命令:`、`选项:`、`参数:`、`[可选值: …]` 等；自带的 `-h/--help` 与 `-V/--version` 说明同样是英文，因此改为自建参数注入本地化文案。
 - 参数解析错误按 `clap::error::ErrorKind` 映射常用类型：缺参数、非法值、未知参数、多余参数、缺子命令、非法子命令，并带上 clap 记录的出错参数名；未覆盖的类型回退英文原文。
 - `DisplayHelp` / `DisplayVersion` 直接输出并退出 0。
 - 实测 help（v0.6.0，与 `cli/spec.rs` 一致）：

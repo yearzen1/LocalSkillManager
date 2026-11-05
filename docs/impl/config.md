@@ -206,7 +206,7 @@ lang = zh (saved to C:\Users\jiahui\AppData\Roaming\lsm\config.toml)
 | `ConfigAbout` | Manage persistent settings | 查看或修改持久化配置 |
 | `ConfigGetAbout` | Print a saved setting | 打印已保存的配置值 |
 | `ConfigSetAbout` | Save a setting | 保存配置值 |
-| `ConfigKeyLangHelp` | Output language | 输出语言 |
+| `ConfigKeyLangHelp` | Configuration key: lang | 配置键：lang |
 | `ConfigValueArg` | Language value: en or zh | 语言值：en 或 zh |
 | `ConfigSaved` | lang = {0} (saved to {1}) | lang = {0}（已保存到 {1}） |
 | `ConfigInvalidValue` | invalid language '{0}' | 非法语言 '{0}' |
