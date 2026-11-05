@@ -352,13 +352,13 @@ scope 可省略（Q51）：最后一个参数恰好是 `global` / `project` 时�
 ### 3.5 search
 
 ```
-lsm search <query> [<scope>] [--json]
+lsm search <query> [<scope>] [--name] [--description] [--json]
 ```
 
 1. scope 可省略，省略时为 `project`（Q51）；只搜一个作用域（Q45），取值仍由 `value_parser` 校验。
 2. query 去掉首尾空白后不得为空，空串退 2。
 3. 扫描对应 skills 目录（`infra::scan::scan_skills`），保留合法与非法项。
-4. 匹配规则：query 与 `name`、`description` 做大小写不敏感的子串匹配；非法项的 description 视为空串，只按目录名匹配。
+4. 匹配规则：query 与 `name`、`description` 做大小写不敏感的子串匹配；默认取两者并集，`--name` 只匹配名称，`--description` 只匹配描述，两个 flag 同时给出等价于默认（Q52）。非法项的 description 视为空串，因此 `--description` 下不会命中它们。
 5. 结果按 `name` 字典序排序；无匹配时文本模式输出 `No skills matched '<query>' in <scope>`，JSON 模式输出 `[]`，退出码均为 0。
 6. 文本与 JSON 排版完全复用 `list`（`output::list::render_text` / `render_json`），非法项照常标 `[invalid]`；`--json` 的 stdout 只有 JSON。
 7. 只读，不创建目录、不写盘。

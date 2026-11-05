@@ -112,6 +112,8 @@ $ lsm --lang zh --help
 | `add` | `--force` | — | 关闭 | 目标已存在时覆盖：备份 → 安装 → 删备份 |
 | `list` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
 | `search` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
+| `search` | `--name` | — | 关闭 | 只匹配 skill 名称 |
+| `search` | `--description` | — | 关闭 | 只匹配 skill 描述 |
 | `pull` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
 | `pull` | `--all` | — | 关闭 | 拉取全局全部 skill，与 `<NAME>...` 互斥 |
 | `push` | `--force` | — | 关闭 | 同 `pull` 的覆盖流程 |

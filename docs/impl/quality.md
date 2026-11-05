@@ -124,6 +124,13 @@ name 前缀解析（Q50）：
 79. `-a foo.md`、`-l`、`-r foo` → 均落到 project；`-g`/`-p` 仍覆盖默认。
 80. `add`/`list`/`search` 的 `--help` 显示 `[SCOPE]`；`remove` 的 `--help` 只显示 `<NAME>...`，scope 规则写在其帮助文案里；取值仍大小写敏感。
 
+`search` 字段过滤（Q52）：
+
+81. `search review --name` 命中名称含 `review` 的 skill，不命中仅描述含 `review` 的 skill。
+82. `search review --description` 反向命中；非法项（description 为空）不命中。
+83. `search review --name --description` 与不写 flag 的结果一致。
+84. `search review --name --json` 的过滤结果与文本模式一致。
+
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
 ### 1.3 手工验收（三平台）
