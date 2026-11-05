@@ -266,6 +266,8 @@ lsm pull <name>... [--force]
 lsm pull --all [--force]
 ```
 
+`<name>` 按 [§3.7](#37-name-前缀解析) 解析：精确优先，未命中再按唯一前缀。
+
 流程（单条）：
 
 1. **先校验 `name`**（不拼路径）：同一套 name 规则 + 拒绝 `/`、`\`、`.`、`..`。校验在 `cli::parse` 构造 `Action` 时执行，保证在命令逻辑之前失败，退出码 2：
@@ -319,6 +321,8 @@ lsm remove <name>... <global|project> [--force]
 lsm -r <name>... -g|-p [--force]
 ```
 
+`<name>` 按 [§3.7](#37-name-前缀解析) 解析：精确优先，未命中再按唯一前缀。
+
 流程（单条）：
 
 1. **先校验 `name`**：与 `pull` 同一套规则（含长度、保留名），不拼路径；失败退 2。
@@ -360,6 +364,8 @@ lsm push <name>... [--force]
 lsm push --all [--force]
 ```
 
+`<name>` 按 [§3.7](#37-name-前缀解析) 解析：精确优先，未命中再按唯一前缀。
+
 `push` 是 `pull` 的反向操作（Q46）：project（cwd）→ global。
 
 单条流程与 `pull` 对称：
@@ -382,6 +388,25 @@ lsm push --all [--force]
 多 name 与 `--all` 的语义完全复用 Q40 / Q44：全量预校验、去重、单条失败不中断、目标已存在无 `--force` 算跳过、结束打印成功/跳过/失败计数、任一失败退 1；`--all` 与 name 互斥；项目目录为空退 0 并提示没有可推送的 skill。
 
 `push` 不加短选项，也不参与归一化。
+
+### 3.7 name 前缀解析
+
+`pull` / `push` / `remove` 的 `<name>` 先按目录名精确匹配，未命中时再按前缀解析（Q50）。解析只发生在命令层：`cli::parse` 仍只做格式校验，非法格式（大写、`..`、`/`）依旧退 2。
+
+1. 目录名精确等于输入 → 精确命中，行为与 §3.3 / §3.4 / §3.6 完全一致。
+2. 否则扫描对应作用域的 skills 目录（`infra::scan::dir_names`，跳过隐藏项、非目录与非法目录名），按字典序取以输入为前缀的名字：
+   - 恰好 1 个 → 视为该全名继续执行，输出里显示全名（`pulled code-review -> ...`）。
+   - 多个 → 运行时错误，退 1：
+     ```
+     error: 'code' matches more than one skill in global: code-lint, code-review
+     hint: use a longer prefix, or run `lsm list global`
+     ```
+     单 name 时直接失败；多 name 时该条记为失败，其余照常执行。
+   - 0 个 → 沿用各命令的 not-found 错误（退 1），hint 不变。
+3. 解析结果在批量里重新去重：`pull code code-review` 只执行一次。
+4. 多 name 时收尾仍打印成功/跳过/失败计数并退 1（与 Q44 一致）。
+5. `--all` 分支不受影响。
+6. 只做前缀，不做子串；name 规则本就只允许小写，命中必然大小写一致。
 
 ## 4. 文件系统细节
 

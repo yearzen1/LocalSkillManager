@@ -97,6 +97,7 @@ $ lsm --lang zh --help
 | `upgrade` | `[--check] [--force]` | implemented |
 
 - `<SCOPE>`：`global` 或 `project`，大小写敏感。
+- `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1）。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`（非法格式退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
 - `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。
@@ -191,7 +192,7 @@ $ lsm --lang zh --help
 | 退出码 | 含义 | 例子 |
 |---|---|---|
 | 0 | 成功 | `list` 为空、`upgrade --check` 发现新版本、`upgrade` 已是最新 |
-| 1 | 运行时错误 | 文件不存在、frontmatter 非法、目标冲突、配置文件损坏、`upgrade` 网络/资产/校验/替换失败 |
+| 1 | 运行时错误 | 文件不存在、frontmatter 非法、目标冲突、name 前缀歧义、配置文件损坏、`upgrade` 网络/资产/校验/替换失败 |
 | 2 | 用法错误 | 参数缺失、`-g` 与 `-p` 互斥、非法 `--lang`、非法 `pull` name、非法 `config` 键/值、`upgrade` 未知参数、无子命令 |
 
 - 正常结果、显式 help、version 走 stdout；错误、warning、无子命令时的 help 走 stderr。

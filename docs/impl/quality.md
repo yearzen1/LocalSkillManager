@@ -12,6 +12,7 @@
 
 - `domain::lang`：`parse` 接受 `en`/`zh`/`en-US`/`zh-CN`，拒绝 `fr`、空串、大小写变体；拒绝时返回 `LangError`。
 - `domain::name`：合法（`a`、`a1`、`my-skill`）、非法（`My-Skill`、`-a`、`a--b`、`a_`、空串）、64/65 字符边界、Windows 保留名（`con`、`nul`、`com1`、`lpt9`）。
+- `domain::resolve`：精确优先于前缀（`a` 与 `ab` 并存时 `a` 仍精确命中）、唯一前缀命中、多命中按字典序返回候选、零命中。
 - `domain::meta`：description 空值、1024/1025 字符边界。
 - `domain::version`：接受 `v0.1.1`/`0.1.1`，拒绝 `v0.2`、`v0.2.0-rc.1`、`latest`、空串；三段数值比较；前导零按数值处理。
 - `domain::release`：资产选择命中/缺失/重复；压缩包不匹配；平台映射覆盖表内组合，未知 OS/arch 报错。
@@ -97,6 +98,16 @@ v0.4.0 新增（Q43–Q47）：
 62. `search --help` / `push --help` 双语输出到 stdout 且退出 0；未知参数退 2。
 63. `copy foo`、`copy --all` → 退出 2（未知子命令），不保留别名。
 64. `-c foo`、`--copy foo` → 退出 2（未知参数），`-c` 已随 `copy` 移除。
+
+name 前缀解析（Q50）：
+
+65. `pull code`（global 只有 `code-review`）→ 退出 0，项目内出现 `code-review`。
+66. `pull code`（global 有 `code-lint`、`code-review`）→ 退出 1，stderr 列出两个候选，项目目录无新增。
+67. `remove code project`（只有 `code-review`）→ 成功删除 `code-review`。
+68. `remove code project`（有 `code-lint`、`code-review`）→ 退出 1，两个目录都还在。
+69. `push code`（project 只有 `code-review`）→ 进入 global。
+70. `pull code missing` → 退出 1，`code-review` 已复制。
+71. `pull Code` / `pull ../evil` → 仍退 2，不产生任何目录。
 
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
