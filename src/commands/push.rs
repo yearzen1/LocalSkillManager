@@ -43,7 +43,7 @@ fn push_many(ctx: &Ctx, inputs: &[SkillName], force: bool) -> Result<(), AppErro
             Ok(_) => {}
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&error_output::render(&err, ctx.lang));
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
             }
         }
     }
@@ -66,7 +66,7 @@ fn push_many(ctx: &Ctx, inputs: &[SkillName], force: bool) -> Result<(), AppErro
             Ok(()) => pushed += 1,
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&error_output::render(&err, ctx.lang));
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
             }
         }
     }
@@ -80,6 +80,7 @@ fn push_many(ctx: &Ctx, inputs: &[SkillName], force: bool) -> Result<(), AppErro
     );
 
     if failed > 0 {
+        output::emit_gap();
         return Err(AppError::runtime(MsgKey::PushAllFailed)
             .with_args([failed.to_string()])
             .with_hint(MsgKey::PushAllFailedHint));
@@ -129,7 +130,7 @@ fn push_all(ctx: &Ctx, force: bool) -> Result<(), AppError> {
             Ok(()) => pushed += 1,
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&error_output::render(&err, ctx.lang));
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
             }
         }
     }
@@ -143,6 +144,7 @@ fn push_all(ctx: &Ctx, force: bool) -> Result<(), AppError> {
     );
 
     if failed > 0 {
+        output::emit_gap();
         return Err(AppError::runtime(MsgKey::PushAllFailed)
             .with_args([failed.to_string()])
             .with_hint(MsgKey::PushAllFailedHint));
@@ -155,7 +157,7 @@ fn report_invalid(ctx: &Ctx, entry: &SkillEntry) {
     let err = AppError::runtime(MsgKey::PushSourceInvalid)
         .with_args([entry.name.clone(), entry.error.clone().unwrap_or_default()])
         .with_hint(MsgKey::PushSourceInvalidHint);
-    output::emit_stderr(&error_output::render(&err, ctx.lang));
+    output::emit_stderr(&error_output::render_block(&err, ctx.lang));
 }
 
 /// `push` 的 not-found 错误；hint 指向 `list project`（Q47）。

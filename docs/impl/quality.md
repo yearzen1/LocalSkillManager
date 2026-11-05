@@ -109,6 +109,12 @@ name 前缀解析（Q50）：
 70. `pull code missing` → 退出 1，`code-review` 已复制。
 71. `pull Code` / `pull ../evil` → 仍退 2，不产生任何目录。
 
+批量输出排版：
+
+72. `pull missing-a missing-b` → 退出 1，stderr 两个错误块之间、汇总行与批次总错误之间各有一个空行；单 name `pull nope` 的 stderr 不以 `\n\n` 结尾。
+73. `pull --all` 遇两个非法 skill → 错误块之间与批次总错误前同样有空行。
+74. `remove missing-a missing-b project` → 两个错误块之间与批次总错误前同样有空行。
+
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
 ### 1.3 手工验收（三平台）

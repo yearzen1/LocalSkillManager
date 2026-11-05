@@ -196,6 +196,7 @@ $ lsm --lang zh --help
 | 2 | 用法错误 | 参数缺失、`-g` 与 `-p` 互斥、非法 `--lang`、非法 `pull` name、非法 `config` 键/值、`upgrade` 未知参数、无子命令 |
 
 - 正常结果、显式 help、version 走 stdout；错误、warning、无子命令时的 help 走 stderr。
+- 批量命令（多 name 的 `pull` / `push` / `remove` 与 `pull --all` / `push --all`）逐条打印错误体时，**相邻错误块之间空一行**；成功/跳过/失败计数行之后再空一行，最后才是批次总错误。单条错误输出不变（不加额外空行）。
 - `upgrade` 的成功/警告/错误同样全部来自消息表；具体文案、`--check` 不写盘的约束与替换规则见 [upgrade.md](upgrade.md)「输出与退出码」。
 - 显式 `--help` / `-h` / `--version` / `-V` → 退出码 0；无子命令 → 退出码 2。
 - 错误格式：

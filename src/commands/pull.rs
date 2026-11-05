@@ -42,7 +42,7 @@ fn pull_many(ctx: &Ctx, inputs: &[SkillName], force: bool) -> Result<(), AppErro
             Ok(_) => {}
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&error_output::render(&err, ctx.lang));
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
             }
         }
     }
@@ -65,7 +65,7 @@ fn pull_many(ctx: &Ctx, inputs: &[SkillName], force: bool) -> Result<(), AppErro
             Ok(()) => pulled += 1,
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&error_output::render(&err, ctx.lang));
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
             }
         }
     }
@@ -79,6 +79,7 @@ fn pull_many(ctx: &Ctx, inputs: &[SkillName], force: bool) -> Result<(), AppErro
     );
 
     if failed > 0 {
+        output::emit_gap();
         return Err(AppError::runtime(MsgKey::PullBatchFailed)
             .with_args([failed.to_string()])
             .with_hint(MsgKey::PullBatchFailedHint));
@@ -143,6 +144,7 @@ fn pull_all(ctx: &Ctx, force: bool) -> Result<(), AppError> {
     );
 
     if failed > 0 {
+        output::emit_gap();
         return Err(AppError::runtime(MsgKey::PullAllFailed)
             .with_args([failed.to_string()])
             .with_hint(MsgKey::PullAllFailedHint));
@@ -155,7 +157,7 @@ fn report_invalid(ctx: &Ctx, entry: &SkillEntry) {
     let err = AppError::runtime(MsgKey::PullSourceInvalid)
         .with_args([entry.name.clone(), entry.error.clone().unwrap_or_default()])
         .with_hint(MsgKey::PullSourceInvalidHint);
-    output::emit_stderr(&error_output::render(&err, ctx.lang));
+    output::emit_stderr(&error_output::render_block(&err, ctx.lang));
 }
 
 /// `pull` 的 not-found 错误；hint 指向 `search`（Q47）。

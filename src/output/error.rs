@@ -24,6 +24,13 @@ pub fn render(err: &AppError, lang: Lang) -> String {
 
     text
 }
+
+/// 批量场景：一条错误块再加一个空行，避免相邻错误粘在一起。
+pub fn render_block(err: &AppError, lang: Lang) -> String {
+    let mut text = render(err, lang);
+    text.push('\n');
+    text
+}
 #[cfg(test)]
 mod tests {
     use crate::error::AppError;
@@ -65,5 +72,16 @@ mod tests {
 
         assert_eq!(text.lines().count(), 1);
         assert!(!text.contains("hint:"));
+    }
+
+    #[test]
+    fn render_block_appends_a_blank_line() {
+        let err = AppError::runtime(MsgKey::FsSymlink).with_args(["/tmp/link"]);
+
+        assert_eq!(
+            render_block(&err, Lang::En),
+            "error: symbolic links are not supported: /tmp/link\n\n"
+        );
+        assert!(render_block(&err, Lang::Zh).ends_with("\n\n"));
     }
 }

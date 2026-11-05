@@ -32,6 +32,11 @@ pub fn warn(lang: Lang, msg: &Msg) {
     ));
 }
 
+/// 在批量错误块与收尾的总错误之间留一个空行。
+pub fn emit_gap() {
+    emit_stderr("\n");
+}
+
 /// 原样写 stdout（用于 `list --json` 与裸值）。
 pub fn emit_stdout(text: &str) {
     print!("{text}");

@@ -2176,3 +2176,88 @@ fn prefix_resolution_still_rejects_invalid_names() {
 
     assert!(!project.path().join(".agents/skills").exists());
 }
+
+// ---------- batch output spacing ----------
+
+#[test]
+fn pull_batch_separates_error_blocks_with_blank_lines() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+
+    let assert = lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "missing-a", "missing-b"])
+        .assert()
+        .code(1);
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+
+    assert!(
+        stderr.contains("\n\nerror: "),
+        "error blocks are not separated: {stderr}"
+    );
+    assert_eq!(
+        stderr.matches("\n\nerror: ").count(),
+        2,
+        "expected a gap between the blocks and before the batch error: {stderr}"
+    );
+}
+
+#[test]
+fn pull_all_separates_error_blocks_with_blank_lines() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    fs::create_dir_all(home.path().join("skills/broken-a")).unwrap();
+    fs::create_dir_all(home.path().join("skills/broken-b")).unwrap();
+
+    let assert = lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--all"])
+        .assert()
+        .code(1);
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+
+    assert_eq!(
+        stderr.matches("\n\nerror: ").count(),
+        2,
+        "expected a gap between the blocks and before the batch error: {stderr}"
+    );
+}
+
+#[test]
+fn remove_batch_separates_error_blocks_with_blank_lines() {
+    let project = TempDir::new().unwrap();
+
+    let assert = lsm()
+        .current_dir(project.path())
+        .args(["remove", "missing-a", "missing-b", "project"])
+        .assert()
+        .code(1);
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+
+    assert_eq!(
+        stderr.matches("\n\nerror: ").count(),
+        2,
+        "expected a gap between the blocks and before the batch error: {stderr}"
+    );
+}
+
+#[test]
+fn single_name_errors_have_no_trailing_blank_line() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+
+    let assert = lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "nope"])
+        .assert()
+        .code(1);
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+
+    assert!(
+        !stderr.ends_with("\n\n"),
+        "unexpected trailing blank line: {stderr}"
+    );
+}

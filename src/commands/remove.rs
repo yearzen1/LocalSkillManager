@@ -32,7 +32,7 @@ pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Resul
             Ok(_) => {}
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&crate::output::error::render(&err, ctx.lang));
+                output::emit_stderr(&crate::output::error::render_block(&err, ctx.lang));
             }
         }
     }
@@ -44,7 +44,7 @@ pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Resul
             Ok(()) => removed += 1,
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&crate::output::error::render(&err, ctx.lang));
+                output::emit_stderr(&crate::output::error::render_block(&err, ctx.lang));
             }
         }
     }
@@ -58,6 +58,7 @@ pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Resul
     );
 
     if failed > 0 {
+        output::emit_gap();
         return Err(AppError::runtime(MsgKey::RemoveBatchFailed)
             .with_args([failed.to_string()])
             .with_hint(MsgKey::RemoveBatchFailedHint));
