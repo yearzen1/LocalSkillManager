@@ -37,7 +37,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - 文案按语言拆到 `i18n/en.rs`、`i18n/zh.rs`，`mod.rs` 只做分发。
 - 所有 `error:` / `hint:` / 成功提示 / help 正文都从消息表取，禁止在业务代码里写死文案。
 - 中文前缀用 `错误:` / `提示:`，英文用 `error:` / `hint:`。
-- 版本号 `lsm 0.6.0`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
+- 版本号 `lsm 0.6.1`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
 
 ### 1.3 help 与参数错误
 
@@ -45,7 +45,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - clap 自带的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）、受限取值的括号（`[possible values: …]`）与结尾提示，在渲染后按语言替换为 `用法:`、`命令:`、`选项:`、`参数:`、`[可选值: …]` 等；自带的 `-h/--help` 与 `-V/--version` 说明同样是英文，因此改为自建参数注入本地化文案。
 - 参数解析错误按 `clap::error::ErrorKind` 映射常用类型：缺参数、非法值、未知参数、多余参数、缺子命令、非法子命令，并带上 clap 记录的出错参数名；未覆盖的类型回退英文原文。
 - `DisplayHelp` / `DisplayVersion` 直接输出并退出 0。
-- 实测 help（v0.6.0，与 `cli/spec.rs` 一致）：
+- 实测 help（v0.6.1，与 `cli/spec.rs` 一致）：
 
 ```
 $ lsm --lang zh --help
@@ -174,7 +174,7 @@ $ lsm --lang zh --help
 ### 2.4 无参数与帮助行为
 
 - `lsm --help` / `-h` / `lsm <command> --help`：本地化 help 输出到 **stdout**，退出码 0。
-- `lsm --version` / `-V`：输出 `lsm 0.6.0` 到 stdout，退出码 0。
+- `lsm --version` / `-V`：输出 `lsm 0.6.1` 到 stdout，退出码 0。
 - `lsm` 无子命令，或只有全局参数（如 `lsm --lang zh`）：本地化 help 输出到 **stderr**，退出码 2。
 - 嵌套子命令沿用同一规则：`lsm config` 无子命令 → help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
 - `lsm upgrade --help` 与 `lsm upgrade --check --help` 同样走 stdout、退出码 0，且不联网、不写盘。
