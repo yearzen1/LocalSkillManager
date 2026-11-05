@@ -163,8 +163,10 @@ pub enum FrontmatterError {
 ### 3.1 add
 
 ```
-lsm add <source> <scope> [--force]
+lsm add <source> [<scope>] [--force]
 ```
+
+`scope` 可省略，省略时为 `project`（Q51）。
 
 流程：
 
@@ -208,8 +210,10 @@ lsm add <source> <scope> [--force]
 ### 3.2 list
 
 ```
-lsm list <scope> [--json]
+lsm list [<scope>] [--json]
 ```
+
+`scope` 可省略，省略时为 `project`（Q51）。
 
 流程：
 
@@ -317,11 +321,13 @@ pull 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）�
 ### 3.4 remove
 
 ```
-lsm remove <name>... <global|project> [--force]
-lsm -r <name>... -g|-p [--force]
+lsm remove <name>... [<global|project>] [--force]
+lsm -r <name>... [-g|-p] [--force]
 ```
 
 `<name>` 按 [§3.7](#37-name-前缀解析) 解析：精确优先，未命中再按唯一前缀。
+
+scope 可省略（Q51）：最后一个参数恰好是 `global` / `project` 时按作用域处理，否则全部按 name、作用域默认 `project`。因此 `lsm remove global` 是「缺 name」的用法错误（退 2）；要卸载名为 `global` 的技能，写 `lsm remove global project`。
 
 流程（单条）：
 
@@ -346,10 +352,10 @@ lsm -r <name>... -g|-p [--force]
 ### 3.5 search
 
 ```
-lsm search <query> <scope> [--json]
+lsm search <query> [<scope>] [--json]
 ```
 
-1. scope 必填，只搜一个作用域（Q45）；`scopes` 仍由 `value_parser` 校验。
+1. scope 可省略，省略时为 `project`（Q51）；只搜一个作用域（Q45），取值仍由 `value_parser` 校验。
 2. query 去掉首尾空白后不得为空，空串退 2。
 3. 扫描对应 skills 目录（`infra::scan::scan_skills`），保留合法与非法项。
 4. 匹配规则：query 与 `name`、`description` 做大小写不敏感的子串匹配；非法项的 description 视为空串，只按目录名匹配。

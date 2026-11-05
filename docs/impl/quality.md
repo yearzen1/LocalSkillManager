@@ -22,7 +22,7 @@
 - `infra::net`：本地桩覆盖 200、302、404、403、非 JSON、超时；请求头含 `User-Agent: lsm/<version>`；`LSM_UPGRADE_API` 空串回落到默认端点。
 - `cli::lang`：`prescan` 支持 `--lang zh`/`--lang=zh`/多处取最后一个；`decide` 三态决策表（`Cli` 优先 → `Env` 次之 → `NeedFile`），非法值返回 `LangError`，前两档命中时永不返回 `NeedFile`。
 - `infra::config`：读写往返；注释与未知键保留；缺文件 → `None`；坏 TOML → `Parse`；`lang = "fr"` → `InvalidValue`；同值写入仍成功；写入失败不破坏旧文件。
-- `cli::normalize`：短选项映射、缺作用域、互斥、混用形式；`config` 子命令不被归一化改写。
+- `cli::normalize`：短选项映射、省略作用域时补 `project`、互斥、混用形式；`config` 子命令不被归一化改写。
 - `error::mapping`：每个窄错误枚举都能转成 `AppError`，`kind` 正确且带预期 `MsgKey`/hint。
 - `output::error`：`error:`/`hint:` 与 `错误:`/`提示:` 两套前缀、hint 省略时不输出空行、`--json` 场景由调用方控制 stdout。
 - `infra::fsops`：`contains_path` 对 `..`、符号链接、目标不存在等场景的判断；`replace_self` 原地替换成功、权限位保留、备份清理、回滚时旧文件仍可执行。
@@ -114,6 +114,15 @@ name 前缀解析（Q50）：
 72. `pull missing-a missing-b` → 退出 1，stderr 两个错误块之间、汇总行与批次总错误之间各有一个空行；单 name `pull nope` 的 stderr 不以 `\n\n` 结尾。
 73. `pull --all` 遇两个非法 skill → 错误块之间与批次总错误前同样有空行。
 74. `remove missing-a missing-b project` → 两个错误块之间与批次总错误前同样有空行。
+
+作用域默认 `project`（Q51）：
+
+75. `add foo.md`（无 scope）→ 安装到 `<cwd>/.agents/skills/foo`。
+76. `list`（无 scope）→ 列出 project；`search foo`（无 scope）→ 只搜 project。
+77. `remove foo`（无 scope）→ 删除 project 里的 `foo`；`remove foo global` → 只删 global。
+78. `remove global`（无 name）→ 退出 2，hint 提示写 `lsm remove <name> <scope>`；`remove global project` 可删除名为 `global` 的 project skill。
+79. `-a foo.md`、`-l`、`-r foo` → 均落到 project；`-g`/`-p` 仍覆盖默认。
+80. `add`/`list`/`search`/`remove` 的 `--help` 显示 `[SCOPE]`，取值仍大小写敏感。
 
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 

@@ -86,17 +86,17 @@ $ lsm --lang zh --help
 
 | 命令 | 参数 | 状态 |
 |---|---|---|
-| `add` | `<SOURCE> <SCOPE> [--force]` | implemented |
-| `list` | `<SCOPE> [--json]` | implemented |
-| `search` | `<QUERY> <SCOPE> [--json]` | implemented |
+| `add` | `<SOURCE> [<SCOPE>]` | implemented |
+| `list` | `[<SCOPE>]` | implemented |
+| `search` | `<QUERY> [<SCOPE>]` | implemented |
 | `pull` | `<NAME>... 或 --all [--force]` | implemented |
 | `push` | `<NAME>... 或 --all [--force]` | implemented |
-| `remove` | `<NAME>... <SCOPE> [--force]` | implemented |
+| `remove` | `<NAME>... [<SCOPE>] [--force]` | implemented |
 | `config get` | `lang` | implemented |
 | `config set` | `lang <LANG>` | implemented |
 | `upgrade` | `[--check] [--force]` | implemented |
 
-- `<SCOPE>`：`global` 或 `project`，大小写敏感。
+- `<SCOPE>`：`global` 或 `project`，大小写敏感；**可省略，省略时为 `project`**。`remove` 的最后一个参数恰好是 `global` / `project` 时按作用域处理，否则全部按 name（作用域默认 `project`）；技能名本身是 `global` / `project` 时必须显式写作用域（如 `lsm remove global project`）。
 - `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1）。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`（非法格式退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
@@ -133,24 +133,26 @@ $ lsm --lang zh --help
 |---|---|
 | `lsm -a foo.md -g` | `lsm add foo.md global` |
 | `lsm -a foo.md -p` | `lsm add foo.md project` |
+| `lsm -a foo.md` | `lsm add foo.md project` |
 | `lsm -a dir -g --force` | `lsm add dir global --force` |
 | `lsm -l -g` | `lsm list global` |
 | `lsm -l -p` | `lsm list project` |
+| `lsm -l` | `lsm list project` |
 | `lsm -l -g --json` | `lsm list global --json` |
 | `lsm -r foo -p` | `lsm remove foo project` |
+| `lsm -r foo` | `lsm remove foo project` |
 | `lsm -r a b -p` | `lsm remove a b project` |
 | `lsm --add foo.md --global` | `lsm add foo.md global` |
 
 归一化规则：
 
 1. 识别动作标志 `-a/--add`、`-l/--list`、`-r/--remove`（`-a`/`-r` 吞掉下一个参数）。
-2. 识别作用域标志 `-g/--global`、`-p/--project`，转换为位置参数。
+2. 识别作用域标志 `-g/--global`、`-p/--project`，转换为位置参数；**没有作用域标志时补 `project`**。
 3. 未出现任何动作标志时原样交给 clap，走完整版语法。
 4. 以下情况直接报用法错误（退出码 2），并打印两种正确写法：
    - `-g` 与 `-p` 同时出现；
    - 多个动作标志同时出现；
    - `-a` / `-r` 缺少参数；
-   - `add` / `list` 缺少作用域；
    - 混用形式（如 `lsm add foo.md -g`）。
 5. `-h`、`-V` 不参与归一化，交给 clap。
 6. `config` 子命令不参与短选项归一化，永远原样交给 clap。
@@ -159,7 +161,7 @@ $ lsm --lang zh --help
 ### 2.3 clap 结构
 
 - 直接用 builder API 构建 `clap::Command`，所有 about / 参数说明 / `--lang` 说明都从消息表按语言注入（`cli/spec.rs::build(lang)`）。
-- 作用域参数用 `value_parser(["global", "project"])` 限定合法值，大小写敏感，错误时由 clap 报用法错误。
+- 作用域参数用 `value_parser(["global", "project"])` 限定合法值，大小写敏感，错误时由 clap 报用法错误。`add`/`list`/`search` 省略时由 clap 填 `project`；`remove` 的 scope 可省略，由 `cli::parse` 按「末尾 scope 词优先」判定。
 - `config` 子命令的 `get`/`set` 是嵌套子命令，键用 `value_parser(["lang"])`（v1 只有 `lang`），未知键由 clap 报用法错误。
 - `upgrade` 只有两个布尔 flag：`--check`、`--force`，不带位置参数；行为与文案见 [upgrade.md](upgrade.md)。
 - clap 自带的 `-h` / `-V` 说明是英文，因此根命令与各子命令都 `disable_help_flag(true)` 后自建 `-h/--help`，根命令另外自建 `-V/--version`，说明文案来自消息表。
@@ -193,7 +195,7 @@ $ lsm --lang zh --help
 |---|---|---|
 | 0 | 成功 | `list` 为空、`upgrade --check` 发现新版本、`upgrade` 已是最新 |
 | 1 | 运行时错误 | 文件不存在、frontmatter 非法、目标冲突、name 前缀歧义、配置文件损坏、`upgrade` 网络/资产/校验/替换失败 |
-| 2 | 用法错误 | 参数缺失、`-g` 与 `-p` 互斥、非法 `--lang`、非法 `pull` name、非法 `config` 键/值、`upgrade` 未知参数、无子命令 |
+| 2 | 用法错误 | 参数缺失、`-g` 与 `-p` 互斥、非法 `--lang`、非法 `pull` name、`remove` 只给了 `global`/`project` 而没有 name、非法 `config` 键/值、`upgrade` 未知参数、无子命令 |
 
 - 正常结果、显式 help、version 走 stdout；错误、warning、无子命令时的 help 走 stderr。
 - 批量命令（多 name 的 `pull` / `push` / `remove` 与 `pull --all` / `push --all`）逐条打印错误体时，**相邻错误块之间空一行**；成功/跳过/失败计数行之后再空一行，最后才是批次总错误。单条错误输出不变（不加额外空行）。

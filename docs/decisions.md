@@ -55,6 +55,7 @@
 | Q48 | `copy` 改名为 `pull` | v0.5.0 起 `lsm pull <name>...` / `pull --all` 取代 `copy`；**不保留 `copy` 别名**，**移除 `-c/--copy` 短选项**（`-p` 仍表示 project，`pull` 不加短选项）；不做 “已改名” 特殊拦截，`copy` / `-c` 按未知子命令 / 未知参数退 2；breaking change 按 0.5.0 发布，迁移说明置顶 release notes |
 | Q49 | `list` 条目之间空行 | 文本表格在**相邻条目之间插入一个空行**，折叠换行后的 description 不会和下一个条目的 name 粘在一起；表头与第一条之间、最后一条之后都不加空行，stdout 仍以单个换行收尾；空列表与单条输出完全不变；`search` 复用同一渲染器，因此同步生效；JSON 输出不受影响 |
 | Q50 | name 前缀解析 | `pull`/`push`/`remove` 的 `<name>` 按「精确优先 → 唯一前缀」解析：先找同名目录，未命中再扫对应作用域目录名取前缀命中；恰好 1 个按全名执行，≥2 个为运行时错误（退 1）并列出候选，0 个沿用 not-found（退 1）；只做前缀、不做子串，不自动执行 `search`（不推翻 Q47）；格式校验仍在 `cli::parse`（退 2），解析在命令层；多 name 时单条歧义/缺失按失败记账并继续（沿用 Q44）；`--all` 不受影响 |
+| Q51 | 作用域默认 `project` | `add`/`list`/`search`/`remove` 的 `<SCOPE>` 可省略，省略时为 `project`；`remove` 的最后一个参数恰好是 `global`/`project` 时按作用域处理，否则全部按 name（默认 `project`），技能名本身是 scope 词时必须显式写作用域；缩减版 `-a`/`-l`/`-r` 无 `-g`/`-p` 时同样补 `project`，`MissingScope` 用法错误与 `UsageMissingScope` 文案移除；`pull`/`push` 方向固定，不受影响 |
 
 ## 维护规则
 
