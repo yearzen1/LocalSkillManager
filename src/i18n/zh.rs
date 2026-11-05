@@ -65,6 +65,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::SearchQueryArg => "要匹配的名称或描述文本",
         MsgKey::SearchScopeArg => "搜索范围：global 或 project（默认 project）",
         MsgKey::SearchJsonFlag => "输出机器可读的 JSON",
+        MsgKey::SearchNameFlag => "只匹配 skill 名称",
+        MsgKey::SearchDescriptionFlag => "只匹配 skill 描述",
         MsgKey::SearchNoMatches => "在 {1} 中没有匹配 '{0}' 的 skill",
 
         MsgKey::PullAbout => "把全局 skill 拉取到当前项目",

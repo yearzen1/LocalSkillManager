@@ -83,6 +83,8 @@ keys!(
     SearchQueryArg,
     SearchScopeArg,
     SearchJsonFlag,
+    SearchNameFlag,
+    SearchDescriptionFlag,
     SearchNoMatches,
     // pull
     PullAbout,

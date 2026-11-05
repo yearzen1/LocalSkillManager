@@ -76,7 +76,7 @@ Limits are never truncated or auto-fixed: violating them is an error.
 ```
 lsm add <source> [<global|project>] [--force]
 lsm list [<global|project>] [--json]
-lsm search <query> [<global|project>] [--json]
+lsm search <query> [<global|project>] [--name] [--description] [--json]
 lsm pull <name>... [--force]
 lsm pull --all [--force]
 lsm push <name>... [--force]
@@ -138,6 +138,7 @@ my-skill     One-line description.
 ### search
 
 - `lsm search <query> [<global|project>]` matches `name` and `description` case-insensitively; only one scope is searched at a time and it defaults to `project`.
+- `--name` matches names only, `--description` matches descriptions only; with neither or with both, the union is searched. Invalid entries have an empty description, so `--description` never matches them.
 - Output reuses the `list` table (invalid entries keep the `[invalid]` marker) or the `list` JSON array with `--json`.
 - No matches is not an error: the command exits 0 and prints `No skills matched '<query>' in <scope>` (JSON: `[]`). An empty query exits 2.
 

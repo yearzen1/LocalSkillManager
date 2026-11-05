@@ -65,6 +65,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::SearchQueryArg => "Text to match against name and description",
         MsgKey::SearchScopeArg => "Where to search: global or project (default: project)",
         MsgKey::SearchJsonFlag => "Print machine-readable JSON",
+        MsgKey::SearchNameFlag => "Match skill names only",
+        MsgKey::SearchDescriptionFlag => "Match descriptions only",
         MsgKey::SearchNoMatches => "No skills matched '{0}' in {1}",
 
         MsgKey::PullAbout => "Pull global skills into the current project",

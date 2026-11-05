@@ -76,7 +76,7 @@ description: 审查 diff 的正确性与风格。
 ```
 lsm add <source> [<global|project>] [--force]
 lsm list [<global|project>] [--json]
-lsm search <query> [<global|project>] [--json]
+lsm search <query> [<global|project>] [--name] [--description] [--json]
 lsm pull <name>... [--force]
 lsm pull --all [--force]
 lsm push <name>... [--force]
@@ -138,6 +138,7 @@ my-skill     一句话说明。
 ### search
 
 - `lsm search <query> [<global|project>]` 对 `name` 与 `description` 做大小写不敏感的子串匹配；一次只搜一个作用域，省略时为 `project`。
+- `--name` 只匹配名称，`--description` 只匹配描述；都不写或都写时取两者并集。非法项的描述为空，因此 `--description` 不会命中它们。
 - 输出复用 `list` 表格（非法项仍标 `[invalid]`）；`--json` 复用 `list` 的 JSON 数组字段。
 - 无匹配不算失败：退出码 0，文本模式打印 `在 <scope> 中没有匹配 '<query>' 的 skill`（JSON 为 `[]`）。空查询退 2。
 

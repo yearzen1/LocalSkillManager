@@ -128,6 +128,18 @@ fn search_command(lang: Lang) -> Command {
                 .long("json")
                 .action(clap::ArgAction::SetTrue)
                 .help(tr(lang, MsgKey::SearchJsonFlag)),
+        )
+        .arg(
+            Arg::new("name")
+                .long("name")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::SearchNameFlag)),
+        )
+        .arg(
+            Arg::new("description")
+                .long("description")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::SearchDescriptionFlag)),
         );
 
     with_help_flag(command, lang)

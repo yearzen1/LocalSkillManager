@@ -22,6 +22,7 @@ pub enum Action {
     Search {
         query: String,
         scope: Scope,
+        field: SearchField,
         json: bool,
     },
     Pull {
@@ -49,6 +50,17 @@ pub enum Action {
 pub enum TransferTarget {
     Many(Vec<SkillName>),
     All,
+}
+
+/// `search` 的匹配字段（Q52）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchField {
+    /// name 与 description 取并集（默认，也覆盖两个 flag 同给）。
+    Both,
+    /// 只匹配 name。
+    Name,
+    /// 只匹配 description。
+    Description,
 }
 
 /// `config` 子命令。

@@ -24,7 +24,12 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
         } => add::run(ctx, source, scope, force),
         Action::Config(command) => config::run(ctx, command),
         Action::List { scope, json } => list::run(ctx, scope, json),
-        Action::Search { query, scope, json } => search::run(ctx, &query, scope, json),
+        Action::Search {
+            query,
+            scope,
+            field,
+            json,
+        } => search::run(ctx, &query, scope, field, json),
         Action::Pull { target, force } => pull::run(ctx, target, force),
         Action::Push { target, force } => push::run(ctx, target, force),
         Action::Remove {

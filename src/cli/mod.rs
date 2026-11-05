@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use clap::ArgMatches;
 
-use crate::domain::action::{Action, ConfigCommand, TransferTarget};
+use crate::domain::action::{Action, ConfigCommand, SearchField, TransferTarget};
 use crate::domain::config::ConfigKey;
 use crate::domain::lang::Lang;
 use crate::domain::name::SkillName;
@@ -98,6 +98,7 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
             Action::Search {
                 query,
                 scope: scope_of(&required(sub, "scope")),
+                field: search_field(sub),
                 json: sub.get_flag("json"),
             }
         }
@@ -244,6 +245,15 @@ fn scope_of(value: &str) -> Scope {
         Scope::Global
     } else {
         Scope::Project
+    }
+}
+
+/// `--name` / `--description` 同时给出等价于默认的「都匹配」（Q52）。
+fn search_field(matches: &ArgMatches) -> SearchField {
+    match (matches.get_flag("name"), matches.get_flag("description")) {
+        (true, false) => SearchField::Name,
+        (false, true) => SearchField::Description,
+        _ => SearchField::Both,
     }
 }
 
