@@ -53,9 +53,6 @@ impl From<NormalizeError> for AppError {
             NormalizeError::MultipleScopes => {
                 AppError::usage(MsgKey::UsageMultipleScopes).with_hint(MsgKey::UsageHintForms)
             }
-            NormalizeError::MissingScope { action } => {
-                AppError::usage(MsgKey::UsageMissingScope).with_args([action])
-            }
             NormalizeError::MixedForms => {
                 AppError::usage(MsgKey::UsageMixedForms).with_hint(MsgKey::UsageHintForms)
             }
@@ -119,11 +116,14 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
             }
         }
         "config" => Action::Config(parse_config(sub)?),
-        "remove" => Action::Remove {
-            scope: scope_of(&required(sub, "scope")),
-            names: skill_names(sub)?,
-            force: sub.get_flag("force"),
-        },
+        "remove" => {
+            let (names, scope) = remove_target(sub)?;
+            Action::Remove {
+                scope,
+                names,
+                force: sub.get_flag("force"),
+            }
+        }
         "upgrade" => Action::Upgrade {
             check: sub.get_flag("check"),
             force: sub.get_flag("force"),
@@ -164,6 +164,49 @@ fn skill_names(matches: &ArgMatches) -> Result<Vec<SkillName>, AppError> {
         }
     }
     Ok(names)
+}
+
+/// `remove` 的 scope 可省略：末尾恰好是 `global` / `project` 时当作用域（Q51）。
+fn remove_target(matches: &ArgMatches) -> Result<(Vec<SkillName>, Scope), AppError> {
+    let mut raw: Vec<String> = matches
+        .get_many::<String>("name")
+        .into_iter()
+        .flatten()
+        .cloned()
+        .collect();
+
+    let scope = match trailing_scope(&raw) {
+        Some(scope) => {
+            raw.pop();
+            scope
+        }
+        None => Scope::Project,
+    };
+
+    // `remove global` 会被读成「scope=global 但没有 name」：明确报用法错误。
+    if raw.is_empty() {
+        return Err(AppError::usage(MsgKey::UsageRemoveMissingName)
+            .with_hint(MsgKey::UsageRemoveMissingNameHint));
+    }
+
+    let mut names = Vec::new();
+    for value in &raw {
+        let name = SkillName::parse(value)?;
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+
+    Ok((names, scope))
+}
+
+/// 末尾的 scope 词：只有 `remove` 的变长 name 需要这个判定。
+fn trailing_scope(raw: &[String]) -> Option<Scope> {
+    match raw.last()?.as_str() {
+        "global" => Some(Scope::Global),
+        "project" => Some(Scope::Project),
+        _ => None,
+    }
 }
 
 fn parse_config(matches: &ArgMatches) -> Result<ConfigCommand, AppError> {

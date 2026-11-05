@@ -122,7 +122,7 @@ name 前缀解析（Q50）：
 77. `remove foo`（无 scope）→ 删除 project 里的 `foo`；`remove foo global` → 只删 global。
 78. `remove global`（无 name）→ 退出 2，hint 提示写 `lsm remove <name> <scope>`；`remove global project` 可删除名为 `global` 的 project skill。
 79. `-a foo.md`、`-l`、`-r foo` → 均落到 project；`-g`/`-p` 仍覆盖默认。
-80. `add`/`list`/`search`/`remove` 的 `--help` 显示 `[SCOPE]`，取值仍大小写敏感。
+80. `add`/`list`/`search` 的 `--help` 显示 `[SCOPE]`；`remove` 的 `--help` 只显示 `<NAME>...`，scope 规则写在其帮助文案里；取值仍大小写敏感。
 
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 

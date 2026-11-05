@@ -27,7 +27,10 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UsageMultipleActions => "only one of -a/-l/-c may be used",
         MsgKey::UsageMissingActionValue => "'{0}' requires a value",
         MsgKey::UsageMultipleScopes => "-g and -p cannot be combined",
-        MsgKey::UsageMissingScope => "'{0}' requires -g or -p",
+        MsgKey::UsageRemoveMissingName => "remove needs at least one skill name",
+        MsgKey::UsageRemoveMissingNameHint => {
+            "to remove a skill named 'global' or 'project', write `lsm remove <name> <scope>`"
+        }
         MsgKey::UsagePullTargetMissing => "{0} needs a skill name or --all",
         MsgKey::UsagePullTargetConflict => "{0} takes either a skill name or --all, not both",
         MsgKey::UsageEmptyQuery => "search needs a non-empty query",
@@ -43,7 +46,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::AddAbout => "Install a skill into global or project",
         MsgKey::AddSourceArg => "Path to a skill directory or a .md file",
-        MsgKey::AddScopeArg => "Where to install: global or project",
+        MsgKey::AddScopeArg => "Where to install: global or project (default: project)",
         MsgKey::AddForceFlag => "Overwrite an existing skill",
         MsgKey::AddInstalled => "installed {0} -> {1}",
         MsgKey::AddNestedTarget => "destination is inside source directory",
@@ -52,7 +55,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::AddUnsupportedSource => "source must be a skill directory or a .md file: {0}",
 
         MsgKey::ListAbout => "List installed skills",
-        MsgKey::ListScopeArg => "Where to look: global or project",
+        MsgKey::ListScopeArg => "Where to look: global or project (default: project)",
         MsgKey::ListJsonFlag => "Print machine-readable JSON",
         MsgKey::ListEmpty => "No skills found in {0}",
         MsgKey::ListHeaderName => "NAME",
@@ -60,7 +63,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::SearchAbout => "Search installed skills by name or description",
         MsgKey::SearchQueryArg => "Text to match against name and description",
-        MsgKey::SearchScopeArg => "Where to search: global or project",
+        MsgKey::SearchScopeArg => "Where to search: global or project (default: project)",
         MsgKey::SearchJsonFlag => "Print machine-readable JSON",
         MsgKey::SearchNoMatches => "No skills matched '{0}' in {1}",
 
@@ -101,8 +104,9 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::PushSamePathHint => "run this command from a different directory",
 
         MsgKey::RemoveAbout => "Remove a skill from global or project",
-        MsgKey::RemoveNameArg => "Skill names to remove",
-        MsgKey::RemoveScopeArg => "Scope to remove from",
+        MsgKey::RemoveNameArg => {
+            "Skill names to remove, optionally followed by global or project (default: project)"
+        }
         MsgKey::RemoveForceFlag => "Remove even if the directory is not a valid skill",
         MsgKey::RemoveRemoved => "removed {0} -> {1}",
         MsgKey::RemoveNotFound => "skill '{0}' not found in {1}",

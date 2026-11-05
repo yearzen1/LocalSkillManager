@@ -74,14 +74,14 @@ description: 审查 diff 的正确性与风格。
 ## 命令参考
 
 ```
-lsm add <source> <global|project> [--force]
-lsm list <global|project> [--json]
-lsm search <query> <global|project> [--json]
+lsm add <source> [<global|project>] [--force]
+lsm list [<global|project>] [--json]
+lsm search <query> [<global|project>] [--json]
 lsm pull <name>... [--force]
 lsm pull --all [--force]
 lsm push <name>... [--force]
 lsm push --all [--force]
-lsm remove <name>... <global|project> [--force]
+lsm remove <name>... [<global|project>] [--force]
 lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
@@ -96,10 +96,15 @@ lsm --lang <en|zh> <command> ...
 |---|---|
 | `lsm -a foo.md -g` | `lsm add foo.md global` |
 | `lsm -a foo.md -p` | `lsm add foo.md project` |
+| `lsm -a foo.md` | `lsm add foo.md project` |
 | `lsm -l -g` | `lsm list global` |
 | `lsm -l -p --json` | `lsm list project --json` |
+| `lsm -l` | `lsm list project` |
 | `lsm -r foo -p` | `lsm remove foo project` |
+| `lsm -r foo` | `lsm remove foo project` |
 | `lsm -r a b -p` | `lsm remove a b project` |
+
+`add`、`list`、`search`、`remove` 的 `<global|project>` 均可省略，省略时为 `project`；缩减版不写 `-g`/`-p` 也是同样效果。
 
 `-g` 与 `-p` 不能同时使用、不能与 `pull` 一起用，也不能与完整子命令写法混用。`search` 与 `push` 没有短选项。`pull` 也没有短选项：`-p` 始终表示 `project`，`-c` 已在 0.5.0 移除。
 
@@ -107,7 +112,7 @@ lsm --lang <en|zh> <command> ...
 
 ### add
 
-- 接受 `.md` 文件或 skill 目录。目录源**不做任何排除**：隐藏文件、`scripts/`、`assets/`、`.git` 全部复制。
+- 接受 `.md` 文件或 skill 目录。作用域可省略，省略时为 `project`；要装到全局需显式写 `global`。目录源**不做任何排除**：隐藏文件、`scripts/`、`assets/`、`.git` 全部复制。
 - 目录源包含 `.git` 时照常完整复制，并向 stderr 打印 `警告: 源目录包含 .git 目录，将被完整复制`。
 - 安装是原子的：内容先构建到 `.tmp-<name>-<pid>`，带 `--force` 时旧目录移到 `.bak-<name>-<pid>`，再整体换位；任一步失败都会回滚且不残留。
 - 目标位于源目录内部（例如 `lsm add . project`）时直接报错，不会递归复制。
@@ -132,7 +137,7 @@ my-skill     一句话说明。
 
 ### search
 
-- `lsm search <query> <global|project>` 对 `name` 与 `description` 做大小写不敏感的子串匹配；scope 必填，一次只搜一个作用域。
+- `lsm search <query> [<global|project>]` 对 `name` 与 `description` 做大小写不敏感的子串匹配；一次只搜一个作用域，省略时为 `project`。
 - 输出复用 `list` 表格（非法项仍标 `[invalid]`）；`--json` 复用 `list` 的 JSON 数组字段。
 - 无匹配不算失败：退出码 0，文本模式打印 `在 <scope> 中没有匹配 '<query>' 的 skill`（JSON 为 `[]`）。空查询退 2。
 
@@ -154,7 +159,8 @@ my-skill     一句话说明。
 
 ### remove
 
-- `lsm remove <name>... <global|project>` 卸载一个或多个 skill。无 `--force` 时只删合法 skill 目录（存在 `SKILL.md` 且其 `name` 与目录名一致），其余必须显式加 `--force`。
+- `lsm remove <name>... [<global|project>]` 卸载一个或多个 skill，作用域省略时为 `project`。无 `--force` 时只删合法 skill 目录（存在 `SKILL.md` 且其 `name` 与目录名一致），其余必须显式加 `--force`。
+- 末尾的 `global` / `project` 会当作作用域：`lsm remove foo global` 删全局副本，`lsm remove foo` 删项目副本。要卸载本身就叫 `global` / `project` 的技能，请写全作用域，例如 `lsm remove global project`。
 - 删除是原子的：先把目标 rename 到同级 `.tmp-remove-*`，再递归删除；rename 失败时原目录保持完整。
 - 多个 name 时先全部校验，再逐条删除；单条失败不中断，结束打印 `成功 N 个，失败 M 个`。任一失败退 1。
 - 目标不存在退出码 1，hint 指向 `lsm search`；`name` 在拼任何路径之前完成校验，`..` 与保留设备名以退出码 2 失败。

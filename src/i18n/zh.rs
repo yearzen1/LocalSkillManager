@@ -27,7 +27,10 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UsageMultipleActions => "只能使用 -a/-l/-c 中的一个",
         MsgKey::UsageMissingActionValue => "'{0}' 需要一个值",
         MsgKey::UsageMultipleScopes => "-g 与 -p 不能同时使用",
-        MsgKey::UsageMissingScope => "'{0}' 需要配合 -g 或 -p",
+        MsgKey::UsageRemoveMissingName => "remove 至少需要一个 skill 名称",
+        MsgKey::UsageRemoveMissingNameHint => {
+            "要卸载名为 global 或 project 的技能，请写 `lsm remove <名称> <作用域>`"
+        }
         MsgKey::UsagePullTargetMissing => "{0} 需要 skill 名称或 --all",
         MsgKey::UsagePullTargetConflict => "{0} 只能在 skill 名称与 --all 之间二选一",
         MsgKey::UsageEmptyQuery => "search 的查询内容不能为空",
@@ -43,7 +46,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::AddAbout => "安装 skill 到 global 或 project",
         MsgKey::AddSourceArg => "skill 目录或 .md 文件路径",
-        MsgKey::AddScopeArg => "安装位置：global 或 project",
+        MsgKey::AddScopeArg => "安装位置：global 或 project（默认 project）",
         MsgKey::AddForceFlag => "覆盖已存在的 skill",
         MsgKey::AddInstalled => "已安装 {0} -> {1}",
         MsgKey::AddNestedTarget => "目标目录位于源目录内部",
@@ -52,7 +55,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::AddUnsupportedSource => "源必须是 skill 目录或 .md 文件：{0}",
 
         MsgKey::ListAbout => "列出已安装的 skill",
-        MsgKey::ListScopeArg => "查找位置：global 或 project",
+        MsgKey::ListScopeArg => "查找位置：global 或 project（默认 project）",
         MsgKey::ListJsonFlag => "输出机器可读的 JSON",
         MsgKey::ListEmpty => "{0} 中没有找到任何 skill",
         MsgKey::ListHeaderName => "名称",
@@ -60,7 +63,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
 
         MsgKey::SearchAbout => "按名称或描述搜索已安装的 skill",
         MsgKey::SearchQueryArg => "要匹配的名称或描述文本",
-        MsgKey::SearchScopeArg => "搜索范围：global 或 project",
+        MsgKey::SearchScopeArg => "搜索范围：global 或 project（默认 project）",
         MsgKey::SearchJsonFlag => "输出机器可读的 JSON",
         MsgKey::SearchNoMatches => "在 {1} 中没有匹配 '{0}' 的 skill",
 
@@ -101,8 +104,9 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::PushSamePathHint => "请在其它目录下运行该命令",
 
         MsgKey::RemoveAbout => "从 global 或 project 卸载 skill",
-        MsgKey::RemoveNameArg => "要卸载的 skill 名称",
-        MsgKey::RemoveScopeArg => "从哪个作用域卸载",
+        MsgKey::RemoveNameArg => {
+            "要卸载的 skill 名称，可在最后写 global 或 project（默认 project）"
+        }
         MsgKey::RemoveForceFlag => "即使不是合法 skill 目录也删除",
         MsgKey::RemoveRemoved => "已卸载 {0} -> {1}",
         MsgKey::RemoveNotFound => "在 {1} 中找不到 skill '{0}'",

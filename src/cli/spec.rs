@@ -66,9 +66,11 @@ fn add_command(lang: Lang) -> Command {
         )
         .arg(
             Arg::new("scope")
-                .required(true)
+                .required(false)
                 .value_name("SCOPE")
                 .value_parser(SCOPE_VALUES)
+                .default_value("project")
+                .hide_default_value(true)
                 .help(tr(lang, MsgKey::AddScopeArg)),
         )
         .arg(
@@ -86,9 +88,11 @@ fn list_command(lang: Lang) -> Command {
         .about(tr(lang, MsgKey::ListAbout))
         .arg(
             Arg::new("scope")
-                .required(true)
+                .required(false)
                 .value_name("SCOPE")
                 .value_parser(SCOPE_VALUES)
+                .default_value("project")
+                .hide_default_value(true)
                 .help(tr(lang, MsgKey::ListScopeArg)),
         )
         .arg(
@@ -112,9 +116,11 @@ fn search_command(lang: Lang) -> Command {
         )
         .arg(
             Arg::new("scope")
-                .required(true)
+                .required(false)
                 .value_name("SCOPE")
                 .value_parser(SCOPE_VALUES)
+                .default_value("project")
+                .hide_default_value(true)
                 .help(tr(lang, MsgKey::SearchScopeArg)),
         )
         .arg(
@@ -178,6 +184,8 @@ fn push_command(lang: Lang) -> Command {
 }
 
 fn remove_command(lang: Lang) -> Command {
+    // clap 不允许变长位置参数之后再跟可选位置参数，因此 scope 不在这里声明：
+    // 它由 `cli::parse` 从 name 末尾识别（Q51），规则写进 NAME 的帮助文案。
     let command = Command::new("remove")
         .about(tr(lang, MsgKey::RemoveAbout))
         .arg(
@@ -186,13 +194,6 @@ fn remove_command(lang: Lang) -> Command {
                 .num_args(1..)
                 .value_name("NAME")
                 .help(tr(lang, MsgKey::RemoveNameArg)),
-        )
-        .arg(
-            Arg::new("scope")
-                .required(true)
-                .value_name("SCOPE")
-                .value_parser(SCOPE_VALUES)
-                .help(tr(lang, MsgKey::RemoveScopeArg)),
         )
         .arg(
             Arg::new("force")

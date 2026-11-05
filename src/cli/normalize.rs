@@ -11,8 +11,6 @@ pub enum NormalizeError {
     MissingActionValue { flag: &'static str },
     /// `-g` 与 `-p` 同时出现。
     MultipleScopes,
-    /// `add` / `list` / `remove` 缺少作用域。
-    MissingScope { action: &'static str },
     /// 短选项与完整子命令混用。
     MixedForms,
 }
@@ -85,23 +83,20 @@ pub fn normalize(argv: Vec<OsString>) -> Result<Vec<OsString>, NormalizeError> {
     };
 
     if scopes.is_empty() {
-        return Err(NormalizeError::MissingScope { action });
+        // 省略作用域时默认 project（Q51）。
+        scopes.push("project");
     }
 
     let mut normalized = vec![OsString::from(action)];
     if let Some(value) = value {
         normalized.push(value);
     }
-    // `remove <name>... <scope>`：scope 必须留在最后一个位置参数。
+    // `remove <name>... [<scope>]`：scope 必须留在最后一个位置参数。
     if action == "remove" {
         normalized.extend(passthrough);
-        if let Some(scope) = scopes.first() {
-            normalized.push(OsString::from(*scope));
-        }
+        normalized.push(OsString::from(scopes[0]));
     } else {
-        if let Some(scope) = scopes.first() {
-            normalized.push(OsString::from(*scope));
-        }
+        normalized.push(OsString::from(scopes[0]));
         normalized.extend(passthrough);
     }
 

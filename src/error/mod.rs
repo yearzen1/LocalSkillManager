@@ -104,7 +104,10 @@ mod tests {
 
     #[test]
     fn usage_errors_exit_two_and_runtime_errors_exit_one() {
-        assert_eq!(AppError::usage(MsgKey::UsageMissingScope).exit_code(), 2);
+        assert_eq!(
+            AppError::usage(MsgKey::UsageMissingSubcommand).exit_code(),
+            2
+        );
         assert_eq!(AppError::runtime(MsgKey::FsSymlink).exit_code(), 1);
     }
 

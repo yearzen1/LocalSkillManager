@@ -161,7 +161,8 @@ $ lsm --lang zh --help
 ### 2.3 clap 结构
 
 - 直接用 builder API 构建 `clap::Command`，所有 about / 参数说明 / `--lang` 说明都从消息表按语言注入（`cli/spec.rs::build(lang)`）。
-- 作用域参数用 `value_parser(["global", "project"])` 限定合法值，大小写敏感，错误时由 clap 报用法错误。`add`/`list`/`search` 省略时由 clap 填 `project`；`remove` 的 scope 可省略，由 `cli::parse` 按「末尾 scope 词优先」判定。
+- 作用域参数用 `value_parser(["global", "project"])` 限定合法值，大小写敏感，错误时由 clap 报用法错误。`add`/`list`/`search` 省略时由 clap 填 `project`。
+- clap 不允许「变长位置参数之后跟可选位置参数」，因此 `remove` 的 scope 不在 clap 层声明，由 `cli::parse` 从 name 末尾识别（末尾是 `global`/`project` 就当作用域，否则默认 `project`）。`lsm remove --help` 的 usage 只显示 `<NAME>...`，scope 规则写在 `NAME` 的帮助文案里。
 - `config` 子命令的 `get`/`set` 是嵌套子命令，键用 `value_parser(["lang"])`（v1 只有 `lang`），未知键由 clap 报用法错误。
 - `upgrade` 只有两个布尔 flag：`--check`、`--force`，不带位置参数；行为与文案见 [upgrade.md](upgrade.md)。
 - clap 自带的 `-h` / `-V` 说明是英文，因此根命令与各子命令都 `disable_help_flag(true)` 后自建 `-h/--help`，根命令另外自建 `-V/--version`，说明文案来自消息表。

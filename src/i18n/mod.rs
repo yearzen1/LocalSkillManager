@@ -47,7 +47,8 @@ keys!(
     UsageMultipleActions,
     UsageMissingActionValue,
     UsageMultipleScopes,
-    UsageMissingScope,
+    UsageRemoveMissingName,
+    UsageRemoveMissingNameHint,
     UsagePullTargetMissing,
     UsagePullTargetConflict,
     UsageEmptyQuery,
@@ -122,7 +123,6 @@ keys!(
     // remove
     RemoveAbout,
     RemoveNameArg,
-    RemoveScopeArg,
     RemoveForceFlag,
     RemoveRemoved,
     RemoveNotFound,

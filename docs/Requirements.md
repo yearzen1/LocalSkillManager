@@ -15,13 +15,15 @@ skill的目录还要所有agent都直接直接使用。
 
 ### 完整版
 ```plaintext
-1. lsm add <xxx>.md global
-2. lsm add <xxx>.md project
-3. lsm list global
-4. lsm list project
+1. lsm add <xxx>.md [global|project]
+2. lsm list [global|project]
+3. lsm search <query> [global|project]
+4. lsm remove <name>... [global|project]
 5. lsm pull <xxx>
 6. lsm upgrade [--check] [--force]
 ```
+
+`[global|project]` 可省略，省略时为 `project`。
 
 ### 缩减版
 ```plaintext
@@ -29,6 +31,9 @@ skill的目录还要所有agent都直接直接使用。
 2.-g = global
 3.-p = project
 4.-l = list
+5.-r = remove
 ```
+
+不写 `-g`/`-p` 时默认 `project`。
 
 `upgrade` 没有短选项，只能写完整子命令。`pull` 也没有短选项：`-p` 始终表示 `project`。

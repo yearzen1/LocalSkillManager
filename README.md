@@ -74,14 +74,14 @@ Limits are never truncated or auto-fixed: violating them is an error.
 ## Command reference
 
 ```
-lsm add <source> <global|project> [--force]
-lsm list <global|project> [--json]
-lsm search <query> <global|project> [--json]
+lsm add <source> [<global|project>] [--force]
+lsm list [<global|project>] [--json]
+lsm search <query> [<global|project>] [--json]
 lsm pull <name>... [--force]
 lsm pull --all [--force]
 lsm push <name>... [--force]
 lsm push --all [--force]
-lsm remove <name>... <global|project> [--force]
+lsm remove <name>... [<global|project>] [--force]
 lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
@@ -96,10 +96,15 @@ Short forms (separate arguments only — `-lg` is not supported):
 |---|---|
 | `lsm -a foo.md -g` | `lsm add foo.md global` |
 | `lsm -a foo.md -p` | `lsm add foo.md project` |
+| `lsm -a foo.md` | `lsm add foo.md project` |
 | `lsm -l -g` | `lsm list global` |
 | `lsm -l -p --json` | `lsm list project --json` |
+| `lsm -l` | `lsm list project` |
 | `lsm -r foo -p` | `lsm remove foo project` |
+| `lsm -r foo` | `lsm remove foo project` |
 | `lsm -r a b -p` | `lsm remove a b project` |
+
+`<global|project>` is optional and defaults to `project` for `add`, `list`, `search` and `remove`; omitting `-g`/`-p` does the same for the short forms.
 
 `-g`/`-p` may not be combined, may not be used with `pull`, and may not be mixed with the long subcommand form. `search` and `push` have no short forms. `pull` has no short form either: `-p` always means `project`, and `-c` was removed in 0.5.0.
 
@@ -107,7 +112,7 @@ Short forms (separate arguments only — `-lg` is not supported):
 
 ### add
 
-- Accepts a `.md` file or a skill directory. Directory sources are copied **without any exclusions** — hidden files, `scripts/`, `assets/` and `.git` are all copied.
+- Accepts a `.md` file or a skill directory. The scope is optional and defaults to `project`; pass `global` explicitly to install globally. Directory sources are copied **without any exclusions** — hidden files, `scripts/`, `assets/` and `.git` are all copied.
 - A directory source containing `.git` is copied in full and prints `warning: source contains .git directory, it will be copied` on stderr.
 - Installations are atomic: content is built in `.tmp-<name>-<pid>`, the previous directory (with `--force`) is moved to `.bak-<name>-<pid>`, then renamed into place. Failures roll back and leave nothing behind.
 - If the destination is inside the source directory (e.g. `lsm add . project`), the command fails instead of copying recursively.
@@ -132,7 +137,7 @@ my-skill     One-line description.
 
 ### search
 
-- `lsm search <query> <global|project>` matches `name` and `description` case-insensitively; `scope` is required and only one scope is searched at a time.
+- `lsm search <query> [<global|project>]` matches `name` and `description` case-insensitively; only one scope is searched at a time and it defaults to `project`.
 - Output reuses the `list` table (invalid entries keep the `[invalid]` marker) or the `list` JSON array with `--json`.
 - No matches is not an error: the command exits 0 and prints `No skills matched '<query>' in <scope>` (JSON: `[]`). An empty query exits 2.
 
@@ -154,7 +159,8 @@ my-skill     One-line description.
 
 ### remove
 
-- `lsm remove <name>... <global|project>` uninstalls one or more skills. Without `--force` only a valid skill directory is deleted (`SKILL.md` present and its `name` matching the directory); anything else needs `--force`.
+- `lsm remove <name>... [<global|project>]` uninstalls one or more skills; the scope defaults to `project`. Without `--force` only a valid skill directory is deleted (`SKILL.md` present and its `name` matching the directory); anything else needs `--force`.
+- A trailing `global` or `project` is read as the scope, so `lsm remove foo global` removes the global copy and `lsm remove foo` removes the project one. To remove a skill that is itself named `global` or `project`, spell the scope out: `lsm remove global project`.
 - Deletion is atomic: the target is renamed to a sibling `.tmp-remove-*` first, then removed. If the rename fails, the original directory stays intact.
 - With several names, all names are validated first, then each is removed; failures do not stop the batch and a final line reports `removed N, failed M`. Any failure exits 1.
 - A missing target exits with code 1 and the hint points at `lsm search`; `name` is validated before any path is built, so `..` and reserved device names exit with code 2.

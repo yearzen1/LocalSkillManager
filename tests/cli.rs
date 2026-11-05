@@ -2320,7 +2320,10 @@ fn remove_trailing_scope_word_selects_that_scope() {
         .success();
 
     assert!(!home.path().join("skills/alpha").exists());
-    assert!(project.path().join(".agents/skills/alpha/SKILL.md").exists());
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
 }
 
 #[test]
