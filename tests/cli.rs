@@ -1057,15 +1057,6 @@ fn remove_refuses_non_skill_dir_unless_forced() {
 }
 
 #[test]
-fn remove_requires_scope() {
-    lsm()
-        .args(["remove", "foo"])
-        .assert()
-        .code(2)
-        .stderr(predicate::str::contains("SCOPE").or(predicate::str::contains("scope")));
-}
-
-#[test]
 fn remove_rejects_path_traversal() {
     lsm()
         .args(["remove", "..", "project"])
@@ -1725,18 +1716,12 @@ fn search_without_matches_exits_zero() {
 }
 
 #[test]
-fn search_rejects_empty_query_and_missing_scope() {
+fn search_rejects_empty_query() {
     lsm()
         .args(["search", "", "global"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("non-empty query"));
-
-    lsm()
-        .args(["search", "foo"])
-        .assert()
-        .code(2)
-        .stderr(predicate::str::contains("SCOPE"));
 }
 
 // ---------- v0.4.0: push ----------
@@ -2260,4 +2245,136 @@ fn single_name_errors_have_no_trailing_blank_line() {
         !stderr.ends_with("\n\n"),
         "unexpected trailing blank line: {stderr}"
     );
+}
+
+// ---------- Q51: scope defaults to project ----------
+
+#[test]
+fn add_without_scope_installs_into_project() {
+    let project = TempDir::new().unwrap();
+    let work = TempDir::new().unwrap();
+    let source = work.path().join("foo.md");
+    write_skill_md(&source, "foo", "F.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["add", source.to_str().unwrap()])
+        .assert()
+        .success();
+
+    assert!(project.path().join(".agents/skills/foo/SKILL.md").exists());
+}
+
+#[test]
+fn list_without_scope_lists_project() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "alpha", "A.");
+
+    lsm()
+        .current_dir(project.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("alpha"));
+}
+
+#[test]
+fn search_without_scope_searches_project() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "alpha", "Alpha description.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["search", "alpha"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("alpha"));
+}
+
+#[test]
+fn remove_without_scope_removes_from_project() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "alpha", "A.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "alpha"])
+        .assert()
+        .success();
+
+    assert!(!project.path().join(".agents/skills/alpha").exists());
+}
+
+#[test]
+fn remove_trailing_scope_word_selects_that_scope() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "Global version.");
+    install_project(&project, "alpha", "Project version.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["remove", "alpha", "global"])
+        .assert()
+        .success();
+
+    assert!(!home.path().join("skills/alpha").exists());
+    assert!(project.path().join(".agents/skills/alpha/SKILL.md").exists());
+}
+
+#[test]
+fn remove_scope_word_without_a_name_is_a_usage_error() {
+    lsm()
+        .args(["remove", "global"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("needs at least one skill name"))
+        .stderr(predicate::str::contains("lsm remove <name> <scope>"));
+}
+
+#[test]
+fn remove_can_target_a_skill_named_like_a_scope_word() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "global", "Named global.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "global", "project"])
+        .assert()
+        .success();
+
+    assert!(!project.path().join(".agents/skills/global").exists());
+}
+
+#[test]
+fn short_flags_default_to_project() {
+    let project = TempDir::new().unwrap();
+    let work = TempDir::new().unwrap();
+    let source = work.path().join("via-flag.md");
+    write_skill_md(&source, "via-flag", "F.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["-a", source.to_str().unwrap()])
+        .assert()
+        .success();
+    assert!(project
+        .path()
+        .join(".agents/skills/via-flag/SKILL.md")
+        .exists());
+
+    lsm()
+        .current_dir(project.path())
+        .arg("-l")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("via-flag"));
+
+    lsm()
+        .current_dir(project.path())
+        .args(["-r", "via-flag"])
+        .assert()
+        .success();
+    assert!(!project.path().join(".agents/skills/via-flag").exists());
 }

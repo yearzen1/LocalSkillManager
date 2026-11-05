@@ -190,18 +190,21 @@ mod tests {
     }
 
     #[test]
-    fn rejects_missing_scope() {
+    fn defaults_scope_to_project() {
         assert_eq!(
-            run(&["-a", "foo.md"]).unwrap_err(),
-            NormalizeError::MissingScope { action: "add" }
+            run(&["-a", "foo.md"]).unwrap(),
+            ["add", "foo.md", "project"]
         );
+        assert_eq!(run(&["-l"]).unwrap(), ["list", "project"]);
+        assert_eq!(run(&["-r", "foo"]).unwrap(), ["remove", "foo", "project"]);
         assert_eq!(
-            run(&["-l"]).unwrap_err(),
-            NormalizeError::MissingScope { action: "list" }
+            run(&["-r", "a", "b"]).unwrap(),
+            ["remove", "a", "b", "project"]
         );
+        // 显式作用域仍然覆盖默认值。
         assert_eq!(
-            run(&["-r", "foo"]).unwrap_err(),
-            NormalizeError::MissingScope { action: "remove" }
+            run(&["-a", "foo.md", "-g"]).unwrap(),
+            ["add", "foo.md", "global"]
         );
     }
 
