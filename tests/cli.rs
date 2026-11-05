@@ -2381,3 +2381,100 @@ fn short_flags_default_to_project() {
         .success();
     assert!(!project.path().join(".agents/skills/via-flag").exists());
 }
+
+// ---------- Q52: search field filters ----------
+
+#[test]
+fn search_name_flag_only_matches_names() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "review-helper", "Unrelated.");
+    install_project(&project, "other", "review appears in the description.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["search", "review", "--name"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("review-helper"))
+        .stdout(predicate::str::contains("other").not());
+}
+
+#[test]
+fn search_description_flag_only_matches_descriptions() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "review-helper", "Unrelated.");
+    install_project(&project, "other", "review appears in the description.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["search", "review", "--description"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("other"))
+        .stdout(predicate::str::contains("review-helper").not());
+}
+
+#[test]
+fn search_both_flags_are_the_same_as_the_default() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "review-helper", "Unrelated.");
+    install_project(&project, "other", "review appears in the description.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["search", "review", "--name", "--description"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("review-helper"))
+        .stdout(predicate::str::contains("other"));
+}
+
+#[test]
+fn search_description_flag_skips_invalid_entries() {
+    let project = TempDir::new().unwrap();
+    fs::create_dir_all(project.path().join(".agents/skills/broken")).unwrap();
+
+    lsm()
+        .current_dir(project.path())
+        .args(["search", "broken", "--description", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_match(r"^\[\]\s*$").unwrap());
+
+    lsm()
+        .current_dir(project.path())
+        .args(["search", "broken", "--name", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("broken"));
+}
+
+#[test]
+fn search_field_filters_apply_to_json() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "review-helper", "Unrelated.");
+    install_project(&project, "other", "review appears in the description.");
+
+    let output = lsm()
+        .current_dir(project.path())
+        .args(["search", "review", "--name", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+
+    assert_eq!(value.as_array().unwrap().len(), 1);
+    assert_eq!(value[0]["name"], "review-helper");
+}
+
+#[test]
+fn search_help_lists_field_filters() {
+    lsm()
+        .args(["search", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--name"))
+        .stdout(predicate::str::contains("--description"));
+}
