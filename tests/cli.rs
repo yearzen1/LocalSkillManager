@@ -2026,3 +2026,153 @@ fn search_and_push_help_exit_zero_and_unknown_flags_exit_two() {
         .code(2);
     lsm().args(["push", "name", "--bogus"]).assert().code(2);
 }
+
+// ---------- Q50: unique name prefix resolution ----------
+
+#[test]
+fn pull_resolves_unique_prefix() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "code-review", "Reviews a diff.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "code"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled code-review"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/code-review/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn pull_rejects_ambiguous_prefix() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "code-lint", "Lints.");
+    install_global(&home, "code-review", "Reviews.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "code"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("code-lint"))
+        .stderr(predicate::str::contains("code-review"))
+        .stderr(predicate::str::contains("longer prefix"));
+
+    assert!(!project.path().join(".agents/skills/code-lint").exists());
+    assert!(!project.path().join(".agents/skills/code-review").exists());
+}
+
+#[test]
+fn exact_name_wins_over_prefix() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "a", "Short name.");
+    install_global(&home, "ab", "Longer name.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "a"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled a"));
+
+    assert!(project.path().join(".agents/skills/a/SKILL.md").exists());
+    assert!(!project.path().join(".agents/skills/ab").exists());
+}
+
+#[test]
+fn push_resolves_unique_prefix() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_project(&project, "code-review", "Reviews.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["push", "code"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pushed code-review"));
+
+    assert!(home.path().join("skills/code-review/SKILL.md").exists());
+}
+
+#[test]
+fn remove_resolves_unique_prefix() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "code-review", "Reviews.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "code", "project"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("removed code-review"));
+
+    assert!(!project.path().join(".agents/skills/code-review").exists());
+}
+
+#[test]
+fn remove_rejects_ambiguous_prefix() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "code-lint", "Lints.");
+    install_project(&project, "code-review", "Reviews.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "code", "project"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("code-lint"))
+        .stderr(predicate::str::contains("code-review"));
+
+    assert!(project.path().join(".agents/skills/code-lint").exists());
+    assert!(project.path().join(".agents/skills/code-review").exists());
+}
+
+#[test]
+fn pull_batch_resolves_prefix_and_keeps_going() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "code-review", "Reviews.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "code", "missing"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("pulled 1, skipped 0, failed 1"))
+        .stderr(predicate::str::contains("not found in global"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/code-review/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn prefix_resolution_still_rejects_invalid_names() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "code-review", "Reviews.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "Code"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid skill name"));
+
+    assert!(!project.path().join(".agents/skills").exists());
+}
