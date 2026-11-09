@@ -16,7 +16,7 @@
 | [impl/quality.md](impl/quality.md) | 测试计划、README、许可证、发布 | 测试与交付 |
 | [impl/upgrade.md](impl/upgrade.md) | 自更新：命令、版本比较、下载校验、原地替换 | 实现或排查 upgrade |
 | [release.md](release.md) | Release 资产命名、tag 约定、发布与改名流程 | 发布与改资产名 |
-| [decisions.md](decisions.md) | Q1–Q42 决策记录 | 查决策依据 |
+| [decisions.md](decisions.md) | Q1–Q52 决策记录 | 查决策依据 |
 | [Requirements.md](Requirements.md) | 原始需求 | 对齐范围 |
 
 推荐阅读顺序：本文 → `storage.md` → `cli.md` → `config.md` → `quality.md` → `upgrade.md`。决策有疑问时查 `decisions.md`。
@@ -35,7 +35,7 @@
 6. `upgrade`：从 GitHub Releases 取最新版本并原地替换 lsm 自身二进制，**不改变 exe 的路径与文件名**。
 7. `remove`（v0.2.0）：卸载指定作用域下由 `add` 安装的 skill，支持多个 name，未加 `--force` 时只删合法的 skill 目录。
 
-非目标（v0.4.0 不做）：
+非目标（当前不做）：
 
 - 不做日志功能（文件日志 / 调试开关 / 审计）。
 - 不在 not-found 时自动执行 `search`，只改 hint（Q47）。
@@ -90,6 +90,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml_ng = "0.10"
 toml_edit = "0.22"
+unicode-width = { version = "0.2", default-features = false }  # list 表格的显示宽度
 ureq = "3"              # upgrade：下载 release（默认 rustls 后端）
 
 [dev-dependencies]
@@ -137,16 +138,18 @@ LocalSkillManager/
 │   │   ├── config.rs      # ConfigKey 枚举
 │   │   ├── version.rs     # Version：升级用的版本解析与比较
 │   │   ├── release.rs     # Release / Asset / 平台资产名选择
+│   │   ├── resolve.rs     # name 精确优先、唯一前缀解析（Q50）
 │   │   ├── action.rs      # Action：Add / List / Search / Pull / Push / Remove / Upgrade / Config
 │   │   └── entry.rs       # SkillEntry：list 展示数据
 │   ├── infra/             # 所有文件系统与环境访问
 │   │   ├── mod.rs
-│   │   ├── env.rs         # 环境快照：LSM_HOME / LSM_CONFIG_DIR / LSM_LANG / LSM_UPGRADE_API / current_exe
+│   │   ├── env.rs         # 环境快照：LSM_HOME / LSM_CONFIG_DIR / LSM_LANG / LSM_UPGRADE_API / CARGO_HOME
 │   │   ├── paths.rs       # 纯函数：skills_dir(&Env, ...)、config_file(&Env)
 │   │   ├── config.rs      # config.toml 读写与校验
 │   │   ├── frontmatter.rs # 解析 SKILL.md
 │   │   ├── fsops.rs       # 递归复制、原子安装、覆盖、自包含检测、原地替换自身
 │   │   ├── net.rs         # 取最新 release、下载资产（唯一网络访问点）
+│   │   ├── process.rs     # 当前可执行文件与升级冒烟校验的子进程调用
 │   │   └── scan.rs        # 扫描 skills 目录，产出 SkillEntry
 │   ├── cli/
 │   │   ├── mod.rs         # parse(ctx, argv) -> Action
@@ -163,14 +166,17 @@ LocalSkillManager/
 │       ├── add.rs
 │       ├── list.rs
 │       ├── search.rs    # 按 name / description 搜索
-│       ├── pull.rs      # global → project
-│       ├── push.rs      # project → global
+│       ├── transfer.rs  # pull / push 共用的方向性复制与批处理
+│       ├── pull.rs      # global → project（薄包装）
+│       ├── push.rs      # project → global（薄包装）
+│       ├── resolve.rs   # name 解析结果 → 结构化错误
 │       ├── remove.rs
 │       ├── upgrade.rs   # 自更新编排：查询 → 校验 → 替换 → 输出
 │       └── config.rs
 └── tests/
     ├── cli.rs
-    └── config.rs
+    ├── config.rs
+    └── upgrade.rs
 ```
 
 ### 4.1 模块职责
@@ -178,28 +184,31 @@ LocalSkillManager/
 | 模块 | 职责 | 关键接口 |
 |---|---|---|
 | `domain::lang` | 语言枚举与归一化（唯一归一处） | `Lang::{En, Zh}`、`Lang::parse(&str) -> Result<Lang, LangError>` |
-| `domain::name` | name 格式、长度、Windows 保留名 | `SkillName::parse(&str) -> Result<Self, NameError>` |
+| `domain::name` | name 格式、长度、Windows 保留名 | `SkillName::parse(&str) -> Result<Self, NameError>`、`SkillName::is_valid(&str) -> bool` |
 | `domain::meta` | `name` / `description` 字段校验 | `SkillMeta::validate() -> Result<(), MetaError>` |
 | `domain::scope` | 作用域枚举 | `Scope::{Global, Project}` |
 | `domain::config` | 配置键枚举 | `ConfigKey::Lang` |
 | `domain::version` | 升级版本解析与比较 | `Version::parse(&str)`、`Ord` |
-| `domain::release` | release 元数据与平台资产名 | `Release::select_asset(Platform)`、`Platform::current()` |
+| `domain::release` | release 元数据与平台资产名 | `asset_name(os, arch)`、`Release::parse_metadata`、`Release::asset` |
+| `domain::resolve` | name 精确优先、唯一前缀解析 | `resolve(&SkillName, &[String]) -> Resolution` |
 | `domain::action` | 解析后的用户意图 | `Action::{Add, List, Search, Pull, Push, Remove, Upgrade, Config}` |
 | `domain::entry` | list 的展示数据 | `SkillEntry`（name/description/path/valid/error） |
-| `infra::env` | 进程环境快照（唯一读环境点） | `Env::read() -> Env`、`Env::{home, config_dir, lang, upgrade_api, exe}` |
+| `infra::env` | 进程环境快照（唯一读环境点） | `Env::read() -> Env`、`Env::{home, config_dir, lang, upgrade_api, cargo_bin_dir}` |
 | `infra::paths` | 纯函数路径解析 | `skills_dir(&Env, Scope, &Path) -> Result<PathBuf, PathError>`、`config_file(&Env) -> Result<PathBuf, PathError>` |
 | `infra::config` | 读写并校验 `config.toml` | `load() -> Result<Option<Lang>, ConfigError>`、`set_lang(Lang)` |
 | `infra::frontmatter` | 读取并解析 SKILL.md | `parse_skill_md(&Path) -> Result<SkillMeta, FrontmatterError>` |
 | `infra::fsops` | 复制、原子安装、覆盖、自包含、原地替换自身 | `install_skill_dir/file`、`contains_path`、`replace_self`（错误为 `FsError`） |
-| `infra::net` | 取 release 元数据、下载资产（唯一网络点） | `fetch_latest_release(&str) -> Result<Release, NetError>`、`download(&str, &Path)` |
-| `infra::scan` | 扫描目录、标记非法项 | `scan_skills(&Path) -> Result<Vec<SkillEntry>, FsError>` |
+| `infra::net` | 取 release 元数据、下载资产（唯一网络点） | `fetch_latest_release(Option<&str>, Version)`、`download_asset(&str, &Path)` |
+| `infra::process` | 当前 exe 与冒烟校验子进程 | `current_exe() -> Result<PathBuf, ProcessError>`、`version_output(&Path)` |
+| `infra::scan` | 扫描目录、标记非法项 | `scan_skills(&Path) -> Result<Vec<SkillEntry>, FsError>`、`dir_names(&Path)` |
 | `cli::lang` | `--lang` 预扫描 + 语言决策表 | `prescan(&[OsString]) -> Option<String>`、`decide(cli, env) -> Decision` |
-| `cli::normalize` | `-a/-l/-c/-g/-p` 归一化 | `normalize(Vec<OsString>) -> Result<Vec<OsString>, NormalizeError>` |
+| `cli::normalize` | `-a/-l/-r/-g/-p` 归一化 | `normalize(Vec<OsString>) -> Result<Vec<OsString>, NormalizeError>` |
 | `cli::spec` / `help` | 双语 CLI 与 help | `build(Lang) -> Command`、`localize(&str, Lang) -> String` |
 | `error::mapping` | 各层错误 → `AppError` | `impl From<NameError/MetaError/...> for AppError` |
 | `output::error` | 错误体渲染 | `render(&AppError, Lang) -> String` |
 | `output::list` | 文本表格 / JSON | `render_text`、`render_json` |
 | `commands::*` | 业务流程编排 | `dispatch(&Ctx, Action) -> Result<(), AppError>` |
+| `commands::transfer` | `pull` / `push` 共用复制流程 | `run(&Ctx, &TransferSpec, TransferTarget, force)`、`PULL` / `PUSH` |
 
 ### 4.2 依赖方向
 
@@ -248,8 +257,8 @@ pub struct Ctx {
 - **add**：`cli` → `Action::Add` → `paths::skills_dir(&ctx.env, ...)` → `frontmatter::parse_skill_md` → `meta::validate` → `fsops::install_skill_*` → `output`。
 - **list**：`cli` → `Action::List` → `paths::skills_dir` → `scan::scan_skills` → `output::list`（text/json）。
 - **search**：`cli` → `Action::Search` → `paths::skills_dir` → `scan::scan_skills` → 过滤匹配 → `output::list`（text/json）。
-- **pull**：`cli`（name 已由 value_parser 校验）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`；多 name 逐条执行并汇总。
-- **push**：与 pull 对称，源为 project、目标为 global。
+- **pull**：`cli`（name 已由 `SkillName::parse` 校验）→ `Action::Pull` → `commands::transfer`（`PULL`：global → project）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`；多 name 逐条执行并汇总。
+- **push**：`Action::Push` → `commands::transfer`（`PUSH`：project → global），批处理与错误排版与 `pull` 完全共用。
 - **remove**：`cli` → `Action::Remove` → `paths::skill_dir` → 可选合法性校验 → `fsops::remove_entry_atomically` → `output`；多 name 逐条执行并汇总。
 - **upgrade**：`cli` → `Action::Upgrade` → `env.exe` + 编译期版本 → `net::fetch_latest_release` → `release::select_asset` →（`--check` 到此结束）→ `net::download` → 冒烟校验 → `fsops::replace_self` → `output`。
 - **语言解析**：`lib::run` → `infra::env::read()` → `cli::lang::decide(--lang, env.lang)` →（`Decision::NeedFile` 时）`infra::config::load()` → `Lang` → `cli::spec::build(lang)`。
@@ -316,6 +325,8 @@ pub struct Ctx {
 | 18 | `commands::upgrade` + 集成用例 + 文档收尾 | `feat(upgrade): self-update from github releases` |
 
 > i18n 排在 CLI 之前而非 `domain` 之后：消息 key 由 help / 错误 / 警告文案决定，等 `MetaError`、`FrontmatterError`、`FsError`、`ConfigError` 都定型后再定稿，可避免消息表返工；各命令的成功/警告提示在对应命令切片内增量追加 key。
+>
+> 表中第 11 片的 `copy` 命名属于历史记录；v0.5.0 已按 Q48 改名为 `pull`，当前模块为 `commands::pull`（与 `push` 共用 `commands::transfer`）。
 >
 > 第 13 片是文档先行：规则、文案与验收标准先落地，第 14–18 片按红 → 绿实现，每片一个原子提交。
 

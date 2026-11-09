@@ -48,6 +48,13 @@ impl SkillName {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// 只校验、不构造 [`SkillName`]；目录扫描过滤时避免为丢弃的结果分配。
+    pub fn is_valid(input: &str) -> bool {
+        input.chars().count() <= MAX_NAME_LEN
+            && has_valid_format(input)
+            && !is_windows_reserved(input)
+    }
 }
 
 /// 小写字母/数字开头结尾，连字符必须单个且不落在首尾。
@@ -165,6 +172,30 @@ mod tests {
     fn accepts_names_that_merely_start_with_reserved_words() {
         for input in ["console", "nullable", "com10"] {
             assert!(SkillName::parse(input).is_ok());
+        }
+    }
+
+    #[test]
+    fn is_valid_matches_parse() {
+        let too_long = "a".repeat(MAX_NAME_LEN + 1);
+        let cases = [
+            "a",
+            "my-skill",
+            "My-Skill",
+            "a--b",
+            "",
+            "con",
+            "console",
+            "com10",
+            too_long.as_str(),
+        ];
+
+        for input in cases {
+            assert_eq!(
+                SkillName::is_valid(input),
+                SkillName::parse(input).is_ok(),
+                "{input:?}"
+            );
         }
     }
 }

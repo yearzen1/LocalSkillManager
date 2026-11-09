@@ -841,7 +841,28 @@ fn pull_rejects_source_name_mismatch() {
         .args(["pull", "dir-name"])
         .assert()
         .code(1)
-        .stderr(predicate::str::contains("name mismatch"));
+        .stderr(predicate::str::contains("does not match frontmatter name"));
+}
+
+#[test]
+fn pull_localizes_source_name_mismatch_detail() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    write_skill_md(
+        &home.path().join("skills/dir-name/SKILL.md"),
+        "other-name",
+        "Mismatch.",
+    );
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .env("LSM_LANG", "zh")
+        .current_dir(project.path())
+        .args(["pull", "dir-name"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("与 frontmatter 中的 name"))
+        .stderr(predicate::str::contains("不一致"));
 }
 
 #[test]
@@ -1054,6 +1075,23 @@ fn remove_refuses_non_skill_dir_unless_forced() {
         .assert()
         .success();
     assert!(!stray.exists());
+}
+
+#[test]
+fn remove_localizes_name_mismatch_detail() {
+    let project = TempDir::new().unwrap();
+    let target = project.path().join(".agents/skills/dir-name");
+    write_skill_md(&target.join("SKILL.md"), "other-name", "Mismatch.");
+
+    lsm()
+        .env("LSM_LANG", "zh")
+        .current_dir(project.path())
+        .args(["remove", "dir-name", "project"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("与 frontmatter 中的 name"))
+        .stderr(predicate::str::contains("不一致"));
+    assert!(target.exists());
 }
 
 #[test]
@@ -2207,6 +2245,37 @@ fn pull_all_separates_error_blocks_with_blank_lines() {
         stderr.matches("\n\nerror: ").count(),
         2,
         "expected a gap between the blocks and before the batch error: {stderr}"
+    );
+}
+
+#[test]
+fn pull_all_separates_transfer_errors_with_blank_lines() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    for name in ["alpha", "beta"] {
+        write_skill_md(
+            &home.path().join("skills").join(name).join("SKILL.md"),
+            name,
+            "Does one thing.",
+        );
+    }
+
+    // 目标是普通文件：两条 skill 都会在安装阶段失败，而不是被标成 invalid。
+    fs::create_dir_all(project.path().join(".agents")).unwrap();
+    fs::write(project.path().join(".agents/skills"), "not a directory").unwrap();
+
+    let assert = lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--all"])
+        .assert()
+        .code(1);
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+
+    assert_eq!(
+        stderr.matches("\n\nerror: ").count(),
+        2,
+        "expected a gap between the transfer errors and before the batch error: {stderr}"
     );
 }
 

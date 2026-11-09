@@ -195,7 +195,7 @@ lang = zh (saved to C:\Users\jiahui\AppData\Roaming\lsm\config.toml)
 - `lsm config --help` / `-h`：本地化 help 到 stdout，退出码 0。
 - `lsm config`（无子命令）：本地化 help 到 **stderr**，退出码 2（沿用 Q20）。
 - `lsm config get`（缺键）、`lsm config get scope`（v1 无此键）、`lsm config set lang fr`：用法错误 2，提示合法键只有 `lang`、合法值为 `en`/`zh`。
-- `config` 子命令不参与短选项归一化：`-a/-l/-c/-g/-p` 只映射 add/list/copy，其余原样交给 clap。
+- `config` 子命令不参与短选项归一化：`-a/-l/-r/-g/-p` 只映射 add/list/remove，其余原样交给 clap。
 
 ## 5. 消息键
 

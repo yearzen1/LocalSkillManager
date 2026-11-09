@@ -5,6 +5,7 @@ pub mod lang;
 pub mod normalize;
 pub mod spec;
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use clap::ArgMatches;
@@ -158,9 +159,10 @@ fn transfer_target(
 /// 读取全部 `name` 并校验；重复 name 去重，保留首次出现的顺序。
 fn skill_names(matches: &ArgMatches) -> Result<Vec<SkillName>, AppError> {
     let mut names = Vec::new();
+    let mut seen = HashSet::new();
     for raw in matches.get_many::<String>("name").into_iter().flatten() {
         let name = SkillName::parse(raw)?;
-        if !names.contains(&name) {
+        if seen.insert(name.clone()) {
             names.push(name);
         }
     }
@@ -191,9 +193,10 @@ fn remove_target(matches: &ArgMatches) -> Result<(Vec<SkillName>, Scope), AppErr
     }
 
     let mut names = Vec::new();
+    let mut seen = HashSet::new();
     for value in &raw {
         let name = SkillName::parse(value)?;
-        if !names.contains(&name) {
+        if seen.insert(name.clone()) {
             names.push(name);
         }
     }

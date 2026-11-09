@@ -25,7 +25,7 @@ lsm upgrade [--check] [--force]
   - latest < 当前：打印当前版本更新；`--force` 才安装（等于回滚到该 release）。
 - 升级只动当前可执行文件，**不读写 `.agents/skills`**，也不检查 skill 是否需要更新。
 - 不做自动检查、不做后台检查、不做启动时提示：只有显式执行 `upgrade` 才联网。
-- 不加短选项：`upgrade` 不参与 `cli::normalize` 的 `-a/-l/-c` 归一化，`lsm -u` 按未知参数退出 2。
+- 不加短选项：`upgrade` 不参与 `cli::normalize` 的 `-a/-l/-r` 归一化，`lsm -u` 按未知参数退出 2。
 
 ## 2. 版本与资产
 

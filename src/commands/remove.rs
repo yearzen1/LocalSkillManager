@@ -1,7 +1,9 @@
 //! `remove`：从指定作用域卸载 skill。
 
+use std::collections::HashSet;
 use std::path::Path;
 
+use crate::domain::lang::Lang;
 use crate::domain::name::SkillName;
 use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
@@ -9,6 +11,7 @@ use crate::i18n::MsgKey;
 use crate::infra::fsops;
 use crate::infra::{frontmatter, paths, scan};
 use crate::output;
+use crate::output::error as error_output;
 use crate::Ctx;
 
 use super::resolve::resolve_name;
@@ -23,16 +26,17 @@ pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Resul
     }
 
     let mut resolved: Vec<SkillName> = Vec::new();
+    let mut seen = HashSet::new();
     let mut failed = 0usize;
 
     // 先解析全部 name；歧义或缺失按该条失败记账，其余照常执行。
     for input in &names {
         match resolve_name(input, &available, scope, remove_not_found(input, scope)) {
-            Ok(name) if !resolved.contains(&name) => resolved.push(name),
+            Ok(name) if seen.insert(name.clone()) => resolved.push(name),
             Ok(_) => {}
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&crate::output::error::render_block(&err, ctx.lang));
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
             }
         }
     }
@@ -44,7 +48,7 @@ pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Resul
             Ok(()) => removed += 1,
             Err(err) => {
                 failed += 1;
-                output::emit_stderr(&crate::output::error::render_block(&err, ctx.lang));
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
             }
         }
     }
@@ -83,7 +87,7 @@ fn remove_one(ctx: &Ctx, scope: Scope, name: &SkillName, force: bool) -> Result<
     }
 
     if !force {
-        ensure_valid_skill(&target, name)?;
+        ensure_valid_skill(ctx.lang, &target, name)?;
     }
 
     let report = fsops::remove_entry_atomically(&target)?;
@@ -107,7 +111,7 @@ fn remove_one(ctx: &Ctx, scope: Scope, name: &SkillName, force: bool) -> Result<
 }
 
 /// 无 `--force` 时只认「目录名等于 name、SKILL.md 合法、frontmatter name 一致」的目录。
-fn ensure_valid_skill(target: &Path, name: &SkillName) -> Result<(), AppError> {
+fn ensure_valid_skill(lang: Lang, target: &Path, name: &SkillName) -> Result<(), AppError> {
     let meta = frontmatter::parse_skill_md(&target.join("SKILL.md")).map_err(|err| {
         AppError::runtime(MsgKey::RemoveNotSkill)
             .with_args([name.as_str().to_string(), frontmatter::describe(&err)])
@@ -115,7 +119,13 @@ fn ensure_valid_skill(target: &Path, name: &SkillName) -> Result<(), AppError> {
     })?;
 
     if meta.name != *name {
-        let detail = format!("name mismatch: {} vs {}", name.as_str(), meta.name.as_str());
+        let detail = output::line(
+            lang,
+            &Msg::with_args(
+                MsgKey::SkillDirMismatch,
+                [name.as_str(), meta.name.as_str()],
+            ),
+        );
         return Err(AppError::runtime(MsgKey::RemoveNotSkill)
             .with_args([name.as_str().to_string(), detail])
             .with_hint(MsgKey::RemoveNotSkillHint));

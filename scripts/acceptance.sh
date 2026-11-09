@@ -42,11 +42,11 @@ case "$(uname -s)" in
     ;;
 esac
 
-step="1/14 cargo test"
+step="1/18 cargo test"
 cargo test --quiet
 ok
 
-step="2/14 cargo build --release"
+step="2/18 cargo build --release"
 cargo build --release --quiet
 if [[ -x "$root/target/release/lsm.exe" ]]; then
   lsm="$root/target/release/lsm.exe"
@@ -62,29 +62,29 @@ export LSM_HOME="$(win "$tmp/agents")"
 export LSM_CONFIG_DIR="$(win "$tmp/config")"
 unset LSM_LANG LSM_UPGRADE_API
 
-step="3/14 add sample to global"
+step="3/18 add sample to global"
 "$lsm" add "$root/docs/sample.md" global >/dev/null
 [[ -f "$tmp/agents/skills/sample/SKILL.md" ]] \
   || fail "missing $tmp/agents/skills/sample/SKILL.md"
 ok
 
-step="4/14 list global"
+step="4/18 list global"
 out=$("$lsm" list global)
 [[ "$out" == *"sample"* ]] || fail "list global does not mention sample, got: $out"
 ok
 
-step="5/14 localized help"
+step="5/18 localized help"
 out=$("$lsm" --lang zh --help)
 [[ "$out" != *"Usage:"* ]] || fail "--lang zh --help is still English: $out"
 ok
 
-step="6/14 persist language"
+step="6/18 persist language"
 "$lsm" config set lang zh >/dev/null
 out=$("$lsm" config get lang)
 [[ "$out" == "zh" ]] || fail "config get lang expected zh, got: $out"
 ok
 
-step="7/14 pull into a project and search"
+step="7/18 pull into a project and search"
 out=$("$lsm" list global)
 # The English header must be gone: proves config.toml took effect.
 [[ "$out" != *"NAME"* ]] || fail "list global is still English after config set lang zh: $out"
@@ -98,7 +98,7 @@ out=$(LSM_LANG=en "$lsm" search sample project)
 [[ "$out" == *"sample"* ]] || fail "search did not find sample, got: $out"
 ok
 
-step="8/14 pull multiple names"
+step="8/18 pull multiple names"
 printf -- '---\nname: beta\ndescription: Second skill.\n---\n\n# Body\n' >"$tmp/beta.md"
 "$lsm" add "$tmp/beta.md" global >/dev/null
 out=$(LSM_LANG=en "$lsm" pull beta sample)
@@ -106,12 +106,12 @@ out=$(LSM_LANG=en "$lsm" pull beta sample)
 [[ -d "$tmp/demo/.agents/skills/beta" ]] || fail "multi pull did not install beta"
 ok
 
-step="9/14 pull --all skips existing"
+step="9/18 pull --all skips existing"
 out=$(LSM_LANG=en "$lsm" pull --all)
 [[ "$out" == *"skipped 2"* ]] || fail "pull --all did not skip existing skills, got: $out"
 ok
 
-step="10/14 push a project skill"
+step="10/18 push a project skill"
 printf -- '---\nname: gamma\ndescription: Project only.\n---\n\n# Body\n' >"$tmp/gamma.md"
 "$lsm" add "$tmp/gamma.md" project >/dev/null
 "$lsm" push gamma >/dev/null
@@ -120,21 +120,50 @@ out=$(LSM_LANG=en "$lsm" list global)
 [[ "$out" == *"gamma"* ]] || fail "list global does not mention pushed gamma, got: $out"
 ok
 
-step="11/14 push --all skips existing"
+step="11/18 push --all skips existing"
 out=$(LSM_LANG=en "$lsm" push --all)
 [[ "$out" == *"skipped 3"* ]] || fail "push --all did not skip existing global skills, got: $out"
 ok
 
-step="12/14 remove multiple names"
+step="12/18 remove multiple names"
 LSM_LANG=en "$lsm" remove sample beta gamma project >/dev/null
 out=$(LSM_LANG=en "$lsm" list project)
 [[ "$out" != *"sample"* && "$out" != *"beta"* && "$out" != *"gamma"* ]] \
   || fail "remove left skills behind, got: $out"
 ok
 
+step="13/18 default scope is project"
+printf -- '---\nname: delta\ndescription: Default scope.\n---\n\n# Body\n' >"$tmp/delta.md"
+"$lsm" add "$tmp/delta.md" >/dev/null
+[[ -f "$tmp/demo/.agents/skills/delta/SKILL.md" ]] \
+  || fail "add without scope did not install into project"
+out=$(LSM_LANG=en "$lsm" list)
+[[ "$out" == *"delta"* ]] || fail "list without scope did not read project, got: $out"
+ok
+
+step="14/18 unique name prefix"
+LSM_LANG=en "$lsm" pull samp >/dev/null
+[[ -d "$tmp/demo/.agents/skills/sample" ]] || fail "pull samp did not resolve to sample"
+LSM_LANG=en "$lsm" remove samp project >/dev/null
+[[ ! -d "$tmp/demo/.agents/skills/sample" ]] || fail "remove samp did not resolve to sample"
+ok
+
+step="15/18 search field filters"
+out=$(LSM_LANG=en "$lsm" search second --description global)
+[[ "$out" == *"beta"* ]] || fail "description filter did not find beta, got: $out"
+out=$(LSM_LANG=en "$lsm" search second --name global)
+[[ "$out" != *"beta"* ]] || fail "name filter should not match the description, got: $out"
+ok
+
+step="16/18 localized possible values"
+out=$("$lsm" --lang zh add --help)
+[[ "$out" != *"possible values"* ]] || fail "zh add --help still contains English possible values: $out"
+[[ "$out" == *"global, project"* ]] || fail "zh add --help lost the allowed scope values: $out"
+ok
+
 # Offline only: the real GitHub round-trip is a manual release step. Exercises
 # the new subcommand without touching the network.
-step="13/14 upgrade help and unknown flags (offline)"
+step="17/18 upgrade help and unknown flags (offline)"
 out=$("$lsm" upgrade --help)
 [[ "$out" == *"--check"* ]] || fail "upgrade --help does not list --check: $out"
 code=0
@@ -142,7 +171,7 @@ code=0
 [[ "$code" -eq 2 ]] || fail "upgrade --bogus exited $code, expected 2"
 ok
 
-step="14/14 copy command and -c flag are removed"
+step="18/18 copy command and -c flag are removed"
 code=0
 LSM_LANG=en "$lsm" copy sample >/dev/null 2>&1 || code=$?
 [[ "$code" -eq 2 ]] || fail "copy exited $code, expected 2"
