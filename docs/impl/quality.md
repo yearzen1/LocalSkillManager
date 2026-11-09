@@ -27,9 +27,9 @@
 - `output::error`：`error:`/`hint:` 与 `错误:`/`提示:` 两套前缀、hint 省略时不输出空行、`--json` 场景由调用方控制 stdout。
 - `infra::fsops`：`contains_path` 对 `..`、符号链接、目标不存在等场景的判断；`replace_self` 原地替换成功、权限位保留、备份清理、回滚时旧文件仍可执行。
 
-### 1.2 集成测试（`tests/cli.rs`、`tests/config.rs`）
+### 1.2 集成测试（`tests/cli.rs`、`tests/config.rs`、`tests/upgrade.rs`）
 
-每个用例使用独立 `tempfile::TempDir`，设置 `LSM_HOME`、`LSM_CONFIG_DIR`、`current_dir`，互不干扰。命令功能用 `tests/cli.rs`，配置持久化用 `tests/config.rs`。
+每个用例使用独立 `tempfile::TempDir`，设置 `LSM_HOME`、`LSM_CONFIG_DIR`、`current_dir`，互不干扰。命令功能用 `tests/cli.rs`，配置持久化用 `tests/config.rs`，升级冒烟校验用 `tests/upgrade.rs`。
 
 1. `add foo.md global`：生成 `LSM_HOME/skills/foo/SKILL.md`，内容字节一致。
 2. `add foo.md project`：生成 `<tmp>/.agents/skills/foo/SKILL.md`。
@@ -131,6 +131,16 @@ name 前缀解析（Q50）：
 83. `search review --name --description` 与不写 flag 的结果一致。
 84. `search review --name --json` 的过滤结果与文本模式一致。
 
+v0.6.1 help 汉化：
+
+85. `--lang zh` 下 `add` / `list` / `search` 的 `<SCOPE>` 帮助显示 `[可选值: global, project]`，`config get/set` 的 `<KEY>` 同样；英文仍为 `[possible values: ...]`。
+86. `config get/set` 的 `<KEY>` 帮助文案为「配置键：lang」/「Configuration key: lang」。
+
+批量输出与本地化回归：
+
+87. `pull --all` 遇到两条安装阶段失败（而非 invalid 条目）时，错误块之间与批次总错误之前各有一个空行。
+88. `--lang zh` 下 `pull` / `remove` 遇到目录名与 frontmatter `name` 不一致时，错误详情为中文（`与 frontmatter 中的 name ... 不一致`），英文仍为 `does not match frontmatter name`。
+
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
 ### 1.3 手工验收（三平台）
@@ -152,6 +162,14 @@ lsm add ../gamma.md project && lsm push gamma  # project → global
 lsm push --all                                 # 全局已有则跳过
 lsm remove sample gamma project                # 多 name：lsm remove a b project
 
+# v0.6.x：默认作用域、唯一前缀、字段过滤与 help 汉化
+lsm list                                       # 默认 project
+lsm pull samp                                  # 唯一前缀 → sample
+lsm remove samp project                        # 唯一前缀 → sample
+lsm search second --description global         # 只在描述里命中
+lsm search second --name global                # 无匹配，退出 0
+lsm --lang zh add --help | grep '可选值'        # [可选值: global, project]
+
 # 离线：只验子命令存在与非法参数，不联网
 lsm upgrade --help                              # 列出 --check / --force，退出 0
 lsm upgrade --bogus                             # 退出 2
@@ -167,7 +185,8 @@ rm -f /tmp/lsm-check
 
 - 这一段是唯一的联网步骤，且只对**副本**执行：`upgrade` 会替换 `current_exe()`，不要对日常使用的 `lsm` 直接跑。
 - Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
-- 发布前的 `upgrade --force` 手工验收见 [progress.md](../progress.md) D10：先复制副本，确认替换后 `--version` 正常。
+- 发布前的 `upgrade --force` 手工验收见 [release.md](../release.md)「升级契约」：用上一版二进制执行一次，确认替换后 `--version` 正常且没有 `.old-*` 残留。
+- v0.6.x 的默认作用域、唯一前缀、`search` 字段过滤与 help 汉化由 `scripts/acceptance.sh` 第 13–16 步覆盖；脚本与本节的文字不一致时以脚本为准。
 
 上面这串步骤的执行入口是 `scripts/acceptance.sh`：Windows 用 Git Bash 调用（`"D:/Git/bin/bash.exe" scripts/acceptance.sh`），**不要用 WSL 的 `bash`**——它会把 Linux 路径原样传给 Windows 二进制，测试会在错误目录里跑出假绿。Linux/macOS 直接 `bash scripts/acceptance.sh`。脚本与本节的步骤不一致时以脚本为准，并在同一提交内改本节。
 

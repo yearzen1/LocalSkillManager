@@ -38,6 +38,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - 所有 `error:` / `hint:` / 成功提示 / help 正文都从消息表取，禁止在业务代码里写死文案。
 - 中文前缀用 `错误:` / `提示:`，英文用 `error:` / `hint:`。
 - 版本号 `lsm 0.6.1`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
+- `list` / `search` 文本表格里的 `[invalid]` 详情与 JSON `error` 同源，固定英文；`pull` / `push` / `remove` 命令错误的 `<原因>` 参数（如目录名与 frontmatter `name` 不一致）按当前语言渲染。
 
 ### 1.3 help 与参数错误
 

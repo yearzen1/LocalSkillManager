@@ -1,6 +1,8 @@
-# v0.5.0 进度表（40 分钟/天）
+# 进度表（历史：v0.5.0）
 
 > 上级：[实现方案索引](impl.md) ｜ 决策：[decisions.md](decisions.md) ｜ 需求：[Requirements.md](Requirements.md)
+>
+> 本文件保留 v0.5.0 的每日计划作为历史记录；v0.5.0 之后的交付状态以 [impl.md](impl.md) 顶部与 git 历史为准。
 >
 > 上一版：v0.4.0 已发布（tag `v0.4.0`，多 name `copy`/`remove`、`search`、`push`）。v0.4.0 的每日记录见 git 历史（`e4d8cad` 及之前）。
 >
