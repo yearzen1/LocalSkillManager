@@ -8,6 +8,7 @@ pub mod push;
 pub mod remove;
 pub mod resolve;
 pub mod search;
+mod transfer;
 pub mod upgrade;
 
 use crate::domain::action::Action;
