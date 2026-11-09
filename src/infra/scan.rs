@@ -23,7 +23,7 @@ pub fn dir_names(dir: &Path) -> Result<Vec<String>, FsError> {
     let mut names: Vec<String> = visible_dirs(dir)?
         .into_iter()
         .map(|(name, _)| name)
-        .filter(|name| SkillName::parse(name).is_ok())
+        .filter(|name| SkillName::is_valid(name))
         .collect();
     names.sort();
     Ok(names)
@@ -71,7 +71,7 @@ fn build_entry(name: &str, path: &Path) -> SkillEntry {
         error: Some(error),
     };
 
-    if SkillName::parse(name).is_err() {
+    if !SkillName::is_valid(name) {
         return invalid("invalid directory name".to_string());
     }
 
