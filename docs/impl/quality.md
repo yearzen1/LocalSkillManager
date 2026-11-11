@@ -185,6 +185,13 @@ lsm search second --description global         # 只在描述里命中
 lsm search second --name global                # 无匹配，退出 0
 lsm --lang zh add --help | grep '可选值'        # [可选值: global, project]
 
+# v0.7.x：分组
+lsm group set frontend sample                  # 创建分组
+lsm group list                                 # frontend: sample
+lsm pull --group frontend                      # 拉取整组
+lsm group add frontend another                 # 追加成员
+lsm group remove frontend                      # 删除分组
+
 # 离线：只验子命令存在与非法参数，不联网
 lsm upgrade --help                              # 列出 --check / --force，退出 0
 lsm upgrade --bogus                             # 退出 2
@@ -201,7 +208,7 @@ rm -f /tmp/lsm-check
 - 这一段是唯一的联网步骤，且只对**副本**执行：`upgrade` 会替换 `current_exe()`，不要对日常使用的 `lsm` 直接跑。
 - Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
 - 发布前的 `upgrade --force` 手工验收见 [release.md](../release.md)「升级契约」：用上一版二进制执行一次，确认替换后 `--version` 正常且没有 `.old-*` 残留。
-- v0.6.x 的默认作用域、唯一前缀、`search` 字段过滤与 help 汉化由 `scripts/acceptance.sh` 第 13–16 步覆盖；脚本与本节的文字不一致时以脚本为准。
+- v0.6.x 的默认作用域、唯一前缀、`search` 字段过滤与 help 汉化由 `scripts/acceptance.sh` 第 13–16 步覆盖；v0.7.x 的分组由第 19–21 步覆盖。脚本与本节的文字不一致时以脚本为准。
 
 上面这串步骤的执行入口是 `scripts/acceptance.sh`：Windows 用 Git Bash 调用（`"D:/Git/bin/bash.exe" scripts/acceptance.sh`），**不要用 WSL 的 `bash`**——它会把 Linux 路径原样传给 Windows 二进制，测试会在错误目录里跑出假绿。Linux/macOS 直接 `bash scripts/acceptance.sh`。脚本与本节的步骤不一致时以脚本为准，并在同一提交内改本节。
 

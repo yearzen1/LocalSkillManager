@@ -78,10 +78,15 @@ lsm add <source> [<global|project>] [--force]
 lsm list [<global|project>] [--json]
 lsm search <query> [<global|project>] [--name] [--description] [--json]
 lsm pull <name>... [--force]
+lsm pull --group <group>... [--force]
 lsm pull --all [--force]
 lsm push <name>... [--force]
 lsm push --all [--force]
 lsm remove <name>... [<global|project>] [--force]
+lsm group list [--json]
+lsm group set <group> <skill>... [--force]
+lsm group add <group> <skill>...
+lsm group remove <group>...
 lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
@@ -150,6 +155,15 @@ my-skill     One-line description.
 - A unique prefix is enough: when only `code-review` is installed, `lsm pull code` pulls it. If several names share the prefix, the command exits 1 and lists the candidates; an exact name always wins.
 - Multiple names keep going after a failure: existing targets without `--force` are skipped, invalid/missing sources fail, and a final line reports `pulled N, skipped M, failed K`. Any failure exits 1; only skips exit 0.
 - `--all` pulls every valid global skill. Existing targets are skipped unless `--force`; invalid skills are reported and the batch keeps going. Skipped skills are not failures: the command exits 1 only when a skill actually failed to pull.
+- `--group <GROUP>` (repeatable) pulls every skill in a saved group. It is mutually exclusive with `<name>...` and `--all`. Groups are expanded in the order given, members keep their definition order, and duplicates are pulled once. Unknown groups, empty groups and missing members are reported while the batch keeps going; a summary is printed even when only one skill is pulled.
+
+### group
+
+- Groups are stored under `[groups]` in the global `config.toml`; each group is a flat list of skill names, for example `frontend = ["tdd", "grill"]`.
+- `lsm group list [--json]` prints groups sorted by name; members keep their definition order. An empty group shows `(empty)`; with no groups it prints `No groups found.` (JSON: `[]`).
+- `lsm group set <group> <skill>...` creates a group; replacing an existing group needs `--force`. `lsm group add` creates the group when missing and appends members without duplicates.
+- `lsm group remove <group>...` deletes one or more groups without `--force`; missing groups are reported while the rest are removed, and any failure exits 1.
+- Group and member names use the same rules as skill names; members do not need to be installed yet. Only `pull --group` and `group ...` read `[groups]`, so a malformed section never blocks other commands.
 
 ### push
 

@@ -69,7 +69,7 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2021"
 description = "Install, pull, and push agent skills under .agents/skills"
 license = "MIT"
@@ -408,4 +408,12 @@ pub struct Ctx {
 - [x] `ConfigKeyLangHelp` 由「输出语言」改为「配置键：lang」/「Configuration key: lang」。
 - [x] `src/cli/help.rs` 单测与 `tests/cli.rs` 端到端用例覆盖；英文输出不变。
 - [x] `impl/cli.md`、`impl/config.md` 同步。
+
+### 8.7 v0.7.0 skill 分组（已实现）
+
+- [x] `config.toml` 的 `[groups]` 持久化分组；组名/成员名按 skill 名规则校验，成员不要求已安装。
+- [x] `group list [--json]`、`group set <GROUP> <SKILL>... [--force]`、`group add <GROUP> <SKILL>...`、`group remove <GROUP>...` 全部可用，双语 help 正常。
+- [x] `pull --group <GROUP>...` 展开分组后复用批量语义；与 `<NAME>...`、`--all` 互斥，未知组/空组/缺成员逐条报错并继续。
+- [x] `[groups]` 惰性加载：写坏只影响 `group *` 与 `pull --group`，不影响其他命令。
+- [x] 两份 README、`impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md` 与验收脚本同步。
 

@@ -78,10 +78,15 @@ lsm add <source> [<global|project>] [--force]
 lsm list [<global|project>] [--json]
 lsm search <query> [<global|project>] [--name] [--description] [--json]
 lsm pull <name>... [--force]
+lsm pull --group <group>... [--force]
 lsm pull --all [--force]
 lsm push <name>... [--force]
 lsm push --all [--force]
 lsm remove <name>... [<global|project>] [--force]
+lsm group list [--json]
+lsm group set <group> <skill>... [--force]
+lsm group add <group> <skill>...
+lsm group remove <group>...
 lsm upgrade [--check] [--force]
 lsm config get lang
 lsm config set lang <en|zh>
@@ -150,6 +155,15 @@ my-skill     一句话说明。
 - 支持唯一前缀：`global` 里只有 `code-review` 时，`lsm pull code` 直接拉取它；多个名字共享前缀则退出 1 并列出候选，精确同名始终优先。
 - 多个 name 时单条失败不中断：目标已存在且无 `--force` 算跳过，源缺失/非法算失败，结束打印 `成功 N 个，跳过 M 个，失败 K 个`。任一失败退 1，只有跳过退 0。
 - `--all` 拉取全部合法全局 skill。目标已存在时默认跳过（`--force` 覆盖）；非法 skill 逐条报错但不中断。跳过不算失败：只有真的拉取失败才退出码 1。
+- `--group <GROUP>` 可重复，拉取已保存分组内的全部 skill；与 `<name>...`、`--all` 三者互斥。多个组按给出顺序展开，组内保留定义顺序，重复 skill 只拉一次；组不存在、组为空、成员缺失都会逐条报错并继续，即使只展开出 1 个 skill 也打印成功/跳过/失败计数。
+
+### group
+
+- 分组保存在全局 `config.toml` 的 `[groups]` 下，每个组是一个扁平的 skill 名数组，例如 `frontend = ["tdd", "grill"]`。
+- `lsm group list [--json]` 按组名字典序输出，成员保留定义顺序；空组显示 `(empty)`，没有任何组时输出 `No groups found.`（JSON 为 `[]`）。
+- `lsm group set <group> <skill>...` 创建分组；覆盖已存在的组需要 `--force`。`lsm group add` 在组不存在时自动创建，追加成员时自动去重。
+- `lsm group remove <group>...` 批量删除分组，不需要 `--force`；不存在的组逐条报错、其余继续，任一失败退 1。
+- 组名与成员名使用与 skill 名相同的规则，成员不要求当前已安装。只有 `pull --group` 与 `group ...` 会读取 `[groups]`，该表写坏不会影响其他命令。
 
 ### push
 
