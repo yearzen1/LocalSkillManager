@@ -757,7 +757,7 @@ fn pull_rejects_name_together_with_all() {
         .args(["pull", "foo", "--all"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("not both"));
+        .stderr(predicate::str::contains("not more than one"));
 }
 
 #[test]
@@ -766,7 +766,7 @@ fn pull_requires_name_or_all() {
         .args(["pull"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("needs a skill name or --all"));
+        .stderr(predicate::str::contains("needs a skill name, --group, or --all"));
 }
 
 #[test]
@@ -2567,4 +2567,490 @@ fn config_key_help_names_the_key_values() {
         .stdout(predicate::str::contains("配置键：lang"))
         .stdout(predicate::str::contains("[可选值: lang]"))
         .stdout(predicate::str::contains("possible values").not());
+}
+
+// ---------- v0.7.0: skill groups ----------
+
+/// 共用同一个配置目录的命令：分组需要跨进程持久化。
+fn lsm_with_config(config: &TempDir) -> Command {
+    let mut cmd = Command::cargo_bin("lsm").unwrap();
+    cmd.env("LSM_CONFIG_DIR", config.path())
+        .env_remove("LSM_LANG")
+        .env_remove("LSM_HOME");
+    cmd
+}
+
+fn config_path(config: &TempDir) -> std::path::PathBuf {
+    config.path().join("config.toml")
+}
+
+fn write_config(config: &TempDir, content: &str) {
+    fs::create_dir_all(config.path()).unwrap();
+    fs::write(config_path(config), content).unwrap();
+}
+
+#[test]
+fn group_set_persists_members_and_list_renders_them() {
+    let config = TempDir::new().unwrap();
+
+    lsm_with_config(&config)
+        .args(["group", "set", "frontend", "tdd", "grill"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("saved"));
+
+    let content = fs::read_to_string(config_path(&config)).unwrap();
+    assert!(content.contains("[groups]"), "missing [groups]: {content}");
+    assert!(content.contains("\"tdd\""), "missing tdd: {content}");
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: tdd, grill"));
+}
+
+#[test]
+fn group_set_requires_force_to_replace_an_existing_group() {
+    let config = TempDir::new().unwrap();
+    lsm_with_config(&config)
+        .args(["group", "set", "frontend", "tdd", "grill"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .args(["group", "set", "frontend", "grill"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("already exists"))
+        .stderr(predicate::str::contains("--force"));
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: tdd, grill"));
+
+    lsm_with_config(&config)
+        .args(["group", "set", "frontend", "grill", "--force"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: grill"))
+        .stdout(predicate::str::contains("tdd").not());
+}
+
+#[test]
+fn group_set_validates_group_and_member_names_before_writing() {
+    let config = TempDir::new().unwrap();
+
+    lsm_with_config(&config)
+        .args(["group", "set", "Frontend", "tdd"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid group name"));
+
+    lsm_with_config(&config)
+        .args(["group", "set", "frontend", "Bad-Name"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid skill name"));
+
+    lsm_with_config(&config)
+        .args(["group", "set", "frontend"])
+        .assert()
+        .code(2);
+
+    assert!(!config_path(&config).exists());
+}
+
+#[test]
+fn group_add_creates_a_group_and_dedupes_members() {
+    let config = TempDir::new().unwrap();
+
+    lsm_with_config(&config)
+        .args(["group", "add", "frontend", "tdd"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .args(["group", "add", "frontend", "grill", "tdd"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(2 skills)"));
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: tdd, grill"));
+}
+
+#[test]
+fn group_list_empty_and_json() {
+    let config = TempDir::new().unwrap();
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No groups found."));
+
+    lsm_with_config(&config)
+        .args(["group", "list", "--json"])
+        .assert()
+        .success()
+        .stdout("[]\n");
+}
+
+#[test]
+fn group_list_sorts_groups_and_keeps_member_order() {
+    let config = TempDir::new().unwrap();
+    lsm_with_config(&config)
+        .args(["group", "set", "zeta", "b", "a"])
+        .assert()
+        .success();
+    lsm_with_config(&config)
+        .args(["group", "set", "alpha", "c"])
+        .assert()
+        .success();
+
+    let output = lsm_with_config(&config)
+        .args(["group", "list", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+
+    assert_eq!(value[0]["name"], "alpha");
+    assert_eq!(value[0]["skills"][0], "c");
+    assert_eq!(value[1]["name"], "zeta");
+    assert_eq!(value[1]["skills"][0], "b");
+    assert_eq!(value[1]["skills"][1], "a");
+}
+
+#[test]
+fn group_remove_is_batched_and_keeps_going() {
+    let config = TempDir::new().unwrap();
+    lsm_with_config(&config)
+        .args(["group", "set", "a", "tdd"])
+        .assert()
+        .success();
+    lsm_with_config(&config)
+        .args(["group", "set", "b", "grill"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .args(["group", "remove", "a", "missing"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("removed 1, failed 1"))
+        .stderr(predicate::str::contains("group 'missing' not found"));
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("b: grill"))
+        .stdout(predicate::str::contains("a:").not());
+}
+
+#[test]
+fn group_remove_single_prints_a_plain_message() {
+    let config = TempDir::new().unwrap();
+    lsm_with_config(&config)
+        .args(["group", "set", "a", "tdd"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .args(["group", "remove", "a"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("removed group 'a'"))
+        .stdout(predicate::str::contains("removed 1, failed").not());
+}
+
+#[test]
+fn broken_groups_only_affect_group_commands() {
+    let config = TempDir::new().unwrap();
+    let project = TempDir::new().unwrap();
+    write_config(&config, "lang = \"en\"\ngroups = \"bad\"\n");
+
+    // [groups] 坏了不影响不读它的命令。
+    lsm_with_config(&config)
+        .current_dir(project.path())
+        .args(["list"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("invalid [groups]"))
+        .stderr(predicate::str::contains("fix or delete"));
+
+    lsm_with_config(&config)
+        .current_dir(project.path())
+        .args(["pull", "--group", "frontend"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("invalid [groups]"));
+}
+
+#[test]
+fn groups_members_must_be_strings() {
+    let config = TempDir::new().unwrap();
+    write_config(&config, "[groups]\nfrontend = [1]\n");
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("invalid [groups]"))
+        .stderr(predicate::str::contains("frontend"));
+}
+
+#[test]
+fn pull_group_copies_every_member() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    install_global(&home, "beta", "B.");
+    lsm_with_config(&config)
+        .args(["group", "set", "common", "alpha", "beta"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "common"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled 2, skipped 0, failed 0"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+    assert!(project.path().join(".agents/skills/beta/SKILL.md").exists());
+}
+
+#[test]
+fn pull_group_prints_a_summary_even_for_one_member() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    lsm_with_config(&config)
+        .args(["group", "set", "one", "alpha"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "one"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled 1, skipped 0, failed 0"));
+}
+
+#[test]
+fn pull_group_dedupes_members_across_groups() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    install_global(&home, "beta", "B.");
+    lsm_with_config(&config)
+        .args(["group", "set", "a", "alpha"])
+        .assert()
+        .success();
+    lsm_with_config(&config)
+        .args(["group", "set", "b", "alpha", "beta"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "a", "--group", "b"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled 2, skipped 0, failed 0"));
+}
+
+#[test]
+fn pull_group_conflicts_with_names_and_all() {
+    let config = TempDir::new().unwrap();
+    let project = TempDir::new().unwrap();
+    lsm_with_config(&config)
+        .args(["group", "set", "common", "alpha"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .current_dir(project.path())
+        .args(["pull", "alpha", "--group", "common"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("not more than one"));
+
+    lsm_with_config(&config)
+        .current_dir(project.path())
+        .args(["pull", "--group", "common", "--all"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("not more than one"));
+
+    assert!(!project.path().join(".agents/skills").exists());
+}
+
+#[test]
+fn pull_group_reports_unknown_and_empty_groups_and_keeps_going() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    write_config(
+        &config,
+        "[groups]\ngood = [\"alpha\"]\nempty = []\n",
+    );
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "missing", "--group", "empty", "--group", "good"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("pulled 1, skipped 0, failed 2"))
+        .stderr(predicate::str::contains("group 'missing' not found"))
+        .stderr(predicate::str::contains("group 'empty' is empty"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn pull_group_missing_member_keeps_going() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    lsm_with_config(&config)
+        .args(["group", "set", "common", "alpha", "missing"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "common"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("pulled 1, skipped 0, failed 1"))
+        .stderr(predicate::str::contains("not found in global"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn pull_group_resolves_unique_prefixes() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "code-review", "Reviews.");
+    lsm_with_config(&config)
+        .args(["group", "set", "common", "code"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "common"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled code-review"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/code-review/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn pull_group_skips_existing_targets_without_force() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "From global.");
+    write_skill_md(
+        &project.path().join(".agents/skills/alpha/SKILL.md"),
+        "alpha",
+        "Local version.",
+    );
+    lsm_with_config(&config)
+        .args(["group", "set", "common", "alpha"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "common"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled 0, skipped 1, failed 0"));
+
+    let local = project.path().join(".agents/skills/alpha/SKILL.md");
+    assert!(fs::read_to_string(local).unwrap().contains("Local version."));
+}
+
+#[test]
+fn group_help_lists_subcommands_and_flags() {
+    lsm()
+        .args(["group", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("set"))
+        .stdout(predicate::str::contains("add"))
+        .stdout(predicate::str::contains("remove"));
+
+    lsm()
+        .args(["group", "set", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--force"));
+
+    lsm()
+        .args(["group", "list", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--json"));
+
+    lsm()
+        .args(["--lang", "zh", "group", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("管理 skill 分组"));
+
+    lsm().arg("group").assert().code(2);
 }
