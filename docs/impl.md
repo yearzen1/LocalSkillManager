@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.6.1 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49），v0.6.0 加 name 前缀解析、作用域默认 `project` 与 `search` 字段过滤（Q50–Q52），v0.6.1 补全 help 的 `[possible values]` 汉化并修正 `config` 键文案
+> 状态：v0.7.0 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49），v0.6.0 加 name 前缀解析、作用域默认 `project` 与 `search` 字段过滤（Q50–Q52），v0.6.1 补全 help 的 `[possible values]` 汉化并修正 `config` 键文案，v0.7.0 加 skill 分组与 `pull --group`（Q53–Q57）
 > 最后更新：2026-11-13
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
@@ -16,7 +16,7 @@
 | [impl/quality.md](impl/quality.md) | 测试计划、README、许可证、发布 | 测试与交付 |
 | [impl/upgrade.md](impl/upgrade.md) | 自更新：命令、版本比较、下载校验、原地替换 | 实现或排查 upgrade |
 | [release.md](release.md) | Release 资产命名、tag 约定、发布与改名流程 | 发布与改资产名 |
-| [decisions.md](decisions.md) | Q1–Q52 决策记录 | 查决策依据 |
+| [decisions.md](decisions.md) | Q1–Q57 决策记录 | 查决策依据 |
 | [Requirements.md](Requirements.md) | 原始需求 | 对齐范围 |
 
 推荐阅读顺序：本文 → `storage.md` → `cli.md` → `config.md` → `quality.md` → `upgrade.md`。决策有疑问时查 `decisions.md`。
@@ -29,7 +29,7 @@
 
 1. `add`：把单个 `.md` 文件或完整 skill 目录安装到 `global` / `project`。
 2. `list`：列出指定作用域下已安装的 skill。
-3. `pull`：把全局 skill 拉取到当前项目的 `.agents/skills/`，支持多个 name 与 `--all`。
+3. `pull`：把全局 skill 拉取到当前项目的 `.agents/skills/`，支持多个 name、`--group` 与 `--all`。
 4. `push`（v0.4.0）：把当前项目 skill 推送到全局目录，支持多个 name 与 `--all`。
 5. `search`（v0.4.0）：按 name / description 子串搜索指定作用域。
 6. `upgrade`：从 GitHub Releases 取最新版本并原地替换 lsm 自身二进制，**不改变 exe 的路径与文件名**。
@@ -139,7 +139,8 @@ LocalSkillManager/
 │   │   ├── version.rs     # Version：升级用的版本解析与比较
 │   │   ├── release.rs     # Release / Asset / 平台资产名选择
 │   │   ├── resolve.rs     # name 精确优先、唯一前缀解析（Q50）
-│   │   ├── action.rs      # Action：Add / List / Search / Pull / Push / Remove / Upgrade / Config
+│   │   ├── group.rs       # GroupName / Group：skill 分组（Q53）
+│   │   ├── action.rs      # Action：Add / List / Search / Pull / Push / Remove / Group / Upgrade / Config
 │   │   └── entry.rs       # SkillEntry：list 展示数据
 │   ├── infra/             # 所有文件系统与环境访问
 │   │   ├── mod.rs
@@ -171,6 +172,7 @@ LocalSkillManager/
 │       ├── push.rs      # project → global（薄包装）
 │       ├── resolve.rs   # name 解析结果 → 结构化错误
 │       ├── remove.rs
+│       ├── group.rs     # group list/set/add/remove
 │       ├── upgrade.rs   # 自更新编排：查询 → 校验 → 替换 → 输出
 │       └── config.rs
 └── tests/
@@ -191,11 +193,12 @@ LocalSkillManager/
 | `domain::version` | 升级版本解析与比较 | `Version::parse(&str)`、`Ord` |
 | `domain::release` | release 元数据与平台资产名 | `asset_name(os, arch)`、`Release::parse_metadata`、`Release::asset` |
 | `domain::resolve` | name 精确优先、唯一前缀解析 | `resolve(&SkillName, &[String]) -> Resolution` |
-| `domain::action` | 解析后的用户意图 | `Action::{Add, List, Search, Pull, Push, Remove, Upgrade, Config}` |
+| `domain::group` | 分组名与分组数据 | `GroupName::parse(&str)`、`Group { name, members }` |
+| `domain::action` | 解析后的用户意图 | `Action::{Add, List, Search, Pull, Push, Remove, Group, Upgrade, Config}` |
 | `domain::entry` | list 的展示数据 | `SkillEntry`（name/description/path/valid/error） |
 | `infra::env` | 进程环境快照（唯一读环境点） | `Env::read() -> Env`、`Env::{home, config_dir, lang, upgrade_api, cargo_bin_dir}` |
 | `infra::paths` | 纯函数路径解析 | `skills_dir(&Env, Scope, &Path) -> Result<PathBuf, PathError>`、`config_file(&Env) -> Result<PathBuf, PathError>` |
-| `infra::config` | 读写并校验 `config.toml` | `load() -> Result<Option<Lang>, ConfigError>`、`set_lang(Lang)` |
+| `infra::config` | 读写并校验 `config.toml` | `load()`、`set_lang(Lang)`、`load_groups()`、`set_group` / `add_group` / `remove_group` |
 | `infra::frontmatter` | 读取并解析 SKILL.md | `parse_skill_md(&Path) -> Result<SkillMeta, FrontmatterError>` |
 | `infra::fsops` | 复制、原子安装、覆盖、自包含、原地替换自身 | `install_skill_dir/file`、`contains_path`、`replace_self`（错误为 `FsError`） |
 | `infra::net` | 取 release 元数据、下载资产（唯一网络点） | `fetch_latest_release(Option<&str>, Version)`、`download_asset(&str, &Path)` |
@@ -257,7 +260,8 @@ pub struct Ctx {
 - **add**：`cli` → `Action::Add` → `paths::skills_dir(&ctx.env, ...)` → `frontmatter::parse_skill_md` → `meta::validate` → `fsops::install_skill_*` → `output`。
 - **list**：`cli` → `Action::List` → `paths::skills_dir` → `scan::scan_skills` → `output::list`（text/json）。
 - **search**：`cli` → `Action::Search` → `paths::skills_dir` → `scan::scan_skills` → 过滤匹配 → `output::list`（text/json）。
-- **pull**：`cli`（name 已由 `SkillName::parse` 校验）→ `Action::Pull` → `commands::transfer`（`PULL`：global → project）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`；多 name 逐条执行并汇总。
+- **pull**：`cli`（name 已由 `SkillName::parse` 校验）→ `Action::Pull` → `commands::transfer`（`PULL`：global → project）→ `paths` → 校验源目录 → `fsops::install_skill_dir` → `output`；多 name 逐条执行并汇总。`--group` 先 `infra::config::load_groups` 展开成员，再走同一批量流程。
+- **group**：`cli`（组名/成员名已校验）→ `Action::Group` → `infra::config::{load_groups,set_group,add_group,remove_group}` → `output`；列表 JSON 与文本排版在命令层。
 - **push**：`Action::Push` → `commands::transfer`（`PUSH`：project → global），批处理与错误排版与 `pull` 完全共用。
 - **remove**：`cli` → `Action::Remove` → `paths::skill_dir` → 可选合法性校验 → `fsops::remove_entry_atomically` → `output`；多 name 逐条执行并汇总。
 - **upgrade**：`cli` → `Action::Upgrade` → `env.exe` + 编译期版本 → `net::fetch_latest_release` → `release::select_asset` →（`--check` 到此结束）→ `net::download` → 冒烟校验 → `fsops::replace_self` → `output`。
@@ -290,6 +294,7 @@ pub struct Ctx {
 | v0.5.1 范围 | `list`（含 `search`）文本表格相邻条目之间空一行；不改 JSON、不改空/单条输出 | [decisions.md](decisions.md) Q49 |
 | v0.6.0 范围 | `pull`/`push`/`remove` 支持唯一 name 前缀；`add`/`list`/`search`/`remove` 的 scope 默认 `project`；`search` 新增 `--name`/`--description`；批量错误块之间空行 | [decisions.md](decisions.md) Q50–Q52 |
 | v0.6.1 范围 | help 的 `[possible values: …]` 跟随语言显示为 `[可选值: …]`；`config get/set` 的 `<KEY>` 文案由「输出语言」改为「配置键：lang」 | [cli.md](impl/cli.md)「help 与参数错误」/ [config.md](impl/config.md)「消息键」 |
+| v0.7.0 范围 | 全局 `config.toml` 的 `[groups]`、`pull --group`、`group list/set/add/remove`；只做扁平成员列表，不扩展到其他命令 | [decisions.md](decisions.md) Q53–Q57 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「pull」 |
 
 ## 6. 文档维护规则
 

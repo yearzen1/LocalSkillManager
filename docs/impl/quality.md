@@ -141,6 +141,21 @@ v0.6.1 help 汉化：
 87. `pull --all` 遇到两条安装阶段失败（而非 invalid 条目）时，错误块之间与批次总错误之前各有一个空行。
 88. `--lang zh` 下 `pull` / `remove` 遇到目录名与 frontmatter `name` 不一致时，错误详情为中文（`与 frontmatter 中的 name ... 不一致`），英文仍为 `does not match frontmatter name`。
 
+skill 分组（Q53–Q57，v0.7.0）：
+
+89. `group set frontend tdd grill` → 退出 0，`config.toml` 出现 `[groups]` 与两个成员；`group list` 输出 `frontend: tdd, grill`。
+90. 再次 `group set frontend ...` 无 `--force` → 退出 1 且旧成员不变；加 `--force` → 覆盖成功。
+91. `group set Frontend tdd` / `group set frontend Bad-Name` → 退出 2，配置文件不产生任何新组。
+92. `group add frontend grill tdd`：组不存在时自动创建；已有成员静默去重，成员顺序保持首次出现。
+93. `group list` 无组 → 退出 0 输出 `No groups found.`；`--json` 输出 `[]`；有组时 JSON 字段为 `name` / `skills`，组按字典序、成员保留定义顺序。
+94. `group remove a missing` → 退出 1，`a` 被删除、`missing` 报错，结束打印成功/失败计数；`group remove` 不需要 `--force`。
+95. `[groups]` 结构非法（`groups = "bad"`、成员是数字）→ `group list` / `pull --group` 退 1，提示修复或删除配置文件；`list` / `search` / 其他命令仍正常。
+96. `pull --group common`（成员 `alpha`、`beta`）→ 两个 skill 都进入项目，结束打印 `pulled 2, skipped 0, failed 0`；只有 1 个成员时也打印计数。
+97. `pull --group a --group b` 展开后重复 skill 只拉取一次；组不存在、组为空、成员缺失都逐条报错并继续，任一失败退 1。
+98. `pull alpha --group common`、`pull --group common --all` → 退出 2，不复制任何 skill。
+99. `pull --group` 的成员仍支持唯一前缀（成员 `code` → `code-review`）；目标已存在且无 `--force` 算跳过，退 0。
+100. `group --help` / `group list --help` / `group set --help` 两种语言均正常；`group set --help` 列出 `--force`，`group list --help` 列出 `--json`。
+
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
 ### 1.3 手工验收（三平台）

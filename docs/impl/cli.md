@@ -90,18 +90,24 @@ $ lsm --lang zh --help
 | `add` | `<SOURCE> [<SCOPE>]` | implemented |
 | `list` | `[<SCOPE>]` | implemented |
 | `search` | `<QUERY> [<SCOPE>]` | implemented |
-| `pull` | `<NAME>... 或 --all [--force]` | implemented |
+| `pull` | `<NAME>... 或 --group <GROUP>... 或 --all [--force]` | implemented |
 | `push` | `<NAME>... 或 --all [--force]` | implemented |
 | `remove` | `<NAME>... [<SCOPE>] [--force]` | implemented |
+| `group list` | `[--json]` | planned |
+| `group set` | `<GROUP> <SKILL>... [--force]` | planned |
+| `group add` | `<GROUP> <SKILL>...` | planned |
+| `group remove` | `<GROUP>...` | planned |
 | `config get` | `lang` | implemented |
 | `config set` | `lang <LANG>` | implemented |
 | `upgrade` | `[--check] [--force]` | implemented |
 
 - `<SCOPE>`：`global` 或 `project`，大小写敏感；**可省略，省略时为 `project`**。`remove` 的最后一个参数恰好是 `global` / `project` 时按作用域处理，否则全部按 name（作用域默认 `project`）；技能名本身是 `global` / `project` 时必须显式写作用域（如 `lsm remove global project`）。
 - `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1）。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`（非法格式退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
+- `<GROUP>`：分组名，规则与 skill 名相同（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名），非法格式退 2；不存在的分组是运行时错误（退 1）。`pull` 的 `--group` 可重复，与 `<NAME>...`、`--all` 三者互斥；规则见 [storage.md](storage.md)「pull」与 [config.md](config.md)「分组」。
+- `<SKILL>`（`group set` / `group add`）：成员 skill 名，只校验格式，不要求当前已安装；缺失在 `pull --group` 时按批处理规则记失败。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
-- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。
+- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）。
 
 选项：
 
@@ -116,7 +122,10 @@ $ lsm --lang zh --help
 | `search` | `--name` | — | 关闭 | 只匹配 skill 名称 |
 | `search` | `--description` | — | 关闭 | 只匹配 skill 描述 |
 | `pull` | `--force` | — | 关闭 | 同 `add` 的覆盖流程 |
-| `pull` | `--all` | — | 关闭 | 拉取全局全部 skill，与 `<NAME>...` 互斥 |
+| `pull` | `--all` | — | 关闭 | 拉取全局全部 skill，与 `<NAME>...`、`--group` 互斥 |
+| `pull` | `--group <GROUP>` | 已定义的组名，可重复 | — | 拉取分组内全部 skill，与 `<NAME>...`、`--all` 互斥 |
+| `group list` | `--json` | — | 关闭 | stdout 只输出 JSON 数组 |
+| `group set` | `--force` | — | 关闭 | 覆盖已存在的分组 |
 | `push` | `--force` | — | 关闭 | 同 `pull` 的覆盖流程 |
 | `push` | `--all` | — | 关闭 | 把项目全部 skill 推到 global，与 `<NAME>...` 互斥 |
 | `remove` | `--force` | — | 关闭 | 允许删除非合法 skill 目录 |
@@ -167,6 +176,8 @@ $ lsm --lang zh --help
 - 作用域参数用 `value_parser(["global", "project"])` 限定合法值，大小写敏感，错误时由 clap 报用法错误。`add`/`list`/`search` 省略时由 clap 填 `project`。
 - clap 不允许「变长位置参数之后跟可选位置参数」，因此 `remove` 的 scope 不在 clap 层声明，由 `cli::parse` 从 name 末尾识别（末尾是 `global`/`project` 就当作用域，否则默认 `project`）。`lsm remove --help` 的 usage 只显示 `<NAME>...`，scope 规则写在 `NAME` 的帮助文案里。
 - `config` 子命令的 `get`/`set` 是嵌套子命令，键用 `value_parser(["lang"])`（v1 只有 `lang`），未知键由 clap 报用法错误。
+- `group` 子命令的 `list`/`set`/`add`/`remove` 同样是嵌套子命令；`group` 无子命令时按 §2.4 输出 help 到 stderr、退 2。
+- `pull --group <GROUP>` 用 `ArgAction::Append` 收集，可重复；与 `<NAME>...`、`--all` 的互斥在 `cli::parse` 里判定，以便输出本地化文案（不依赖 clap 的英文冲突提示）。
 - `upgrade` 只有两个布尔 flag：`--check`、`--force`，不带位置参数；行为与文案见 [upgrade.md](upgrade.md)。
 - clap 自带的 `-h` / `-V` 说明是英文，因此根命令与各子命令都 `disable_help_flag(true)` 后自建 `-h/--help`，根命令另外自建 `-V/--version`，说明文案来自消息表。
 - 参数校验错误统一由 `cli::parse` 转成 `AppError`，在 `lib::run` 边界渲染。
@@ -271,6 +282,7 @@ impl AppError {
 - Q29：分层收敛与错误映射（错误枚举在 `domain`/`infra`，`AppError` 只在边界构造，渲染归 `output`）。
 - Q30 / Q31 / Q32：`upgrade` 的命令形态、原地替换（文件名不变）、网络与资产契约（见 [upgrade.md](upgrade.md)）。
 - Q33 / Q37：命令表与选项表同属 CLI 真源，改动顺序与二进制一致性由 `tests/cli.rs` 强制。
+- Q53–Q57：分组存放于全局 `config.toml` 的 `[groups]`，提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。
 
 完整决策见 [decisions.md](../decisions.md)。
 

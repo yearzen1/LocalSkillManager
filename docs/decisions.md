@@ -57,6 +57,11 @@
 | Q50 | name 前缀解析 | `pull`/`push`/`remove` 的 `<name>` 按「精确优先 → 唯一前缀」解析：先找同名目录，未命中再扫对应作用域目录名取前缀命中；恰好 1 个按全名执行，≥2 个为运行时错误（退 1）并列出候选，0 个沿用 not-found（退 1）；只做前缀、不做子串，不自动执行 `search`（不推翻 Q47）；格式校验仍在 `cli::parse`（退 2），解析在命令层；多 name 时单条歧义/缺失按失败记账并继续（沿用 Q44）；`--all` 不受影响 |
 | Q51 | 作用域默认 `project` | `add`/`list`/`search`/`remove` 的 `<SCOPE>` 可省略，省略时为 `project`；`remove` 的最后一个参数恰好是 `global`/`project` 时按作用域处理，否则全部按 name（默认 `project`），技能名本身是 scope 词时必须显式写作用域；缩减版 `-a`/`-l`/`-r` 无 `-g`/`-p` 时同样补 `project`，`MissingScope` 用法错误与 `UsageMissingScope` 文案移除；`pull`/`push` 方向固定，不受影响 |
 | Q52 | `search` 字段过滤 | 新增 `--name` / `--description` 两个布尔开关，无短选项；默认与两个 flag 同给都按 name ∪ description 匹配，`--name` 只看名称、`--description` 只看描述；匹配规则、排序、空 query 退 2、JSON 输出均不变；非法项的 description 视为空串，`--description` 不命中它们 |
+| Q53 | 分组存放与成员规则 | 分组定义存放在全局 `config.toml` 的 `[groups]` 表（组名 → skill 名数组），不新增项目级配置；组名与成员名共用 skill 名校验，成员**只校验格式、不要求已安装**；成员重复按首次出现去重；`[groups]` 惰性加载，只有 `pull --group` 与 `group *` 读取，写坏不影响其他命令 |
+| Q54 | 分组的读取与排序 | `group list` 按组名字典序输出，成员保留定义顺序；空组显示 `(empty)`；无组输出 `No groups found.`；`--json` 输出 `[{"name":...,"skills":[...]}]`；`[groups]` 结构非法退 1，hint 指向修复或删除配置文件 |
+| Q55 | 分组命令面与 `pull --group` | 新增 `group list` / `group set` / `group add` / `group remove`；`pull --group <GROUP>...` 可重复，与 `<NAME>...`、`--all` 三者互斥（同给任两项退 2）；展开后复用 Q44 的批量语义，组不存在/组为空/成员缺失都按该条失败继续，即使只展开出 1 个也打印成功/跳过/失败计数，任一失败退 1 |
+| Q56 | 分组的破坏性规则 | `group set` 创建不存在的组不需要 `--force`，覆盖已存在的组必须 `--force`，否则退 1；`group add` 组不存在时自动创建、已有成员静默去重；`group remove <GROUP>...` 批量删除且不需要 `--force`，不存在的组逐条报错、其余继续，任一失败退 1；`set` 不给成员退 2 |
+| Q57 | v0.7.0 范围 | 只做分组：`[groups]` 持久化、`pull --group`、4 个 `group` 子命令与 `group list --json`；不把分组扩展到 `push`/`remove`/`list`/`search`，不做分组嵌套与通配；版本按 minor 升到 0.7.0 |
 
 ## 维护规则
 

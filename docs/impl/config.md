@@ -29,18 +29,30 @@
 
 ### 1.2 文件格式
 
-TOML，v1 只有一个键：
+TOML，v1 有 `lang` 与 `[groups]` 两项：
 
 ```toml
 # Output language: en | zh
 lang = "zh"
+
+[groups]
+frontend = ["tdd", "grill", "intent-lock"]
+common = ["conventional-commit"]
 ```
 
 - UTF-8 编码；含 BOM 时先去 BOM 再解析。
-- 值只接受 `en`/`zh` 及其别名（`en-US`/`zh-CN`）；**落盘永远写规范形式** `en`/`zh`。
-- 文件可手改：注释与未知键在 `config set` 时原样保留（用 `toml_edit` 做读改写）。
-- 未知键不报错；v1 不读取它们，也不删除它们。
-- 缺文件、缺 `lang` 键都表示"未设置"，不是错误。
+- `lang` 值只接受 `en`/`zh` 及其别名（`en-US`/`zh-CN`）；**落盘永远写规范形式** `en`/`zh`。
+- 文件可手改：注释与未知键在 `config set` / `group *` 写盘时原样保留（用 `toml_edit` 做读改写）。
+- 未知键不报错；当前版本不读取它们，也不删除它们。
+- 缺文件、缺 `lang` 键、缺 `[groups]` 表都表示"未设置"，不是错误。
+
+### 1.4 分组（`[groups]`）
+
+- `[groups]` 是表，键是分组名，值是 skill 名数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
+- 分组名与 skill 名共用同一套校验（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名）；成员同样必须是合法 skill 名。
+- 组内成员**只校验格式**，不要求当前已安装在 global；缺失由 `pull --group` 按批处理记失败。
+- 结构非法（`groups` 不是表、成员不是字符串、名字不合法）→ 运行时错误退 1，提示修复或删除配置文件。
+- **惰性读取**：只有 `pull --group` 与 `group list/set/add/remove` 读取 `[groups]`；`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 与语言解析完全不碰它，`[groups]` 写坏不影响这些命令。
 
 ### 1.3 数据结构
 
@@ -59,11 +71,25 @@ pub enum ConfigError {
     Write { path, source },          // 建目录 / 临时文件 / rename 失败
     Parse { path, source },          // TOML 语法非法
     InvalidValue { path, raw },      // lang 值不受支持
+    InvalidGroups { path, detail },  // [groups] 结构或成员名非法
+    GroupExists { name },            // group set 覆盖已存在的组且未加 --force
+    GroupNotFound { name },          // 要 add/remove 的组不存在
 }
 
 pub fn load(env: &Env) -> Result<Option<Lang>, ConfigError>;
 pub fn set_lang(env: &Env, value: Lang) -> Result<PathBuf, ConfigError>; // 返回写入路径
+
+pub struct GroupSaveReport { pub path: PathBuf, pub members: usize }
+pub fn load_groups(env: &Env) -> Result<Vec<Group>, ConfigError>;        // 按组名字典序
+pub fn set_group(env: &Env, name: &GroupName, members: &[SkillName], force: bool)
+    -> Result<GroupSaveReport, ConfigError>;
+pub fn add_group(env: &Env, name: &GroupName, members: &[SkillName])
+    -> Result<GroupSaveReport, ConfigError>;                            // 不存在则创建，已存在则追加去重
+pub fn remove_group(env: &Env, name: &GroupName) -> Result<PathBuf, ConfigError>;
 ```
+
+- `GroupSaveReport.members` 是写盘后的成员总数，供成功提示显示。
+- 所有写操作复用同一套「读 → `toml_edit` 改 → 临时文件 → rename」流程，保留注释与未知键；`[groups]` 删空时整表移除。
 
 - `ConfigError` 定义在 `infra::config`；`error::mapping` 把它转成 `AppError { kind: Runtime }`，不在 infra 内构造 `AppError`。
 - 只有 `domain::lang::Lang` 一个语言类型：`--lang`、`LSM_LANG`、配置文件值都走同一个 `Lang::parse`，不存在两套归一化。
@@ -197,6 +223,24 @@ lang = zh (saved to C:\Users\jiahui\AppData\Roaming\lsm\config.toml)
 - `lsm config get`（缺键）、`lsm config get scope`（v1 无此键）、`lsm config set lang fr`：用法错误 2，提示合法键只有 `lang`、合法值为 `en`/`zh`。
 - `config` 子命令不参与短选项归一化：`-a/-l/-r/-g/-p` 只映射 add/list/remove，其余原样交给 clap。
 
+### 4.5 `group` 命令
+
+```
+lsm group list [--json]
+lsm group set <GROUP> <SKILL>... [--force]
+lsm group add <GROUP> <SKILL>...
+lsm group remove <GROUP>...
+```
+
+- `group` 是顶层子命令；`list`/`set`/`add`/`remove` 是它的嵌套子命令，`group` 无子命令时 help 到 stderr、退 2。
+- 组名与成员名在 `cli::parse` 全量预校验，任一非法退 2、一条都不写。
+- `group list`：按组名字典序输出，一行一组 `frontend: tdd, grill`；空组显示 `(empty)`；没有任何组时输出 `No groups found.`；`--json` 输出 `[{"name":"frontend","skills":["tdd","grill"]}]`（2 空格缩进，空结果为 `[]`）。
+- `group set`：组不存在则创建；已存在时必须 `--force`，否则退 1 并提示先 `group list`；成员为空由 clap 报缺参数退 2。重复成员去重。
+- `group add`：组不存在则创建；已存在则把新成员追加到末尾，重复成员静默去重；成功退 0。
+- `group remove <GROUP>...`：批量删除，不需要 `--force`；不存在的组逐条报错、其余继续，结束打印成功/失败计数，任一失败退 1。
+- 写入失败、坏 TOML、`[groups]` 结构非法都退 1，hint 指向修复或删除配置文件。
+- 成功提示：`group 'frontend' saved (3 skills) -> <配置路径>` 与 `removed group 'frontend'`，按当前语言渲染。
+
 ## 5. 消息键
 
 键是 `MsgKey` 的枚举变体（定义在 `i18n/mod.rs`），文案在 `i18n/en.rs` / `i18n/zh.rs`，两边必须各一份：
@@ -214,6 +258,34 @@ lang = zh (saved to C:\Users\jiahui\AppData\Roaming\lsm\config.toml)
 | `ConfigWriteFailed` | failed to write config file: {0} | 写入配置文件失败：{0} |
 | `ConfigUnknownKey` | unknown config key '{0}' | 未知配置键 '{0}' |
 | `ConfigFixHint` | fix or delete {0} | 修复或删除 {0} |
+| `GroupAbout` | Manage skill groups | 管理 skill 分组 |
+| `GroupListAbout` | List skill groups | 列出 skill 分组 |
+| `GroupSetAbout` | Create or replace a skill group | 创建或替换 skill 分组 |
+| `GroupAddAbout` | Append skills to a group | 向分组追加 skill |
+| `GroupRemoveAbout` | Remove skill groups | 删除 skill 分组 |
+| `GroupNameArg` | Group name | 分组名 |
+| `GroupSetForceFlag` | Overwrite an existing group | 覆盖已存在的分组 |
+| `GroupSkillArg` | Skill names in the group | 分组内的 skill 名称 |
+| `GroupJsonFlag` | Print machine-readable JSON | 输出机器可读的 JSON |
+| `GroupInvalid` | invalid group name '{0}' | 非法的分组名称 '{0}' |
+| `GroupInvalidHint` | group names use lowercase letters, digits and single hyphens | 分组名称只能使用小写字母、数字和单个连字符 |
+| `GroupTooLong` | group name is too long: {0} > 64 characters | 分组名称过长：{0} > 64 个字符 |
+| `GroupReserved` | group name '{0}' is reserved on Windows | 分组名称 '{0}' 是 Windows 保留设备名 |
+| `GroupAlreadyExists` | group '{0}' already exists | 分组 '{0}' 已存在 |
+| `GroupNotFound` | group '{0}' not found | 找不到分组 '{0}' |
+| `GroupNotFoundHint` | run `lsm group list` to see available groups | 运行 `lsm group list` 查看可用分组 |
+| `GroupEmpty` | group '{0}' is empty | 分组 '{0}' 为空 |
+| `GroupEmptyHint` | add members with `lsm group add {0} <skill>...` | 运行 `lsm group add {0} <skill>...` 添加成员 |
+| `GroupNoGroups` | No groups found. | 未找到任何分组。 |
+| `GroupLine` | {0}: {1} | {0}: {1} |
+| `GroupEmptyMembers` | (empty) | （空） |
+| `GroupSaved` | group '{0}' saved ({1} skills) -> {2} | 分组 '{0}' 已保存（{1} 个成员）-> {2} |
+| `GroupRemoved` | removed group '{0}' | 已删除分组 '{0}' |
+| `GroupBatchSummary` | removed {0}, failed {1} | 成功 {0} 个，失败 {1} 个 |
+| `GroupBatchFailed` | {0} group(s) failed to remove | {0} 个分组删除失败 |
+| `GroupBatchFailedHint` | fix the groups above, then run `lsm group remove` again | 修复上面的分组后重新运行 `lsm group remove` |
+| `GroupConfigInvalid` | invalid [groups] in config file {0}: {1} | 配置文件中的 [groups] 非法：{0}：{1} |
+| `PullGroupFlag` | Pull every skill in a group (repeatable) | 拉取分组内的全部 skill（可重复） |
 
 - `config get` 的输出是裸值，不经过消息表。
 - 键名用 `Config` 前缀分组，将来加键时直接追加变体；`i18n::tests` 会遍历全部键，检查两种语言都有非空文案、占位符集合一致。
@@ -223,5 +295,9 @@ lang = zh (saved to C:\Users\jiahui\AppData\Roaming\lsm\config.toml)
 - Q27：语言持久化（配置文件 + `config get/set`，TOML + `toml_edit`）。
 - Q28：优先级与失效策略（惰性读取、坏配置退 1、不做项目级配置）。
 - Q29：分层收敛（`Lang` 唯一、`Env` 快照、`decide` 纯决策表、错误映射与渲染在边界）。
+- Q53 / Q54：分组存放于全局 `config.toml` 的 `[groups]`，成员只校验格式；分组读写惰性加载。
+- Q55：`group list/set/add/remove` 的命令形态与批量语义。
+- Q56：`group set` 覆盖已存在的组必须 `--force`；`group remove` 不需要。
+- Q57：分组属于 v0.7.0。
 
 完整决策见 [decisions.md](../decisions.md)。
