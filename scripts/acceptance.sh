@@ -199,9 +199,9 @@ out=$(LSM_LANG=en "$lsm" pull --group common)
 ok
 
 step="21/21 group add and remove"
-LSM_LANG=en "$lsm" group add common delta >/dev/null
+LSM_LANG=en "$lsm" group add common gamma >/dev/null
 out=$(LSM_LANG=en "$lsm" group list)
-[[ "$out" == *"delta"* ]] || fail "group add did not append delta, got: $out"
+[[ "$out" == *"gamma"* ]] || fail "group add did not append gamma, got: $out"
 LSM_LANG=en "$lsm" group remove common >/dev/null
 out=$(LSM_LANG=en "$lsm" group list)
 [[ "$out" == *"No groups found."* ]] || fail "group remove left a group behind, got: $out"
