@@ -1,17 +1,18 @@
 # 如何管理 skill 分组
 
-分组是一组常用 skill 的名字列表。把分组保存到全局配置后，可以用一条 `lsm pull --group` 把整组 skill 拉进当前项目。
+分组是一组常用 skill 的名字列表，成员也可以是另一个分组（`@common`）。把分组保存到全局配置后，可以用一条 `lsm pull --group` 把整组 skill 拉进当前项目。
 
 ## 适用场景
 
 - 你每次新建项目都要拉同一批 skill，不想反复输入多个名字；
 - 你想把「后端常用」「文档常用」这类组合固定下来；
-- 你需要查看、追加、覆盖或删除已有分组。
+- 你想复用另一个分组的成员，而不是每次重复列一遍；
+- 你需要查看、追加、覆盖、移除成员或删除已有分组。
 
 不适用：
 
 - 想为每个项目保存不同的分组。分组目前存在**全局** `config.toml` 里，不是项目级配置；需要项目级差异时，请分别执行需要的 `lsm pull`。
-- 想按标签或子串自动匹配 skill。分组是显式名字列表，只支持唯一前缀，不支持子串匹配、通配与嵌套。
+- 想按标签或子串自动匹配 skill。分组是显式名字列表，只支持唯一前缀与 `@组名` 引用，不支持子串匹配与通配。
 
 ## 前置条件
 
@@ -38,6 +39,14 @@ lsm group set frontend conv tdd   # conv -> conventional-commit
 ```
 
 只要有任一个成员找不到或前缀不唯一，整组都不会写盘，命令退出 1 并逐条列出问题；找不到时会给出相近名字的提示。
+
+想让一个分组复用另一个分组的成员，写 `@组名`：
+
+```bash
+lsm group set frontend @common docs-writer
+```
+
+`frontend` 保存的是引用；`common` 以后增加或删除成员，`frontend` 会跟着变化。引用必须已定义，且不能形成环（`a -> b -> a` 会被拒绝）。
 
 如果分组已存在，必须显式覆盖：
 
@@ -67,7 +76,13 @@ lsm group list
 frontend: tdd, grill, conventional-commit
 ```
 
-组按组名字典序排列，成员保持定义顺序；没有分组时输出 `No groups found.`。
+组按组名字典序排列，成员保持定义顺序（引用的组显示为 `@common`）；没有分组时输出 `No groups found.`。
+
+想看展开后的最终 skill 列表：
+
+```bash
+lsm group list --resolved
+```
 
 需要机器可读输出时：
 
@@ -82,12 +97,16 @@ lsm group list --json
   {
     "name": "frontend",
     "skills": [
-      "tdd",
-      "grill"
+      "docs-writer"
+    ],
+    "includes": [
+      "common"
     ]
   }
 ]
 ```
+
+`skills` 是直接 skill 成员，`includes` 是 `@group` 引用；加 `--resolved` 时 `skills` 换成展开后的列表。
 
 ### 4. 用分组拉取
 
@@ -110,19 +129,31 @@ lsm pull tdd --group frontend   # 退出 2
 lsm pull --group frontend --all # 退出 2
 ```
 
-### 5. 删除分组
+### 5. 移除成员或删除分组
+
+从分组里移除一个 skill 或 `@引用`：
 
 ```bash
-lsm group remove frontend
+lsm group remove frontend tdd
+lsm group remove frontend @common
 ```
 
-批量删除：
+成员在**该组已有成员**里按「精确 → 唯一前缀」解析；找不到时列出相近选项，且整组不修改。
+
+删除整个分组用 `delete`：
 
 ```bash
-lsm group remove frontend docs
+lsm group delete frontend
+lsm group delete frontend docs
 ```
 
-删除分组**不需要** `--force`。不存在的组逐条报错，其余照常删除；任一失败退出 1。
+如果该组被其他组引用，默认拒绝删除并列出依赖者；确认要一起清理引用时加 `--force`：
+
+```bash
+lsm group delete common --force
+```
+
+`group remove frontend`（只给组名、不给成员）是用法错误，会提示改用 `group delete frontend`。
 
 ## 验证
 
@@ -140,9 +171,11 @@ lsm list project
 
 - **`group 'x' already exists`**：这是 `set` 的覆盖保护。确认要替换时加 `--force`；如果只是想加成员，改用 `group add`。
 - **`invalid group name` / `invalid skill name`**：组名和成员名都使用 skill 名规则（小写字母、数字、单个连字符，≤64 字符，不能是 Windows 保留设备名）。组名写了大写时，hint 会给出对应的全小写写法。命令在写盘前整体校验，失败时不会留下半个分组。
-- **`group 'x' not found`**：`pull --group` 或 `group remove` 引用了不存在的组。先用 `lsm group list` 确认；也可以只写唯一前缀。该组记为一次失败，其他组继续。
+- **`group 'x' not found`**：`pull --group`、`group remove` 或 `group delete` 引用了不存在的组。先用 `lsm group list` 确认；也可以只写唯一前缀。批量操作中该组记为一次失败，其他组继续。
 - **`group 'x' is empty`**：手改配置留下了空数组。用 `lsm group add x <skill>...` 补成员，或删除该组。
-- **某个成员 `not installed in global`**：`group set` / `group add` 在写盘前校验成员必须已安装在 global。先 `lsm add` 补上该 skill，或改成唯一前缀；命令会提示相近的名字。手改配置写入的缺失成员仍会在 `pull --group` 时逐条报错。
+- **某个成员 `not installed in global`**：`group set` / `group add` 在写盘前校验 skill 成员必须已安装在 global。先 `lsm add` 补上该 skill，或改成唯一前缀；命令会提示相近的名字。手改配置写入的缺失成员仍会在 `pull --group` 时逐条报错。
+- **`group reference cycle` / `references undefined group`**：`@group` 引用成环或指向不存在的组。用 `lsm group list` 检查引用关系，移除其中一条引用；写入时就会拒绝成环，手改配置则在 `pull --group` / `--resolved` 时报错。
+- **`is referenced by`**：`group delete` 默认保护被引用的分组。先改掉引用，或在确认要一并清理时加 `--force`。
 - **目标已存在**：没有 `--force` 时算**跳过**，不算失败；需要覆盖时加 `lsm pull --group frontend --force`。
 
 分组文件结构与加载时机见[配置文件参考](../reference/config.md)；作用域与分组位置的取舍见[核心概念](../explanation/concepts.md)。

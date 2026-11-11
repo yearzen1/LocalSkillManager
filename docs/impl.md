@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.7.2 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49），v0.6.0 加 name 前缀解析、作用域默认 `project` 与 `search` 字段过滤（Q50–Q52），v0.6.1 补全 help 的 `[possible values]` 汉化并修正 `config` 键文案，v0.7.0 加 skill 分组与 `pull --group`（Q53–Q57），v0.7.1 给分组成员加 global 存在性校验与模糊匹配（Q58），v0.7.2 给 `upgrade` 加 `--verbose` / `--progress` 过程反馈（Q59）
+> 状态：v0.8.0 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49），v0.6.0 加 name 前缀解析、作用域默认 `project` 与 `search` 字段过滤（Q50–Q52），v0.6.1 补全 help 的 `[possible values]` 汉化并修正 `config` 键文案，v0.7.0 加 skill 分组与 `pull --group`（Q53–Q57），v0.7.1 给分组成员加 global 存在性校验与模糊匹配（Q58），v0.7.2 给 `upgrade` 加 `--verbose` / `--progress` 过程反馈（Q59），v0.8.0 支持组引用与组成员删除（Q60）
 > 最后更新：2026-11-13
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
@@ -70,7 +70,7 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.7.2"
+version = "0.8.0"
 edition = "2021"
 description = "Install, pull, and push agent skills under .agents/skills"
 license = "MIT"
@@ -298,6 +298,7 @@ pub struct Ctx {
 | v0.7.0 范围 | 全局 `config.toml` 的 `[groups]`、`pull --group`、`group list/set/add/remove`；只做扁平成员列表，不扩展到其他命令 | [decisions.md](decisions.md) Q53–Q57 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「pull」 |
 | v0.7.1 范围 | `group set/add` 成员必须存在于 global 并解析唯一前缀；组名读取支持唯一前缀；未命中给相近候选；大写组名提示全小写写法 | [decisions.md](decisions.md) Q58 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「name 前缀解析」 |
 | v0.7.2 范围 | `upgrade` 新增 `--verbose` / `--progress`：阶段提示与下载进度条只写 stderr，默认仍完全静默；固定 20 列 ASCII 条，不探测终端 | [decisions.md](decisions.md) Q59 / [upgrade.md](impl/upgrade.md)「过程输出」 |
+| v0.8.0 范围 | `[groups]` 支持 `@组名` 引用；`group remove` 改为删成员、新增 `group delete`；`group list --resolved`、JSON `includes`；`pull --group` 递归展开并检测环 | [decisions.md](decisions.md) Q60 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「pull」 |
 
 ## 6. 文档维护规则
 
@@ -434,4 +435,13 @@ pub struct Ctx {
 - [x] 默认不加 flag 时中间输出为零，stdout 仍只有一行结果；失败时先结束进度行再打错误体。
 - [x] `infra::net` 的下载回调报告已收字节与 `Content-Length`；`output` 提供字节数、进度条与百分比纯函数。
 - [x] `impl/cli.md`、`impl/upgrade.md`、`impl/quality.md` 与验收脚本第 17 步同步。
+
+### 8.10 v0.8.0 组引用与组成员删除（已实现）
+
+- [x] `Member` 分 `Skill` / `Group` 两态，配置支持 `@group` 引用，保持字符串数组格式与旧配置兼容。
+- [x] 展开深度优先、按首次出现去重；缺失引用与环在展开时检测并报出 `a -> b -> a`。
+- [x] `group add/set` 接受 `@ref`，写入时校验引用存在、拒绝自引用与成环，失败整组不写盘。
+- [x] `group remove <GROUP> <ITEM>...` 移除成员/引用；`group delete <GROUP>... [--force]` 删除整组，被引用时默认拒绝。
+- [x] `group list --resolved` 与 JSON `includes`；`pull --group` 递归展开后复用批量语义。
+- [x] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md`、分组 how-to 与配置参考同步。
 

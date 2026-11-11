@@ -48,14 +48,19 @@ common = ["conventional-commit"]
 
 ### 1.4 分组（`[groups]`）
 
-- `[groups]` 是表，键是分组名，值是 skill 名数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
+- `[groups]` 是表，键是分组名，值是成员数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
+- 成员有两种写法：`tdd` 是 skill 名；`@common` 是组引用（引用另一个分组）。因为 skill 名不允许 `@`，不需要转义。
 - 分组名与 skill 名共用同一套校验（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名）；大写输入在格式错误 hint 里提示对应的全小写写法（如 `Predevelop` → `predevelop`），但不会自动改写。
-- 成员名同样必须是合法 skill 名；`group set` / `group add` 写入前要求成员已安装在 **global**，并按「精确 → 唯一前缀」解析后写入全名（`code` → `code-review`）。
-- 任一成员缺失或多候选时整组不写盘：逐条打印错误，最后汇总退 1。成员缺失时若存在相近名字（子串或编辑距离，最多 3 条），hint 列出候选。
-- 直接手改 `config.toml` 仍可写入未安装的成员；这类成员在 `pull --group` 时按批处理逐条失败（Q53 的读取兜底不变）。
-- `group remove` 与 `pull --group` 的组名按「精确 → 唯一前缀」解析：恰好一个组匹配时用全名；多候选或零命中按该条失败，零命中时 hint 列出相近组名；`group set` / `group add` 的目标组名保持精确。
+- skill 成员在 `group set` / `group add` 写入前要求已安装在 **global**，并按「精确 → 唯一前缀」解析后写入全名（`code` → `code-review`）。
+- `@ref` 在写入前要求目标分组已定义，并按「精确 → 唯一前缀」解析；拒绝自引用与成环（`a -> b -> a`）。
+- 任一成员缺失、多候选或引用成环时整组不写盘：逐条打印错误，最后汇总退 1。缺失时若存在相近名字（子串或编辑距离，最多 3 条），hint 列出候选。
+- 直接手改 `config.toml` 仍可写入未安装的 skill 或悬空引用；展开时（`group list --resolved`、`pull --group`）检测缺失引用与环，并逐条失败。
+- 展开规则：深度优先，`@ref` 在原位置插入被引用组的成员，skill 按首次出现去重；顶层组展开为空时 `pull --group` 记为失败。
+- `group remove`、`group delete` 与 `pull --group` 的组名按「精确 → 唯一前缀」解析：恰好一个组匹配时用全名；多候选或零命中按该条失败，零命中时 hint 列出相近组名；`group set` / `group add` 的目标组名保持精确。
+- `group remove` 只删除成员/引用；`group delete` 删除整组，被其他组引用时默认拒绝，`--force` 才删除并同时移除这些引用。
+- `group list --json` 输出 `[{"name":...,"skills":[...],"includes":[...]}]`；`skills` 是直接 skill 成员，`includes` 是 `@ref`；`--resolved` 时 `skills` 换成展开后的列表。
 - 结构非法（`groups` 不是表、成员不是字符串、名字不合法）→ 运行时错误退 1，提示修复或删除配置文件。
-- **惰性读取**：只有 `pull --group` 与 `group list/set/add/remove` 读取 `[groups]`；`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 与语言解析完全不碰它，`[groups]` 写坏不影响这些命令。
+- **惰性读取**：只有 `pull --group` 与 `group list/set/add/remove/delete` 读取 `[groups]`；`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 与语言解析完全不碰它，`[groups]` 写坏不影响这些命令。
 
 ### 1.3 数据结构
 
@@ -229,20 +234,23 @@ lang = zh (saved to C:\Users\jiahui\AppData\Roaming\lsm\config.toml)
 ### 4.5 `group` 命令
 
 ```
-lsm group list [--json]
-lsm group set <GROUP> <SKILL>... [--force]
-lsm group add <GROUP> <SKILL>...
-lsm group remove <GROUP>...
+lsm group list [--json] [--resolved]
+lsm group set <GROUP> <ITEM>... [--force]
+lsm group add <GROUP> <ITEM>...
+lsm group remove <GROUP> <ITEM>...
+lsm group delete <GROUP>... [--force]
 ```
 
-- `group` 是顶层子命令；`list`/`set`/`add`/`remove` 是它的嵌套子命令，`group` 无子命令时 help 到 stderr、退 2。
-- 组名与成员名在 `cli::parse` 全量预校验，任一非法退 2、一条都不写。
-- `group list`：按组名字典序输出，一行一组 `frontend: tdd, grill`；空组显示 `(empty)`；没有任何组时输出 `No groups found.`；`--json` 输出 `[{"name":"frontend","skills":["tdd","grill"]}]`（2 空格缩进，空结果为 `[]`）。
+- `group` 是顶层子命令；`list`/`set`/`add`/`remove`/`delete` 是它的嵌套子命令，`group` 无子命令时 help 到 stderr、退 2。
+- 组名与成员在 `cli::parse` 全量预校验，任一非法退 2、一条都不写。
+- `<ITEM>` 是 skill 名或 `@组名` 引用；格式非法（含 `@` 后为空）退 2。
+- `group list`：按组名字典序输出，一行一组 `frontend: @common, tdd`；空组显示 `(empty)`；没有任何组时输出 `No groups found.`；`--json` 输出 `[{"name":"frontend","skills":["tdd"],"includes":["common"]}]`（2 空格缩进，空结果为 `[]`）；`--resolved` 把 `@ref` 展开进 `skills`。
 - `group set`：组不存在则创建；已存在时必须 `--force`，否则退 1 并提示先 `group list`；成员为空由 clap 报缺参数退 2。重复成员去重。
 - `group add`：组不存在则创建；已存在则把新成员追加到末尾，重复成员静默去重；成功退 0。
-- `group remove <GROUP>...`：批量删除，不需要 `--force`；不存在的组逐条报错、其余继续，结束打印成功/失败计数，任一失败退 1。
+- `group remove <GROUP> <ITEM>...`：只从该组移除成员或引用，组本身保留；成员按组内已有成员前缀解析，找不到时整组不修改并退 1；只给组名退 2，hint 指向 `group delete`。
+- `group delete <GROUP>...`：删除整组；被其他组引用时默认拒绝并列出依赖者，`--force` 时同时移除这些引用；不存在的组逐条报错、其余继续，结束打印成功/失败计数，任一失败退 1。
 - 写入失败、坏 TOML、`[groups]` 结构非法都退 1，hint 指向修复或删除配置文件。
-- 成功提示：`group 'frontend' saved (3 skills) -> <配置路径>` 与 `removed group 'frontend'`，按当前语言渲染。
+- 成功提示：`group 'frontend' saved (3 skills) -> <配置路径>`、`removed 'tdd' from group 'frontend'` 与 `removed group 'frontend'`，按当前语言渲染。
 
 ## 5. 消息键
 
@@ -265,11 +273,14 @@ lsm group remove <GROUP>...
 | `GroupListAbout` | List skill groups | 列出 skill 分组 |
 | `GroupSetAbout` | Create or replace a skill group | 创建或替换 skill 分组 |
 | `GroupAddAbout` | Append skills to a group | 向分组追加 skill |
-| `GroupRemoveAbout` | Remove skill groups | 删除 skill 分组 |
+| `GroupRemoveAbout` | Remove skills from a group | 从分组移除 skill |
+| `GroupDeleteAbout` | Delete skill groups | 删除 skill 分组 |
 | `GroupNameArg` | Group name | 分组名 |
 | `GroupSetForceFlag` | Overwrite an existing group | 覆盖已存在的分组 |
-| `GroupSkillArg` | Skill names in the group | 分组内的 skill 名称 |
+| `GroupDeleteForceFlag` | Delete even if other groups reference it | 即使被其他组引用也删除 |
+| `GroupSkillArg` | Skills or @group references | skill 名称或 @group 引用 |
 | `GroupJsonFlag` | Print machine-readable JSON | 输出机器可读的 JSON |
+| `GroupResolvedFlag` | Expand @group references | 展开 @group 引用 |
 | `GroupInvalid` | invalid group name '{0}' | 非法的分组名称 '{0}' |
 | `GroupInvalidHint` | group names use lowercase letters, digits and single hyphens | 分组名称只能使用小写字母、数字和单个连字符 |
 | `GroupTooLong` | group name is too long: {0} > 64 characters | 分组名称过长：{0} > 64 个字符 |
@@ -283,8 +294,24 @@ lsm group remove <GROUP>...
 | `GroupMemberMissingHint` | run `lsm list global` to see installed skills | 运行 `lsm list global` 查看已安装的 skill |
 | `GroupMembersFailed` | {0} skill(s) are unavailable in global; the group was not written | {0} 个 skill 在 global 中不可用，未写入任何分组 |
 | `GroupMembersFailedHint` | fix the skills above, then run the command again | 修正上面的 skill 名称后重新运行 |
+| `GroupSetFailed` | {0} item(s) could not be resolved; the group was not changed | {0} 个成员无法解析，未修改分组 |
+| `GroupSetFailedHint` | fix the names above, then run the command again | 修正上面的名称后重新运行 |
+| `GroupListFailed` | {0} group(s) could not be expanded | {0} 个分组无法展开 |
+| `GroupListFailedHint` | fix the @group references above, then run the command again | 修正上面的 @group 引用后重新运行 |
 | `GroupAmbiguous` | group '{0}' matches more than one group: {1} | 分组 '{0}' 匹配到多个组：{1} |
 | `GroupAmbiguousHint` | use a longer prefix, or run `lsm group list` | 请使用更长的前缀，或运行 `lsm group list` |
+| `GroupItemNotInGroup` | '{0}' is not in group '{1}' | 分组 '{1}' 中没有 '{0}' |
+| `GroupRemoveFailed` | {0} item(s) are not in group '{1}'; the group was not changed | {0} 个成员不在分组 '{1}' 中，未修改分组 |
+| `GroupRemoveFailedHint` | fix the names above, then run the command again | 修正上面的名称后重新运行 |
+| `GroupMemberRemoved` | removed '{0}' from group '{1}' | 已从分组 '{1}' 移除 '{0}' |
+| `GroupRefMissing` | group '{0}' references undefined group '{1}' | 分组 '{0}' 引用了不存在的分组 '{1}' |
+| `GroupRefMissingHint` | run `lsm group list` to see defined groups | 运行 `lsm group list` 查看已定义的分组 |
+| `GroupCycle` | group reference cycle: {0} | 分组引用成环：{0} |
+| `GroupCycleHint` | remove one of the references in [groups] | 移除 [groups] 中的一条引用 |
+| `GroupSelfReference` | group '{0}' cannot include itself | 分组 '{0}' 不能引用自身 |
+| `GroupDeleteReferenced` | group '{0}' is referenced by: {1} | 分组 '{0}' 被以下分组引用：{1} |
+| `GroupDeleteReferencedHint` | use --force to delete it and remove the references | 使用 --force 删除并移除这些引用 |
+| `GroupRefStripped` | removed reference '@{0}' from group '{1}' | 已从分组 '{1}' 移除引用 '@{0}' |
 | `GroupEmpty` | group '{0}' is empty | 分组 '{0}' 为空 |
 | `GroupEmptyHint` | add members with `lsm group add {0} <skill>...` | 运行 `lsm group add {0} <skill>...` 添加成员 |
 | `GroupNoGroups` | No groups found. | 未找到任何分组。 |
@@ -294,7 +321,7 @@ lsm group remove <GROUP>...
 | `GroupRemoved` | removed group '{0}' | 已删除分组 '{0}' |
 | `GroupBatchSummary` | removed {0}, failed {1} | 成功 {0} 个，失败 {1} 个 |
 | `GroupBatchFailed` | {0} group(s) failed to remove | {0} 个分组删除失败 |
-| `GroupBatchFailedHint` | fix the groups above, then run `lsm group remove` again | 修复上面的分组后重新运行 `lsm group remove` |
+| `GroupBatchFailedHint` | fix the groups above, then run `lsm group delete` again | 修复上面的分组后重新运行 `lsm group delete` |
 | `GroupConfigInvalid` | invalid [groups] in config file {0}: {1} | 配置文件中的 [groups] 非法：{0}：{1} |
 | `PullGroupFlag` | Pull every skill in a group (repeatable) | 拉取分组内的全部 skill（可重复） |
 
@@ -308,8 +335,9 @@ lsm group remove <GROUP>...
 - Q29：分层收敛（`Lang` 唯一、`Env` 快照、`decide` 纯决策表、错误映射与渲染在边界）。
 - Q53 / Q54：分组存放于全局 `config.toml` 的 `[groups]`；分组读写惰性加载。
 - Q55：`group list/set/add/remove` 的命令形态与批量语义。
-- Q56：`group set` 覆盖已存在的组必须 `--force`；`group remove` 不需要。
+- Q56：`group set` 覆盖已存在的组必须 `--force`；`group delete` 删除被引用的组需要 `--force`。
 - Q57：分组属于 v0.7.0。
 - Q58：`group set/add` 的成员写入前必须存在于 global 并解析前缀；组名读取支持唯一前缀；大写组名只给提示，不自动改写。
+- Q60：成员支持 `@组名` 引用；展开去重并检测环；`group remove` 删成员、`group delete` 删组；`--resolved` 与 JSON `includes`。
 
 完整决策见 [decisions.md](../decisions.md)。

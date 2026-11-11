@@ -44,13 +44,14 @@ docs = ["docs-writer"]
 |---|---|
 | 类型 | TOML 表 |
 | 键 | 分组名，必须符合 skill 名规则 |
-| 值 | 字符串数组，每个元素是 skill 名 |
+| 值 | 字符串数组，每个元素是 skill 名或 `@组名` 引用 |
 | 成员顺序 | 保留定义顺序 |
 | 重复成员 | 读取与写入时按首次出现去重 |
 | 空数组 | 允许存在；`pull --group` 会把它记为失败并提示组为空 |
 | 缺失 | 等价于没有分组 |
-| 成员是否必须已安装 | `group set/add` 写入时必须在 global 中已安装；手改配置可写入缺失成员，由 `pull --group` 逐条解析 |
+| 成员是否必须已安装 | `group set/add` 写入时 skill 必须在 global 中已安装；手改配置可写入缺失成员，由 `pull --group` 逐条解析 |
 | 成员前缀 | `group set/add` 写入前按「精确 → 唯一前缀」解析并存储全名（`code` → `code-review`） |
+| 组引用 | `@common` 引用另一个分组；写入时要求已定义，读取时递归展开并检测环 |
 
 组名与成员名的规则：
 
@@ -59,13 +60,23 @@ docs = ["docs-writer"]
 - 最多 64 个字符；
 - 不能是 Windows 保留设备名（`con`、`prn`、`aux`、`nul`、`com1`–`com9`、`lpt1`–`lpt9`）。
 
-组名输入大写时会提示对应的全小写写法（如 `Predevelop` → `predevelop`），不会自动改写。`group remove` 与 `pull --group` 的组名支持唯一前缀（`predev` → `predevelop`）；`group set/add` 的目标组名必须精确匹配。
+组名输入大写时会提示对应的全小写写法（如 `Predevelop` → `predevelop`），不会自动改写。`group remove`、`group delete` 与 `pull --group` 的组名支持唯一前缀（`predev` → `predevelop`）；`group set/add` 的目标组名必须精确匹配。
 
-`[groups]` 是**惰性读取**的：只有 `group list/set/add/remove` 与 `pull --group` 会读取。`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 不读它，因此该表写坏不会影响这些命令。
+`@ref` 的展开是深度优先、按首次出现去重；`group list --resolved` 和 `pull --group` 会做缺失引用与环检测。示例：
+
+```toml
+[groups]
+common   = ["tdd", "grill"]
+frontend = ["@common", "docs-writer"]
+```
+
+`frontend` 展开后是 `tdd, grill, docs-writer`。
+
+`[groups]` 是**惰性读取**的：只有 `group list/set/add/remove/delete` 与 `pull --group` 会读取。`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 不读它，因此该表写坏不会影响这些命令。
 
 ## 写入
 
-- `config set lang`、`group set`、`group add`、`group remove` 都会读改写同一份文件；
+- `config set lang`、`group set`、`group add`、`group remove`、`group delete` 都会读改写同一份文件；
 - 注释与未知键原样保留；
 - 写入使用同目录临时文件加 rename；失败时清理临时文件，旧文件保持原样；
 - 配置文件语法非法时不覆盖，必须先修复或删除；

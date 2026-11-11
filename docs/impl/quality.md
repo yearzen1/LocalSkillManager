@@ -151,7 +151,7 @@ skill 分组（Q53–Q57，v0.7.0）：
 91. `group set Frontend tdd` / `group set frontend Bad-Name` → 退出 2，配置文件不产生任何新组。
 92. `group add frontend grill tdd`：组不存在时自动创建；已有成员静默去重，成员顺序保持首次出现。
 93. `group list` 无组 → 退出 0 输出 `No groups found.`；`--json` 输出 `[]`；有组时 JSON 字段为 `name` / `skills`，组按字典序、成员保留定义顺序。
-94. `group remove a missing` → 退出 1，`a` 被删除、`missing` 报错，结束打印成功/失败计数；`group remove` 不需要 `--force`。
+94. `group delete a missing` → 退出 1，`a` 被删除、`missing` 报错，结束打印成功/失败计数；删除未被引用的组不需要 `--force`。
 95. `[groups]` 结构非法（`groups = "bad"`、成员是数字）→ `group list` / `pull --group` 退 1，提示修复或删除配置文件；`list` / `search` / 其他命令仍正常。
 96. `pull --group common`（成员 `alpha`、`beta`）→ 两个 skill 都进入项目，结束打印 `pulled 2, skipped 0, failed 0`；只有 1 个成员时也打印计数。
 97. `pull --group a --group b` 展开后重复 skill 只拉取一次；组不存在、组为空、成员缺失都逐条报错并继续，任一失败退 1。
@@ -166,10 +166,27 @@ skill 分组（Q53–Q57，v0.7.0）：
 103. `group add frontend code`（global 只有 `code-review`）→ 退出 0，配置里存储 `code-review` 而不是 `code`。
 104. global 同时有 `code-lint`、`code-review` 时 `group add frontend code` → 退出 1 并列出两个候选，整组不写盘。
 105. 一次给多个坏成员 → 每个坏成员各打印一条错误，最后汇总一行并退 1；合法成员也不写入。
-106. `group remove predev`（已存在 `predevelop`）→ 删除 `predevelop`；存在多个同前缀组时退 1 并列出候选。
+106. `group delete predev`（已存在 `predevelop`）→ 删除 `predevelop`；存在多个同前缀组时退 1 并列出候选。
 107. `pull --group predev`（已存在 `predevelop`）→ 展开 `predevelop`，输出显示全名。
 108. 已有 `predevelop` 时 `group add predev x` → 创建新组 `predev`，不做前缀解析。
 109. 手改 `[groups]` 写入 global 不存在的成员后执行 `pull --group` → 该成员按条失败，其余继续（原 97 的兜底不变）。
+
+组引用与成员删除（Q60，v0.8.0）：
+
+110. `group add frontend @common` → 退出 0，`group list` 显示 `frontend: @common, ...`。
+111. `group list --resolved` 把 `@common` 展开成其成员，嵌套两层也正确；`--json` 同样生效。
+112. `pull --group frontend` 拉取引用组里的全部 skill，重复 skill 只拉一次。
+113. 引用唯一前缀：`@comm` → `@common`；组名不存在时退 1 并列出候选。
+114. `group add a @a` → 退出 1，提示不能引用自身，不写盘。
+115. 已有 `b = ["@a"]` 时 `group add a @b` → 退出 1，报 `a -> b -> a`，不写盘。
+116. 手改配置制造环后 `pull --group a` → 该组失败并打印环路径，其他组继续。
+117. 写入不存在的 `@ref` 退 1；手改的悬空引用在 `pull --group` 时按该组失败。
+118. `group remove frontend @common` 只移除引用，`common` 分组仍然存在。
+119. `group remove frontend tdd` 移除成员；成员不在组里时退 1、整组不修改并给候选。
+120. `group remove frontend`（不给成员）→ 退出 2，hint 指向 `group delete frontend`。
+121. `group delete common` 被 `frontend` 引用时退 1 并列依赖者；加 `--force` 后删除 `common` 并移除 `frontend` 里的 `@common`。
+122. `group delete a missing` 批量删除：`a` 被删、`missing` 报错，结束打印计数并退 1。
+123. `group list --json` 输出 `name` / `skills` / `includes`，`skills` 不含 `@ref`。
 
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
@@ -204,18 +221,27 @@ lsm --lang zh add --help | grep '可选值'        # [可选值: global, project
 lsm group set frontend sample                  # 创建分组
 lsm group list                                 # frontend: sample
 lsm pull --group frontend                      # 拉取整组
-lsm group add frontend another                 # 追加成员
-lsm group remove frontend                      # 删除分组
+lsm group add frontend sample                  # 追加成员
+lsm group delete frontend                      # 删除分组
 
 # v0.7.1：分组成员校验与模糊匹配
 lsm group set Backend sample                   # 退出 2，hint 提示 'backend'
 lsm group set backend samp                     # 唯一前缀 → sample，写入全名
 lsm group set backend nope                     # 退出 1，不写盘
-lsm group remove back                          # 唯一前缀 → backend
+lsm group delete back                          # 唯一前缀 → backend
 
 # v0.7.2：upgrade 过程反馈
 lsm upgrade --check --verbose                   # stderr 打印 checking 行，stdout 仍是结果行
 lsm upgrade --progress                          # 下载阶段 stderr 单行重绘进度条
+
+# v0.8.0：组引用与成员删除
+lsm group set base sample
+lsm group add frontend @base                   # 引用无需安装
+lsm group list --resolved                      # 展开 @base
+lsm group remove frontend @base                # 只移除引用
+lsm group set frontend sample
+lsm group remove frontend sample               # 只移除成员
+lsm group delete base                          # 无引用时直接删除
 
 # 离线：只验子命令存在与非法参数，不联网
 lsm upgrade --help                              # 列出 --check / --force / --verbose / --progress，退出 0
@@ -233,7 +259,7 @@ rm -f /tmp/lsm-check
 - 这一段是唯一的联网步骤，且只对**副本**执行：`upgrade` 会替换 `current_exe()`，不要对日常使用的 `lsm` 直接跑。
 - Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
 - 发布前的 `upgrade --force` 手工验收见 [release.md](../release.md)「升级契约」：用上一版二进制执行一次，确认替换后 `--version` 正常且没有 `.old-*` 残留。
-- v0.6.x 的默认作用域、唯一前缀、`search` 字段过滤与 help 汉化由 `scripts/acceptance.sh` 第 13–16 步覆盖；v0.7.x 的分组由第 19–21 步覆盖。脚本与本节的文字不一致时以脚本为准。
+- v0.6.x 的默认作用域、唯一前缀、`search` 字段过滤与 help 汉化由 `scripts/acceptance.sh` 第 13–16 步覆盖；v0.7.x / v0.8.0 的分组由第 19–21 步覆盖。脚本与本节的文字不一致时以脚本为准。
 
 上面这串步骤的执行入口是 `scripts/acceptance.sh`：Windows 用 Git Bash 调用（`"D:/Git/bin/bash.exe" scripts/acceptance.sh`），**不要用 WSL 的 `bash`**——它会把 Linux 路径原样传给 Windows 二进制，测试会在错误目录里跑出假绿。Linux/macOS 直接 `bash scripts/acceptance.sh`。脚本与本节的步骤不一致时以脚本为准，并在同一提交内改本节。
 

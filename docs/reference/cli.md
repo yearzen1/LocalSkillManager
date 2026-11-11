@@ -17,7 +17,8 @@
 | `group list` | 列出分组 | `lsm group list --help` |
 | `group set` | 创建或整体替换分组 | `lsm group set --help` |
 | `group add` | 向分组追加成员 | `lsm group add --help` |
-| `group remove` | 删除一个或多个分组 | `lsm group remove --help` |
+| `group remove` | 从分组移除 skill 或 `@group` 引用 | `lsm group remove --help` |
+| `group delete` | 删除一个或多个分组 | `lsm group delete --help` |
 | `config get` | 输出已保存的配置值 | `lsm config get --help` |
 | `config set` | 保存配置值 | `lsm config set --help` |
 | `upgrade` | 更新 `lsm` 自身二进制 | `lsm upgrade --help` |
@@ -36,12 +37,14 @@
 
 | 选项 | 出现在 | 定义位置 |
 |---|---|---|
-| `--force` | `add` / `pull` / `push` / `remove` / `group set` / `upgrade` | [`impl/cli.md`](../impl/cli.md) §2.1 选项表 |
+| `--force` | `add` / `pull` / `push` / `remove` / `group set` / `group delete` / `upgrade` | [`impl/cli.md`](../impl/cli.md) §2.1 选项表 |
 | `--all` | `pull` / `push` | 同上 |
 | `--group <GROUP>` | `pull`，可重复 | 同上 |
 | `--json` | `list` / `search` / `group list` | 同上 |
+| `--resolved` | `group list` | 同上 |
 | `--name` / `--description` | `search` | 同上 |
 | `--check` | `upgrade` | 同上 |
+| `--verbose` / `--progress` | `upgrade` | 同上 |
 
 `-a` / `-l` / `-r` / `-g` / `-p` 是历史短选项别名，由参数归一化处理，不在选项表内；新命令不新增短选项。
 
