@@ -40,11 +40,20 @@ pub fn skill_dir(
 
 /// `config.toml` 的完整路径。
 pub fn config_file(env: &Env) -> Result<PathBuf, PathError> {
+    Ok(config_dir(env)?.join("config.toml"))
+}
+
+/// `groups.toml` 的完整路径：与 `config.toml` 同目录。
+pub fn groups_file(env: &Env) -> Result<PathBuf, PathError> {
+    Ok(config_dir(env)?.join("groups.toml"))
+}
+
+fn config_dir(env: &Env) -> Result<&Path, PathError> {
     Ok(env
         .config_dir
         .as_ref()
         .ok_or(PathError::ConfigDirUnavailable)?
-        .join("config.toml"))
+        .as_path())
 }
 
 #[cfg(test)]
@@ -114,5 +123,20 @@ mod tests {
     fn config_file_fails_without_config_dir() {
         let env = env_with(Some("/tmp/agents"), None);
         assert_eq!(config_file(&env), Err(PathError::ConfigDirUnavailable));
+    }
+
+    #[test]
+    fn groups_file_lives_next_to_config_file() {
+        let env = env_with(None, Some("/tmp/config/lsm"));
+        assert_eq!(
+            groups_file(&env).unwrap(),
+            PathBuf::from("/tmp/config/lsm").join("groups.toml")
+        );
+    }
+
+    #[test]
+    fn groups_file_fails_without_config_dir() {
+        let env = env_with(Some("/tmp/agents"), None);
+        assert_eq!(groups_file(&env), Err(PathError::ConfigDirUnavailable));
     }
 }

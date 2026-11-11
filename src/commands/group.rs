@@ -1,6 +1,7 @@
-//! `group list` / `set` / `add` / `remove` / `delete`：读写 `config.toml` 的 `[groups]`。
+//! `group list` / `set` / `add` / `remove` / `delete`：读写 `groups.toml` 的顶层表。
 
 use std::collections::HashSet;
+use std::path::Path;
 
 use crate::domain::action::GroupCommand;
 use crate::domain::group::{expand, find_path, Group, GroupName, Member};
@@ -10,7 +11,7 @@ use crate::domain::resolve::Match;
 use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
 use crate::i18n::{tr, MsgKey};
-use crate::infra::{config, paths, scan};
+use crate::infra::{groups as group_store, paths, scan};
 use crate::output;
 use crate::output::error as error_output;
 use crate::Ctx;
@@ -32,7 +33,7 @@ pub fn run(ctx: &Ctx, command: GroupCommand) -> Result<(), AppError> {
 }
 
 fn list(ctx: &Ctx, json: bool, resolved: bool) -> Result<(), AppError> {
-    let groups = config::load_groups(&ctx.env)?;
+    let groups = group_store::load_groups(&ctx.env)?;
 
     if resolved {
         let mut expanded = Vec::with_capacity(groups.len());
@@ -107,17 +108,19 @@ fn list(ctx: &Ctx, json: bool, resolved: bool) -> Result<(), AppError> {
 }
 
 fn set(ctx: &Ctx, name: &GroupName, members: &[Member], force: bool) -> Result<(), AppError> {
-    let groups = config::load_groups(&ctx.env)?;
+    let groups = group_store::load_groups(&ctx.env)?;
     let members = resolve_members(ctx, name, &groups, members)?;
-    let report = config::set_group(&ctx.env, name, &members, force)?;
+    let report = group_store::set_group(&ctx.env, name, &members, force)?;
+    warn_legacy(ctx, report.legacy_leftover.as_deref());
     emit_saved(ctx, name, &report);
     Ok(())
 }
 
 fn add(ctx: &Ctx, name: &GroupName, members: &[Member]) -> Result<(), AppError> {
-    let groups = config::load_groups(&ctx.env)?;
+    let groups = group_store::load_groups(&ctx.env)?;
     let members = resolve_members(ctx, name, &groups, members)?;
-    let report = config::add_group(&ctx.env, name, &members)?;
+    let report = group_store::add_group(&ctx.env, name, &members)?;
+    warn_legacy(ctx, report.legacy_leftover.as_deref());
     emit_saved(ctx, name, &report);
     Ok(())
 }
@@ -219,7 +222,7 @@ fn resolve_reference(
 }
 
 fn remove_members(ctx: &Ctx, name: &GroupName, members: &[Member]) -> Result<(), AppError> {
-    let groups = config::load_groups(&ctx.env)?;
+    let groups = group_store::load_groups(&ctx.env)?;
     let available = group_names(&groups);
     let name = resolve_group(name, &available)?;
     let definition = groups
@@ -300,7 +303,8 @@ fn remove_members(ctx: &Ctx, name: &GroupName, members: &[Member]) -> Result<(),
         .filter(|member| !removals.contains(member))
         .cloned()
         .collect();
-    config::replace_group_members(&ctx.env, &name, &remaining)?;
+    let report = group_store::replace_group_members(&ctx.env, &name, &remaining)?;
+    warn_legacy(ctx, report.legacy_leftover.as_deref());
 
     for member in &removals {
         output::emit_line(
@@ -326,7 +330,7 @@ fn missing_in_group(item: &str, group: &GroupName, available: &[String]) -> AppE
 }
 
 fn delete(ctx: &Ctx, names: &[GroupName], force: bool) -> Result<(), AppError> {
-    let groups = config::load_groups(&ctx.env)?;
+    let groups = group_store::load_groups(&ctx.env)?;
     let available = group_names(&groups);
 
     if let [name] = names {
@@ -335,7 +339,8 @@ fn delete(ctx: &Ctx, names: &[GroupName], force: bool) -> Result<(), AppError> {
         if force {
             strip_references(ctx, std::slice::from_ref(&target))?;
         }
-        config::remove_group(&ctx.env, &target)?;
+        let report = group_store::remove_group(&ctx.env, &target)?;
+        warn_legacy(ctx, report.legacy_leftover.as_deref());
         output::emit_line(
             ctx.lang,
             &Msg::with_args(MsgKey::GroupRemoved, [target.as_str()]),
@@ -424,8 +429,9 @@ fn delete(ctx: &Ctx, names: &[GroupName], force: bool) -> Result<(), AppError> {
 
     let mut removed = 0usize;
     for target in &deletable {
-        match config::remove_group(&ctx.env, target) {
-            Ok(_) => {
+        match group_store::remove_group(&ctx.env, target) {
+            Ok(report) => {
+                warn_legacy(ctx, report.legacy_leftover.as_deref());
                 removed += 1;
                 output::emit_line(
                     ctx.lang,
@@ -488,7 +494,9 @@ fn ensure_deletable(groups: &[Group], target: &GroupName, force: bool) -> Result
 }
 
 fn strip_references(ctx: &Ctx, targets: &[GroupName]) -> Result<(), AppError> {
-    for (owner, reference) in config::strip_group_references(&ctx.env, targets)? {
+    let report = group_store::strip_group_references(&ctx.env, targets)?;
+
+    for (owner, reference) in report.stripped {
         output::warn(
             ctx.lang,
             &Msg::with_args(
@@ -497,7 +505,19 @@ fn strip_references(ctx: &Ctx, targets: &[GroupName]) -> Result<(), AppError> {
             ),
         );
     }
+
+    warn_legacy(ctx, report.legacy_leftover.as_deref());
     Ok(())
+}
+
+/// 旧 `config.toml` 里的 `[groups]` 没删掉时提醒一次：它已被忽略，但用户可能想手工清理。
+fn warn_legacy(ctx: &Ctx, leftover: Option<&Path>) {
+    if let Some(path) = leftover {
+        output::warn(
+            ctx.lang,
+            &Msg::with_args(MsgKey::GroupLegacyLeftover, [path.display().to_string()]),
+        );
+    }
 }
 
 fn finish_items(
@@ -530,7 +550,7 @@ fn emit_errors(ctx: &Ctx, errors: &[AppError]) {
     }
 }
 
-fn emit_saved(ctx: &Ctx, name: &GroupName, report: &config::GroupSaveReport) {
+fn emit_saved(ctx: &Ctx, name: &GroupName, report: &group_store::GroupWriteReport) {
     output::emit_line(
         ctx.lang,
         &Msg::with_args(

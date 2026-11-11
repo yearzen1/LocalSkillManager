@@ -14,7 +14,7 @@ use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
 use crate::i18n::MsgKey;
 use crate::infra::fsops::{self, FsError};
-use crate::infra::{config, frontmatter, paths, scan};
+use crate::infra::{frontmatter, groups, paths, scan};
 use crate::output;
 use crate::output::error as error_output;
 use crate::Ctx;
@@ -109,7 +109,7 @@ fn transfer_groups(
     groups: &[GroupName],
     force: bool,
 ) -> Result<(), AppError> {
-    let definitions = config::load_groups(&ctx.env)?;
+    let definitions = groups::load_groups(&ctx.env)?;
     let available = scan::dir_names(source_dir)?;
     let group_names: Vec<String> = definitions
         .iter()

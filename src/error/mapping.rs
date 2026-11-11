@@ -10,6 +10,7 @@ use crate::i18n::MsgKey;
 use crate::infra::config::ConfigError;
 use crate::infra::frontmatter::FrontmatterError;
 use crate::infra::fsops::FsError;
+use crate::infra::groups::GroupError;
 use crate::infra::net::NetError;
 use crate::infra::paths::PathError;
 use crate::infra::process::ProcessError;
@@ -248,16 +249,43 @@ impl From<ConfigError> for AppError {
                     .with_args([raw])
                     .with_hint_args(MsgKey::ConfigFixHint, [shown])
             }
-            ConfigError::InvalidGroups { path, detail } => {
+        }
+    }
+}
+
+impl From<GroupError> for AppError {
+    fn from(err: GroupError) -> Self {
+        match err {
+            GroupError::Path(path_error) => path_error.into(),
+            GroupError::Io { path, source } => {
+                let detail = source.to_string();
+                AppError::runtime(MsgKey::FsIo)
+                    .with_args([path.display().to_string(), detail])
+                    .with_source(source)
+            }
+            GroupError::Write { path, source } => {
+                let detail = source.to_string();
+                AppError::runtime(MsgKey::GroupWriteFailed)
+                    .with_args([format!("{}: {detail}", path.display())])
+                    .with_source(source)
+            }
+            GroupError::Parse { path, source } => {
                 let shown = path.display().to_string();
-                AppError::runtime(MsgKey::GroupConfigInvalid)
+                AppError::runtime(MsgKey::GroupParseFailed)
+                    .with_args([shown.clone()])
+                    .with_hint_args(MsgKey::ConfigFixHint, [shown])
+                    .with_source(source)
+            }
+            GroupError::Invalid { path, detail } => {
+                let shown = path.display().to_string();
+                AppError::runtime(MsgKey::GroupFileInvalid)
                     .with_args([shown.clone(), detail])
                     .with_hint_args(MsgKey::ConfigFixHint, [shown])
             }
-            ConfigError::GroupExists { name } => AppError::runtime(MsgKey::GroupAlreadyExists)
+            GroupError::GroupExists { name } => AppError::runtime(MsgKey::GroupAlreadyExists)
                 .with_args([name])
                 .with_hint(MsgKey::SkillAlreadyExistsHint),
-            ConfigError::GroupNotFound { name } => AppError::runtime(MsgKey::GroupNotFound)
+            GroupError::GroupNotFound { name } => AppError::runtime(MsgKey::GroupNotFound)
                 .with_args([name])
                 .with_hint(MsgKey::GroupNotFoundHint),
         }

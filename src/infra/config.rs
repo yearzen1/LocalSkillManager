@@ -1,13 +1,14 @@
 //! `config.toml` 的读写：TOML、保留注释与未知键、原子写入。错误为 [`ConfigError`]。
+//!
+//! 分组不在这里：`groups.toml` 由 [`super::groups`] 负责。
 
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use crate::domain::group::{Group, GroupName, Member};
 use crate::domain::lang::Lang;
 
 use super::env::Env;
 use super::paths::{self, PathError};
+use super::tomlfile::{self, TomlFileError};
 
 /// 配置文件读写失败。
 #[derive(Debug)]
@@ -31,18 +32,6 @@ pub enum ConfigError {
     },
     /// `lang` 值不是受支持的语言。
     InvalidValue { path: PathBuf, raw: String },
-    /// `[groups]` 不是「组名 → skill 名数组」的结构。
-    InvalidGroups { path: PathBuf, detail: String },
-    /// `group set` 要覆盖已存在的组但没加 `--force`。
-    GroupExists { name: String },
-    /// 要 `add` / `remove` 的组不存在。
-    GroupNotFound { name: String },
-}
-
-/// 一次分组写盘的结果。
-pub struct GroupSaveReport {
-    pub path: PathBuf,
-    pub members: usize,
 }
 
 /// 读取 `lang`。文件或键缺失返回 `None`，不是错误。
@@ -82,178 +71,16 @@ pub fn load(env: &Env) -> Result<Option<Lang>, ConfigError> {
 pub fn set_lang(env: &Env, value: Lang) -> Result<PathBuf, ConfigError> {
     let path = config_path(env)?;
 
-    let (mut doc, is_new) = read_document(&path)?;
+    let (mut doc, is_new) = tomlfile::read(&path)?;
     doc["lang"] = toml_edit::value(value.code());
 
-    let mut rendered = doc.to_string();
     if is_new {
-        rendered = format!("# Output language: en | zh\n{rendered}");
-    }
-    if !rendered.ends_with('\n') {
-        rendered.push('\n');
-    }
-
-    write_rendered(&path, &rendered)?;
-    Ok(path)
-}
-
-/// 读取全部分组；文件或 `[groups]` 缺失返回空列表，结构非法才是错误。
-pub fn load_groups(env: &Env) -> Result<Vec<Group>, ConfigError> {
-    let path = config_path(env)?;
-    let (doc, _) = read_document(&path)?;
-    groups_from_document(&path, &doc)
-}
-
-/// 创建或整体替换一个分组；`force` 为假时拒绝覆盖已有组。
-pub fn set_group(
-    env: &Env,
-    name: &GroupName,
-    members: &[Member],
-    force: bool,
-) -> Result<GroupSaveReport, ConfigError> {
-    let path = config_path(env)?;
-    let (mut doc, _) = read_document(&path)?;
-    let members = dedupe(members);
-
-    {
-        let table = groups_table_mut(&mut doc, &path)?;
-        if !force && table.contains_key(name.as_str()) {
-            return Err(ConfigError::GroupExists {
-                name: name.as_str().to_string(),
-            });
-        }
-        table.insert(name.as_str(), members_item(&members));
+        let rendered = format!("# Output language: en | zh\n{doc}");
+        tomlfile::write_rendered(&path, &ensure_trailing_newline(rendered))?;
+        return Ok(path);
     }
 
-    write_document(&path, &doc)?;
-    Ok(GroupSaveReport {
-        path,
-        members: members.len(),
-    })
-}
-
-/// 向分组追加成员；组不存在时自动创建，重复成员静默去重。
-pub fn add_group(
-    env: &Env,
-    name: &GroupName,
-    members: &[Member],
-) -> Result<GroupSaveReport, ConfigError> {
-    let path = config_path(env)?;
-    let (mut doc, _) = read_document(&path)?;
-
-    let merged = {
-        let table = groups_table_mut(&mut doc, &path)?;
-        let mut merged = match table.get(name.as_str()) {
-            Some(item) => members_from_item(&path, name.as_str(), item)?,
-            None => Vec::new(),
-        };
-        let mut seen: HashSet<Member> = merged.iter().cloned().collect();
-        for member in members {
-            if seen.insert(member.clone()) {
-                merged.push(member.clone());
-            }
-        }
-        table.insert(name.as_str(), members_item(&merged));
-        merged
-    };
-
-    write_document(&path, &doc)?;
-    Ok(GroupSaveReport {
-        path,
-        members: merged.len(),
-    })
-}
-
-/// 用给定成员整体替换一个已存在的分组；组不存在返回 [`ConfigError::GroupNotFound`]。
-pub fn replace_group_members(
-    env: &Env,
-    name: &GroupName,
-    members: &[Member],
-) -> Result<GroupSaveReport, ConfigError> {
-    let path = config_path(env)?;
-    let (mut doc, _) = read_document(&path)?;
-    let members = dedupe(members);
-
-    {
-        let table = groups_table_mut(&mut doc, &path)?;
-        if !table.contains_key(name.as_str()) {
-            return Err(ConfigError::GroupNotFound {
-                name: name.as_str().to_string(),
-            });
-        }
-        table.insert(name.as_str(), members_item(&members));
-    }
-
-    write_document(&path, &doc)?;
-    Ok(GroupSaveReport {
-        path,
-        members: members.len(),
-    })
-}
-
-/// 从所有分组中移除指向 `targets` 的 `@ref`；返回被移除的（拥有者, 引用）。
-pub fn strip_group_references(
-    env: &Env,
-    targets: &[GroupName],
-) -> Result<Vec<(GroupName, GroupName)>, ConfigError> {
-    let path = config_path(env)?;
-    let (mut doc, _) = read_document(&path)?;
-    let mut stripped = Vec::new();
-
-    {
-        let table = groups_table_mut(&mut doc, &path)?;
-        let names: Vec<String> = table.iter().map(|(name, _)| name.to_string()).collect();
-
-        for raw_name in names {
-            let owner = GroupName::parse(&raw_name)
-                .map_err(|_| invalid_groups(&path, format!("invalid group name '{raw_name}'")))?;
-            let Some(item) = table.get(&raw_name) else {
-                continue;
-            };
-            let mut members = members_from_item(&path, &raw_name, item)?;
-            let before = members.len();
-
-            members.retain(|member| match member {
-                Member::Group(reference) if targets.contains(reference) => {
-                    stripped.push((owner.clone(), reference.clone()));
-                    false
-                }
-                _ => true,
-            });
-
-            if members.len() != before {
-                table.insert(&raw_name, members_item(&members));
-            }
-        }
-    }
-
-    if !stripped.is_empty() {
-        write_document(&path, &doc)?;
-    }
-
-    Ok(stripped)
-}
-
-/// 删除一个分组；组不存在返回 [`ConfigError::GroupNotFound`]。
-pub fn remove_group(env: &Env, name: &GroupName) -> Result<PathBuf, ConfigError> {
-    let path = config_path(env)?;
-    let (mut doc, _) = read_document(&path)?;
-
-    let emptied = {
-        let table = groups_table_mut(&mut doc, &path)?;
-        if table.remove(name.as_str()).is_none() {
-            return Err(ConfigError::GroupNotFound {
-                name: name.as_str().to_string(),
-            });
-        }
-        table.is_empty()
-    };
-
-    if emptied {
-        doc.as_table_mut().remove("groups");
-    }
-
-    write_document(&path, &doc)?;
+    tomlfile::write(&path, &doc)?;
     Ok(path)
 }
 
@@ -261,156 +88,11 @@ fn config_path(env: &Env) -> Result<PathBuf, ConfigError> {
     paths::config_file(env).map_err(ConfigError::Path)
 }
 
-fn groups_from_document(
-    path: &Path,
-    doc: &toml_edit::DocumentMut,
-) -> Result<Vec<Group>, ConfigError> {
-    let Some(item) = doc.get("groups") else {
-        return Ok(Vec::new());
-    };
-
-    let table = item.as_table().ok_or_else(|| {
-        invalid_groups(
-            path,
-            "groups must be a table of skill-name arrays".to_string(),
-        )
-    })?;
-
-    let mut groups = Vec::new();
-    for (raw_name, value) in table.iter() {
-        let name = GroupName::parse(raw_name)
-            .map_err(|_| invalid_groups(path, format!("invalid group name '{raw_name}'")))?;
-        groups.push(Group {
-            name,
-            members: members_from_item(path, raw_name, value)?,
-        });
-    }
-
-    groups.sort_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
-    Ok(groups)
-}
-
-fn members_from_item(
-    path: &Path,
-    group: &str,
-    item: &toml_edit::Item,
-) -> Result<Vec<Member>, ConfigError> {
-    let array = item.as_array().ok_or_else(|| {
-        invalid_groups(
-            path,
-            format!("group '{group}' must be an array of skill names or @group references"),
-        )
-    })?;
-
-    let mut members = Vec::new();
-    let mut seen = HashSet::new();
-    for element in array.iter() {
-        let raw = element.as_str().ok_or_else(|| {
-            invalid_groups(path, format!("group '{group}' members must be strings"))
-        })?;
-        let member = Member::parse(raw).map_err(|_| {
-            invalid_groups(path, format!("group '{group}' has invalid member '{raw}'"))
-        })?;
-        if seen.insert(member.clone()) {
-            members.push(member);
-        }
-    }
-
-    Ok(members)
-}
-
-fn groups_table_mut<'a>(
-    doc: &'a mut toml_edit::DocumentMut,
-    path: &Path,
-) -> Result<&'a mut toml_edit::Table, ConfigError> {
-    if doc.get("groups").is_none() {
-        doc["groups"] = toml_edit::Item::Table(toml_edit::Table::new());
-    }
-
-    doc["groups"].as_table_mut().ok_or_else(|| {
-        invalid_groups(
-            path,
-            "groups must be a table of skill-name arrays".to_string(),
-        )
-    })
-}
-
-fn members_item(members: &[Member]) -> toml_edit::Item {
-    let mut array = toml_edit::Array::new();
-    for member in members {
-        array.push(member.to_string());
-    }
-    toml_edit::Item::Value(toml_edit::Value::Array(array))
-}
-
-fn dedupe(members: &[Member]) -> Vec<Member> {
-    let mut seen = HashSet::new();
-    members
-        .iter()
-        .filter(|member| seen.insert((*member).clone()))
-        .cloned()
-        .collect()
-}
-
-fn invalid_groups(path: &Path, detail: String) -> ConfigError {
-    ConfigError::InvalidGroups {
-        path: path.to_path_buf(),
-        detail,
-    }
-}
-
-fn write_document(path: &Path, doc: &toml_edit::DocumentMut) -> Result<(), ConfigError> {
-    let mut rendered = doc.to_string();
+fn ensure_trailing_newline(mut rendered: String) -> String {
     if !rendered.ends_with('\n') {
         rendered.push('\n');
     }
-    write_rendered(path, &rendered)
-}
-
-/// 同目录临时文件 + rename；失败时清理临时文件，旧文件保持原样。
-fn write_rendered(path: &Path, rendered: &str) -> Result<(), ConfigError> {
-    let parent = path.parent().ok_or_else(|| ConfigError::Write {
-        path: path.to_path_buf(),
-        source: anyhow::anyhow!("config file has no parent directory"),
-    })?;
-
-    std::fs::create_dir_all(parent).map_err(|err| ConfigError::Write {
-        path: parent.to_path_buf(),
-        source: anyhow::Error::new(err),
-    })?;
-
-    let temp = parent.join(format!(".config.toml.tmp-{}", std::process::id()));
-    std::fs::write(&temp, rendered).map_err(|err| ConfigError::Write {
-        path: temp.clone(),
-        source: anyhow::Error::new(err),
-    })?;
-
-    if let Err(err) = std::fs::rename(&temp, path) {
-        let _ = std::fs::remove_file(&temp);
-        return Err(ConfigError::Write {
-            path: path.to_path_buf(),
-            source: anyhow::Error::new(err),
-        });
-    }
-
-    Ok(())
-}
-
-/// 读现有文档；文件不存在时返回空文档并标记为新建。
-fn read_document(path: &std::path::Path) -> Result<(toml_edit::DocumentMut, bool), ConfigError> {
-    match std::fs::read_to_string(path) {
-        Ok(text) => {
-            let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
-            Ok((parse_document(path, text)?, false))
-        }
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            Ok((toml_edit::DocumentMut::new(), true))
-        }
-        Err(err) => Err(ConfigError::Io {
-            path: path.to_path_buf(),
-            source: anyhow::Error::new(err),
-        }),
-    }
+    rendered
 }
 
 fn parse_document(
@@ -424,6 +106,16 @@ fn parse_document(
         })
 }
 
+impl From<TomlFileError> for ConfigError {
+    fn from(err: TomlFileError) -> Self {
+        match err {
+            TomlFileError::Io { path, source } => ConfigError::Io { path, source },
+            TomlFileError::Write { path, source } => ConfigError::Write { path, source },
+            TomlFileError::Parse { path, source } => ConfigError::Parse { path, source },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -431,7 +123,6 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::domain::name::SkillName;
 
     fn env_in(dir: &TempDir) -> Env {
         Env {
@@ -572,177 +263,5 @@ mod tests {
             .filter(|name| name.contains("tmp"))
             .collect();
         assert!(leftovers.is_empty(), "leftovers: {leftovers:?}");
-    }
-
-    fn group(name: &str) -> GroupName {
-        GroupName::parse(name).unwrap()
-    }
-
-    fn skill(name: &str) -> Member {
-        Member::Skill(SkillName::parse(name).unwrap())
-    }
-
-    fn group_ref(name: &str) -> Member {
-        Member::Group(GroupName::parse(name).unwrap())
-    }
-
-    #[test]
-    fn missing_groups_means_empty() {
-        let dir = TempDir::new().unwrap();
-        assert!(load_groups(&env_in(&dir)).unwrap().is_empty());
-
-        write_config(&dir, "lang = \"en\"\n");
-        assert!(load_groups(&env_in(&dir)).unwrap().is_empty());
-    }
-
-    #[test]
-    fn reads_groups_sorted_and_dedupes_members_in_order() {
-        let dir = TempDir::new().unwrap();
-        write_config(
-            &dir,
-            "[groups]\nzeta = [\"b\", \"a\", \"b\"]\nalpha = [\"c\"]\n",
-        );
-
-        let groups = load_groups(&env_in(&dir)).unwrap();
-
-        assert_eq!(groups.len(), 2);
-        assert_eq!(groups[0].name.as_str(), "alpha");
-        assert_eq!(groups[0].members[0].to_string(), "c");
-        assert_eq!(groups[1].name.as_str(), "zeta");
-        let members: Vec<String> = groups[1].members.iter().map(ToString::to_string).collect();
-        assert_eq!(members, ["b", "a"]);
-    }
-
-    #[test]
-    fn rejects_invalid_groups_structure() {
-        let cases = [
-            "groups = \"bad\"\n",
-            "[groups]\nfrontend = [1]\n",
-            "[groups]\nFrontend = []\n",
-            "[groups]\nfrontend = [\"Bad\"]\n",
-            "[groups]\nfrontend = \"tdd\"\n",
-        ];
-
-        for content in cases {
-            let dir = TempDir::new().unwrap();
-            write_config(&dir, content);
-            assert!(
-                matches!(
-                    load_groups(&env_in(&dir)),
-                    Err(ConfigError::InvalidGroups { .. })
-                ),
-                "expected InvalidGroups for {content:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn set_group_writes_and_requires_force_to_replace() {
-        let dir = TempDir::new().unwrap();
-        let env = env_in(&dir);
-        let name = group("frontend");
-
-        let report = set_group(&env, &name, &[skill("tdd"), skill("grill")], false).unwrap();
-        assert_eq!(report.members, 2);
-        assert_eq!(load_groups(&env).unwrap()[0].members.len(), 2);
-
-        assert!(matches!(
-            set_group(&env, &name, &[skill("grill")], false),
-            Err(ConfigError::GroupExists { .. })
-        ));
-        assert_eq!(load_groups(&env).unwrap()[0].members.len(), 2);
-
-        let report = set_group(&env, &name, &[skill("grill")], true).unwrap();
-        assert_eq!(report.members, 1);
-        assert_eq!(
-            load_groups(&env).unwrap()[0].members[0].to_string(),
-            "grill"
-        );
-    }
-
-    #[test]
-    fn add_group_creates_then_appends_without_duplicates() {
-        let dir = TempDir::new().unwrap();
-        let env = env_in(&dir);
-        let name = group("frontend");
-
-        let report = add_group(&env, &name, &[skill("tdd")]).unwrap();
-        assert_eq!(report.members, 1);
-
-        let report = add_group(&env, &name, &[skill("grill"), skill("tdd")]).unwrap();
-        assert_eq!(report.members, 2);
-
-        let groups = load_groups(&env).unwrap();
-        let members: Vec<String> = groups[0].members.iter().map(ToString::to_string).collect();
-        assert_eq!(members, ["tdd", "grill"]);
-    }
-
-    #[test]
-    fn group_refs_round_trip_and_can_be_stripped() {
-        let dir = TempDir::new().unwrap();
-        let env = env_in(&dir);
-        let name = group("frontend");
-
-        set_group(&env, &name, &[skill("tdd"), group_ref("common")], false).unwrap();
-
-        let content = fs::read_to_string(config_file_path(&env)).unwrap();
-        assert!(content.contains("\"@common\""), "{content:?}");
-        assert_eq!(
-            load_groups(&env).unwrap()[0].members,
-            [skill("tdd"), group_ref("common")]
-        );
-
-        let stripped = strip_group_references(&env, &[group("common")]).unwrap();
-        assert_eq!(stripped, [(group("frontend"), group("common"))]);
-        assert_eq!(load_groups(&env).unwrap()[0].members, [skill("tdd")]);
-    }
-
-    #[test]
-    fn replace_group_members_requires_an_existing_group() {
-        let dir = TempDir::new().unwrap();
-        let env = env_in(&dir);
-
-        assert!(matches!(
-            replace_group_members(&env, &group("frontend"), &[skill("tdd")]),
-            Err(ConfigError::GroupNotFound { .. })
-        ));
-    }
-
-    #[test]
-    fn remove_group_deletes_it_and_drops_the_empty_table() {
-        let dir = TempDir::new().unwrap();
-        let env = env_in(&dir);
-        let name = group("frontend");
-        set_group(&env, &name, &[skill("tdd")], false).unwrap();
-
-        remove_group(&env, &name).unwrap();
-
-        let content = fs::read_to_string(config_file_path(&env)).unwrap();
-        assert!(!content.contains("[groups]"), "{content:?}");
-        assert!(matches!(
-            remove_group(&env, &name),
-            Err(ConfigError::GroupNotFound { .. })
-        ));
-    }
-
-    #[test]
-    fn group_writes_keep_comments_and_unknown_keys() {
-        let dir = TempDir::new().unwrap();
-        let path = write_config(
-            &dir,
-            "# mine\ntheme = \"dark\"\nlang = \"en\"\n\n# groups below\n",
-        );
-
-        set_group(&env_in(&dir), &group("frontend"), &[skill("tdd")], false).unwrap();
-
-        let content = fs::read_to_string(&path).unwrap();
-        assert!(content.contains("# mine"), "{content:?}");
-        assert!(content.contains("theme = \"dark\""), "{content:?}");
-        assert!(content.contains("# groups below"), "{content:?}");
-        assert!(content.contains("[groups]"), "{content:?}");
-    }
-
-    fn config_file_path(env: &Env) -> PathBuf {
-        env.config_dir.as_ref().unwrap().join("config.toml")
     }
 }

@@ -203,7 +203,10 @@ keys!(
     GroupBatchSummary,
     GroupBatchFailed,
     GroupBatchFailedHint,
-    GroupConfigInvalid,
+    GroupParseFailed,
+    GroupWriteFailed,
+    GroupFileInvalid,
+    GroupLegacyLeftover,
     // skill 元数据
     SkillAlreadyExists,
     SkillAlreadyExistsHint,
