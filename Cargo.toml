@@ -1,6 +1,6 @@
 [package]
 name = "local-skill-manager"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 description = "Install, pull, and push agent skills under .agents/skills"
 license = "MIT"
