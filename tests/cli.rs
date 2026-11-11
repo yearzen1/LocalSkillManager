@@ -1646,14 +1646,128 @@ fn upgrade_help_is_localized_and_unknown_flags_exit_two() {
         .assert()
         .success()
         .stdout(predicate::str::contains("--check"))
-        .stdout(predicate::str::contains("--force"));
+        .stdout(predicate::str::contains("--force"))
+        .stdout(predicate::str::contains("--verbose"))
+        .stdout(predicate::str::contains("--progress"));
     lsm()
         .args(["--lang", "zh", "upgrade", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("--check"));
+        .stdout(predicate::str::contains("--check"))
+        .stdout(predicate::str::contains("--verbose"))
+        .stdout(predicate::str::contains("--progress"));
     lsm().arg("-u").assert().code(2);
     lsm().args(["upgrade", "--bogus"]).assert().code(2);
+}
+
+#[test]
+fn upgrade_is_silent_without_feedback_flags() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let mut payload = fs::read(&exe).unwrap();
+    payload.push(0);
+    let (asset_url, asset_handle) = serve_stub(payload);
+    let asset = platform_asset();
+    let (endpoint, meta_handle) = serve_stub(release_json(&current_tag(), &[(asset, asset_url)]));
+
+    let output = upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--force"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("upgraded lsm"), "{stdout}");
+    assert_eq!(stdout.lines().count(), 1, "{stdout}");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("checking") && !stderr.contains("downloading") && !stderr.contains('\r'),
+        "stderr must stay free of process output: {stderr:?}"
+    );
+
+    meta_handle.join().unwrap();
+    asset_handle.join().unwrap();
+}
+
+#[test]
+fn upgrade_verbose_reports_each_stage_on_stderr() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let mut payload = fs::read(&exe).unwrap();
+    payload.push(0);
+    let (asset_url, asset_handle) = serve_stub(payload);
+    let asset = platform_asset();
+    let (endpoint, meta_handle) = serve_stub(release_json(&current_tag(), &[(asset, asset_url)]));
+
+    upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--force", "--verbose"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("upgraded lsm"))
+        .stderr(predicate::str::contains("checking for the latest release"))
+        .stderr(predicate::str::contains("downloading"))
+        .stderr(predicate::str::contains("verifying the downloaded binary"))
+        .stderr(predicate::str::contains("replacing"));
+
+    meta_handle.join().unwrap();
+    asset_handle.join().unwrap();
+}
+
+#[test]
+fn upgrade_check_verbose_only_announces_the_lookup() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let (endpoint, handle) = serve_stub(release_json(&current_tag(), &[]));
+
+    upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--check", "--verbose"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("up to date"))
+        .stderr(predicate::str::contains("checking for the latest release"))
+        .stderr(predicate::str::contains("downloading").not());
+
+    handle.join().unwrap();
+}
+
+#[test]
+fn upgrade_progress_draws_a_bar_that_ends_with_a_newline() {
+    let dir = TempDir::new().unwrap();
+    let exe = upgrade_copy(&dir);
+    let mut payload = fs::read(&exe).unwrap();
+    payload.push(0);
+    let (asset_url, asset_handle) = serve_stub(payload);
+    let asset = platform_asset();
+    let (endpoint, meta_handle) = serve_stub(release_json(&current_tag(), &[(asset, asset_url)]));
+
+    let output = upgrade_cmd(&exe, &endpoint, dir.path())
+        .args(["upgrade", "--force", "--progress"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout.lines().count(), 1, "{stdout}");
+
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    assert!(stderr.contains("downloading"), "{stderr}");
+    assert!(stderr.contains('%'), "{stderr}");
+    assert!(stderr.contains("100%"), "{stderr}");
+    assert!(stderr.contains('\r'), "{stderr:?}");
+    assert!(stderr.ends_with('\n'), "{stderr:?}");
+
+    // 进度行必须先结束，后续阶段行才能另起一行。
+    let verifying = stderr
+        .lines()
+        .find(|line| line.contains("verifying the downloaded binary"))
+        .expect("verifying stage must be printed");
+    assert!(
+        !verifying.contains("downloading") && !verifying.contains('%'),
+        "verifying stage must start on its own line: {verifying:?}"
+    );
+
+    meta_handle.join().unwrap();
+    asset_handle.join().unwrap();
 }
 
 #[test]

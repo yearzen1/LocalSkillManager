@@ -166,6 +166,8 @@ ok
 step="17/21 upgrade help and unknown flags (offline)"
 out=$("$lsm" upgrade --help)
 [[ "$out" == *"--check"* ]] || fail "upgrade --help does not list --check: $out"
+[[ "$out" == *"--verbose"* ]] || fail "upgrade --help does not list --verbose: $out"
+[[ "$out" == *"--progress"* ]] || fail "upgrade --help does not list --progress: $out"
 code=0
 "$lsm" upgrade --bogus >/dev/null 2>&1 || code=$?
 [[ "$code" -eq 2 ]] || fail "upgrade --bogus exited $code, expected 2"
