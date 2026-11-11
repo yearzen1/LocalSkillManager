@@ -2591,11 +2591,21 @@ fn write_config(config: &TempDir, content: &str) {
     fs::write(config_path(config), content).unwrap();
 }
 
+/// 带独立 global 目录的命令；分组写入时会校验成员是否已安装。
+fn lsm_with_home(config: &TempDir, home: &TempDir) -> Command {
+    let mut cmd = lsm_with_config(config);
+    cmd.env("LSM_HOME", home.path());
+    cmd
+}
+
 #[test]
 fn group_set_persists_members_and_list_renders_them() {
     let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    install_global(&home, "grill", "G.");
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "frontend", "tdd", "grill"])
         .assert()
         .success()
@@ -2605,7 +2615,7 @@ fn group_set_persists_members_and_list_renders_them() {
     assert!(content.contains("[groups]"), "missing [groups]: {content}");
     assert!(content.contains("\"tdd\""), "missing tdd: {content}");
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "list"])
         .assert()
         .success()
@@ -2615,30 +2625,33 @@ fn group_set_persists_members_and_list_renders_them() {
 #[test]
 fn group_set_requires_force_to_replace_an_existing_group() {
     let config = TempDir::new().unwrap();
-    lsm_with_config(&config)
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    install_global(&home, "grill", "G.");
+    lsm_with_home(&config, &home)
         .args(["group", "set", "frontend", "tdd", "grill"])
         .assert()
         .success();
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "frontend", "grill"])
         .assert()
         .code(1)
         .stderr(predicate::str::contains("already exists"))
         .stderr(predicate::str::contains("--force"));
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "list"])
         .assert()
         .success()
         .stdout(predicate::str::contains("frontend: tdd, grill"));
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "frontend", "grill", "--force"])
         .assert()
         .success();
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "list"])
         .assert()
         .success()
@@ -2654,7 +2667,8 @@ fn group_set_validates_group_and_member_names_before_writing() {
         .args(["group", "set", "Frontend", "tdd"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("invalid group name"));
+        .stderr(predicate::str::contains("invalid group name"))
+        .stderr(predicate::str::contains("did you mean 'frontend'?"));
 
     lsm_with_config(&config)
         .args(["group", "set", "frontend", "Bad-Name"])
@@ -2671,21 +2685,142 @@ fn group_set_validates_group_and_member_names_before_writing() {
 }
 
 #[test]
+fn group_set_requires_members_to_exist_in_global() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "grill", "G.");
+
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "frontend", "grill", "grilx"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "skill 'grilx' is not installed in global",
+        ))
+        .stderr(predicate::str::contains("did you mean: grill?"));
+
+    assert!(!config_path(&config).exists());
+}
+
+#[test]
+fn group_set_reports_every_unavailable_member() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "grill", "G.");
+
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "frontend", "missing-a", "missing-b"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("skill 'missing-a'"))
+        .stderr(predicate::str::contains("skill 'missing-b'"))
+        .stderr(predicate::str::contains("2 skill(s) are unavailable"));
+
+    assert!(!config_path(&config).exists());
+}
+
+#[test]
+fn group_add_stores_the_resolved_full_name() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "code-review", "Reviews.");
+
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "common", "code"])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(config_path(&config)).unwrap();
+    assert!(
+        content.contains("code-review"),
+        "missing full name: {content}"
+    );
+    assert!(!content.contains("\"code\""), "stored prefix: {content}");
+}
+
+#[test]
+fn group_set_rejects_an_ambiguous_prefix_without_writing() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "code-lint", "Lint.");
+    install_global(&home, "code-review", "Reviews.");
+
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "common", "code"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("matches more than one skill"))
+        .stderr(predicate::str::contains("code-lint"))
+        .stderr(predicate::str::contains("code-review"));
+
+    assert!(!config_path(&config).exists());
+}
+
+#[test]
+fn group_remove_resolves_a_unique_group_prefix() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "predevelop", "tdd"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "remove", "predev"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("removed group 'predevelop'"));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No groups found."));
+}
+
+#[test]
+fn group_add_does_not_resolve_the_target_group_name() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "predevelop", "tdd"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "predev", "tdd"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("predev: tdd"))
+        .stdout(predicate::str::contains("predevelop: tdd"));
+}
+
+#[test]
 fn group_add_creates_a_group_and_dedupes_members() {
     let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    install_global(&home, "grill", "G.");
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "add", "frontend", "tdd"])
         .assert()
         .success();
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "add", "frontend", "grill", "tdd"])
         .assert()
         .success()
         .stdout(predicate::str::contains("(2 skills)"));
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "list"])
         .assert()
         .success()
@@ -2712,16 +2847,20 @@ fn group_list_empty_and_json() {
 #[test]
 fn group_list_sorts_groups_and_keeps_member_order() {
     let config = TempDir::new().unwrap();
-    lsm_with_config(&config)
+    let home = home_dir();
+    for name in ["a", "b", "c"] {
+        install_global(&home, name, "X.");
+    }
+    lsm_with_home(&config, &home)
         .args(["group", "set", "zeta", "b", "a"])
         .assert()
         .success();
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "alpha", "c"])
         .assert()
         .success();
 
-    let output = lsm_with_config(&config)
+    let output = lsm_with_home(&config, &home)
         .args(["group", "list", "--json"])
         .assert()
         .success()
@@ -2740,23 +2879,26 @@ fn group_list_sorts_groups_and_keeps_member_order() {
 #[test]
 fn group_remove_is_batched_and_keeps_going() {
     let config = TempDir::new().unwrap();
-    lsm_with_config(&config)
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    install_global(&home, "grill", "G.");
+    lsm_with_home(&config, &home)
         .args(["group", "set", "a", "tdd"])
         .assert()
         .success();
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "b", "grill"])
         .assert()
         .success();
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "remove", "a", "missing"])
         .assert()
         .code(1)
         .stdout(predicate::str::contains("removed 1, failed 1"))
         .stderr(predicate::str::contains("group 'missing' not found"));
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "list"])
         .assert()
         .success()
@@ -2767,12 +2909,14 @@ fn group_remove_is_batched_and_keeps_going() {
 #[test]
 fn group_remove_single_prints_a_plain_message() {
     let config = TempDir::new().unwrap();
-    lsm_with_config(&config)
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
         .args(["group", "set", "a", "tdd"])
         .assert()
         .success();
 
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "remove", "a"])
         .assert()
         .success()
@@ -2828,7 +2972,7 @@ fn pull_group_copies_every_member() {
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
     install_global(&home, "beta", "B.");
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "common", "alpha", "beta"])
         .assert()
         .success();
@@ -2854,7 +2998,7 @@ fn pull_group_prints_a_summary_even_for_one_member() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "one", "alpha"])
         .assert()
         .success();
@@ -2875,11 +3019,11 @@ fn pull_group_dedupes_members_across_groups() {
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
     install_global(&home, "beta", "B.");
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "a", "alpha"])
         .assert()
         .success();
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "b", "alpha", "beta"])
         .assert()
         .success();
@@ -2896,8 +3040,10 @@ fn pull_group_dedupes_members_across_groups() {
 #[test]
 fn pull_group_conflicts_with_names_and_all() {
     let config = TempDir::new().unwrap();
+    let home = home_dir();
     let project = TempDir::new().unwrap();
-    lsm_with_config(&config)
+    install_global(&home, "alpha", "A.");
+    lsm_with_home(&config, &home)
         .args(["group", "set", "common", "alpha"])
         .assert()
         .success();
@@ -2951,10 +3097,7 @@ fn pull_group_missing_member_keeps_going() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
-    lsm_with_config(&config)
-        .args(["group", "set", "common", "alpha", "missing"])
-        .assert()
-        .success();
+    write_config(&config, "[groups]\ncommon = [\"alpha\", \"missing\"]\n");
 
     lsm_with_config(&config)
         .env("LSM_HOME", home.path())
@@ -2977,7 +3120,7 @@ fn pull_group_resolves_unique_prefixes() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "code-review", "Reviews.");
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "common", "code"])
         .assert()
         .success();
@@ -2997,6 +3140,49 @@ fn pull_group_resolves_unique_prefixes() {
 }
 
 #[test]
+fn pull_group_resolves_a_unique_group_prefix() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "predevelop", "alpha"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "predev"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled alpha"));
+
+    assert!(project
+        .path()
+        .join(".agents/skills/alpha/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn pull_group_suggests_a_close_group_name() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    write_config(&config, "[groups]\npredevelop = [\"alpha\"]\n");
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "predevelp"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("group 'predevelp' not found"))
+        .stderr(predicate::str::contains("did you mean: predevelop?"));
+}
+
+#[test]
 fn pull_group_skips_existing_targets_without_force() {
     let config = TempDir::new().unwrap();
     let home = home_dir();
@@ -3007,7 +3193,7 @@ fn pull_group_skips_existing_targets_without_force() {
         "alpha",
         "Local version.",
     );
-    lsm_with_config(&config)
+    lsm_with_home(&config, &home)
         .args(["group", "set", "common", "alpha"])
         .assert()
         .success();

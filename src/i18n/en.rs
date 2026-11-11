@@ -19,6 +19,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::LangHelp => "Output language [en, zh]",
         MsgKey::NameAmbiguous => "'{0}' matches more than one skill in {1}: {2}",
         MsgKey::NameAmbiguousHint => "use a longer prefix, or run `lsm list {0}`",
+        MsgKey::NameSuggestion => "did you mean: {0}?",
 
         MsgKey::UsageInvalidLanguage => "invalid language '{0}'",
         MsgKey::UsageInvalidLanguageHint => "use one of: en, zh",
@@ -152,6 +153,15 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::GroupAlreadyExists => "group '{0}' already exists",
         MsgKey::GroupNotFound => "group '{0}' not found",
         MsgKey::GroupNotFoundHint => "run `lsm group list` to see available groups",
+        MsgKey::GroupLowercaseHint => "did you mean '{0}'? group names must be lowercase",
+        MsgKey::GroupMemberMissing => "skill '{0}' is not installed in global",
+        MsgKey::GroupMemberMissingHint => "run `lsm list global` to see installed skills",
+        MsgKey::GroupMembersFailed => {
+            "{0} skill(s) are unavailable in global; the group was not written"
+        }
+        MsgKey::GroupMembersFailedHint => "fix the skills above, then run the command again",
+        MsgKey::GroupAmbiguous => "group '{0}' matches more than one group: {1}",
+        MsgKey::GroupAmbiguousHint => "use a longer prefix, or run `lsm group list`",
         MsgKey::GroupEmpty => "group '{0}' is empty",
         MsgKey::GroupEmptyHint => "add members with `lsm group add {0} <skill>...`",
         MsgKey::GroupNoGroups => "No groups found.",

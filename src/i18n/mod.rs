@@ -39,6 +39,7 @@ keys!(
     // name 解析
     NameAmbiguous,
     NameAmbiguousHint,
+    NameSuggestion,
     // 用法错误
     UsageInvalidLanguage,
     UsageInvalidLanguageHint,
@@ -166,6 +167,13 @@ keys!(
     GroupAlreadyExists,
     GroupNotFound,
     GroupNotFoundHint,
+    GroupLowercaseHint,
+    GroupMemberMissing,
+    GroupMemberMissingHint,
+    GroupMembersFailed,
+    GroupMembersFailedHint,
+    GroupAmbiguous,
+    GroupAmbiguousHint,
     GroupEmpty,
     GroupEmptyHint,
     GroupNoGroups,

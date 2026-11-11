@@ -19,7 +19,7 @@ use crate::output;
 use crate::output::error as error_output;
 use crate::Ctx;
 
-use super::resolve::resolve_name;
+use super::resolve::{resolve_group, resolve_name};
 
 /// 一个方向的全部可变部分：作用域与消息键。
 pub(super) struct TransferSpec {
@@ -111,20 +111,28 @@ fn transfer_groups(
 ) -> Result<(), AppError> {
     let definitions = config::load_groups(&ctx.env)?;
     let available = scan::dir_names(source_dir)?;
+    let group_names: Vec<String> = definitions
+        .iter()
+        .map(|group| group.name.as_str().to_string())
+        .collect();
 
     let mut names: Vec<SkillName> = Vec::new();
     let mut seen = HashSet::new();
     let mut failed = 0usize;
 
     for input in groups {
-        let Some(definition) = definitions.iter().find(|group| group.name == *input) else {
-            failed += 1;
-            let err = AppError::runtime(MsgKey::GroupNotFound)
-                .with_args([input.as_str()])
-                .with_hint(MsgKey::GroupNotFoundHint);
-            output::emit_stderr(&error_output::render_block(&err, ctx.lang));
-            continue;
+        let resolved = match resolve_group(input, &group_names) {
+            Ok(name) => name,
+            Err(err) => {
+                failed += 1;
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
+                continue;
+            }
         };
+        let definition = definitions
+            .iter()
+            .find(|group| group.name == resolved)
+            .expect("resolve_group returns a defined group name");
 
         if definition.members.is_empty() {
             failed += 1;

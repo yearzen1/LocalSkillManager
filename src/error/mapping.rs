@@ -1,6 +1,6 @@
 //! 唯一的「各层窄错误 → `AppError`」适配点，hint 也在这里配置。
 
-use crate::domain::group::GroupNameError;
+use crate::domain::group::{GroupName, GroupNameError};
 use crate::domain::lang::LangError;
 use crate::domain::meta::MetaError;
 use crate::domain::name::NameError;
@@ -47,9 +47,13 @@ impl From<NameError> for AppError {
 impl From<GroupNameError> for AppError {
     fn from(err: GroupNameError) -> Self {
         match err.0 {
-            NameError::Format { input } => AppError::usage(MsgKey::GroupInvalid)
-                .with_args([input])
-                .with_hint(MsgKey::GroupInvalidHint),
+            NameError::Format { input } => {
+                let err = AppError::usage(MsgKey::GroupInvalid).with_args([input.clone()]);
+                match lowercase_alternative(&input) {
+                    Some(lowercase) => err.with_hint_args(MsgKey::GroupLowercaseHint, [lowercase]),
+                    None => err.with_hint(MsgKey::GroupInvalidHint),
+                }
+            }
             NameError::TooLong { len, .. } => {
                 AppError::usage(MsgKey::GroupTooLong).with_args([len.to_string()])
             }
@@ -58,6 +62,12 @@ impl From<GroupNameError> for AppError {
             }
         }
     }
+}
+
+/// 含大写且全小写后合法时，返回该写法供 hint 使用（Q58）。
+fn lowercase_alternative(input: &str) -> Option<String> {
+    let lowercase = input.to_lowercase();
+    (lowercase != input && GroupName::parse(&lowercase).is_ok()).then_some(lowercase)
 }
 
 impl From<MetaError> for AppError {
@@ -317,6 +327,28 @@ mod tests {
 
     use super::*;
     use crate::error::ErrorKind;
+
+    #[test]
+    fn uppercase_group_names_hint_the_lowercase_form() {
+        let app: AppError = GroupName::parse("Predevelop").unwrap_err().into();
+
+        assert_eq!(app.exit_code(), 2);
+        assert_eq!(app.msg.key, MsgKey::GroupInvalid);
+        assert_eq!(app.msg.args, ["Predevelop"]);
+        let hint = app.hint.expect("uppercase names should suggest lowercase");
+        assert_eq!(hint.key, MsgKey::GroupLowercaseHint);
+        assert_eq!(hint.args, ["predevelop"]);
+    }
+
+    #[test]
+    fn invalid_group_names_keep_the_generic_hint() {
+        let app: AppError = GroupName::parse("Pre_dev").unwrap_err().into();
+
+        assert_eq!(
+            app.hint.as_ref().map(|hint| hint.key),
+            Some(MsgKey::GroupInvalidHint)
+        );
+    }
 
     #[test]
     fn pull_name_errors_are_usage_errors() {
