@@ -200,13 +200,13 @@ out=$(LSM_LANG=en "$lsm" pull --group common)
   || fail "pull --group did not install every member"
 ok
 
-step="21/21 group add and remove"
+step="21/21 group add and delete"
 LSM_LANG=en "$lsm" group add common gamma >/dev/null
 out=$(LSM_LANG=en "$lsm" group list)
 [[ "$out" == *"gamma"* ]] || fail "group add did not append gamma, got: $out"
-LSM_LANG=en "$lsm" group remove common >/dev/null
+LSM_LANG=en "$lsm" group delete common >/dev/null
 out=$(LSM_LANG=en "$lsm" group list)
-[[ "$out" == *"No groups found."* ]] || fail "group remove left a group behind, got: $out"
+[[ "$out" == *"No groups found."* ]] || fail "group delete left a group behind, got: $out"
 ok
 
 printf 'PASS\n'
