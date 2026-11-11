@@ -184,6 +184,11 @@ ok
 
 step="19/21 group set and list"
 LSM_LANG=en "$lsm" group set common sample beta >/dev/null
+[[ -f "$LSM_CONFIG_DIR/groups.toml" ]] || fail "group set did not write groups.toml"
+grep -q '^common = ' "$LSM_CONFIG_DIR/groups.toml" || fail "groups.toml is missing the top-level table entry"
+if [ -f "$LSM_CONFIG_DIR/config.toml" ] && grep -q '^\[groups\]' "$LSM_CONFIG_DIR/config.toml"; then
+  fail "config.toml still has a [groups] table"
+fi
 out=$(LSM_LANG=en "$lsm" group list)
 [[ "$out" == *"common:"* ]] || fail "group list does not mention common, got: $out"
 [[ "$out" == *"sample"* && "$out" == *"beta"* ]] || fail "group members missing, got: $out"

@@ -2700,9 +2700,18 @@ fn config_path(config: &TempDir) -> std::path::PathBuf {
     config.path().join("config.toml")
 }
 
+fn groups_path(config: &TempDir) -> std::path::PathBuf {
+    config.path().join("groups.toml")
+}
+
 fn write_config(config: &TempDir, content: &str) {
     fs::create_dir_all(config.path()).unwrap();
     fs::write(config_path(config), content).unwrap();
+}
+
+fn write_groups(config: &TempDir, content: &str) {
+    fs::create_dir_all(config.path()).unwrap();
+    fs::write(groups_path(config), content).unwrap();
 }
 
 /// 带独立 global 目录的命令；分组写入时会校验成员是否已安装。
@@ -2725,9 +2734,10 @@ fn group_set_persists_members_and_list_renders_them() {
         .success()
         .stdout(predicate::str::contains("saved"));
 
-    let content = fs::read_to_string(config_path(&config)).unwrap();
-    assert!(content.contains("[groups]"), "missing [groups]: {content}");
+    let content = fs::read_to_string(groups_path(&config)).unwrap();
+    assert!(content.contains("frontend"), "missing group: {content}");
     assert!(content.contains("\"tdd\""), "missing tdd: {content}");
+    assert!(!content.contains("[groups]"), "stale table: {content}");
 
     lsm_with_home(&config, &home)
         .args(["group", "list"])
@@ -2796,6 +2806,7 @@ fn group_set_validates_group_and_member_names_before_writing() {
         .code(2);
 
     assert!(!config_path(&config).exists());
+    assert!(!groups_path(&config).exists());
 }
 
 #[test]
@@ -2814,6 +2825,7 @@ fn group_set_requires_members_to_exist_in_global() {
         .stderr(predicate::str::contains("did you mean: grill?"));
 
     assert!(!config_path(&config).exists());
+    assert!(!groups_path(&config).exists());
 }
 
 #[test]
@@ -2831,6 +2843,7 @@ fn group_set_reports_every_unavailable_member() {
         .stderr(predicate::str::contains("2 item(s) could not be resolved"));
 
     assert!(!config_path(&config).exists());
+    assert!(!groups_path(&config).exists());
 }
 
 #[test]
@@ -2844,7 +2857,7 @@ fn group_add_stores_the_resolved_full_name() {
         .assert()
         .success();
 
-    let content = fs::read_to_string(config_path(&config)).unwrap();
+    let content = fs::read_to_string(groups_path(&config)).unwrap();
     assert!(
         content.contains("code-review"),
         "missing full name: {content}"
@@ -2868,6 +2881,7 @@ fn group_set_rejects_an_ambiguous_prefix_without_writing() {
         .stderr(predicate::str::contains("code-review"));
 
     assert!(!config_path(&config).exists());
+    assert!(!groups_path(&config).exists());
 }
 
 #[test]
@@ -3042,9 +3056,9 @@ fn group_delete_single_prints_a_plain_message() {
 fn broken_groups_only_affect_group_commands() {
     let config = TempDir::new().unwrap();
     let project = TempDir::new().unwrap();
-    write_config(&config, "lang = \"en\"\ngroups = \"bad\"\n");
+    write_groups(&config, "frontend = \"bad\"\n");
 
-    // [groups] 坏了不影响不读它的命令。
+    // 分组文件坏了不影响不读它的命令。
     lsm_with_config(&config)
         .current_dir(project.path())
         .args(["list"])
@@ -3055,7 +3069,7 @@ fn broken_groups_only_affect_group_commands() {
         .args(["group", "list"])
         .assert()
         .code(1)
-        .stderr(predicate::str::contains("invalid [groups]"))
+        .stderr(predicate::str::contains("invalid groups file"))
         .stderr(predicate::str::contains("fix or delete"));
 
     lsm_with_config(&config)
@@ -3063,19 +3077,69 @@ fn broken_groups_only_affect_group_commands() {
         .args(["pull", "--group", "frontend"])
         .assert()
         .code(1)
-        .stderr(predicate::str::contains("invalid [groups]"));
+        .stderr(predicate::str::contains("invalid groups file"));
+}
+
+#[test]
+fn legacy_groups_migrate_on_the_first_write() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    install_global(&home, "grill", "G.");
+    write_config(
+        &config,
+        "# mine\nlang = \"zh\"\n\n[groups]\nfrontend = [\"tdd\"]\n",
+    );
+
+    // 读回退：groups.toml 还没生成时仍能读到旧表，且不触发写盘。
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: tdd"));
+    assert!(!groups_path(&config).exists());
+
+    // 第一次写盘迁移到 groups.toml，并清掉 config.toml 里的旧表。
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "frontend", "grill"])
+        .assert()
+        .success();
+
+    let groups = fs::read_to_string(groups_path(&config)).unwrap();
+    assert!(groups.contains("frontend"), "{groups:?}");
+    assert!(groups.contains("\"grill\""), "{groups:?}");
+    assert!(!groups.contains("[groups]"), "{groups:?}");
+
+    let legacy = fs::read_to_string(config_path(&config)).unwrap();
+    assert!(!legacy.contains("[groups]"), "{legacy:?}");
+    assert!(legacy.contains("lang = \"zh\""), "{legacy:?}");
+    assert!(legacy.contains("# mine"), "{legacy:?}");
+}
+
+#[test]
+fn groups_still_work_when_config_toml_is_broken() {
+    let config = TempDir::new().unwrap();
+    write_config(&config, "lang = \"zh\n");
+    write_groups(&config, "frontend = [\"tdd\"]\n");
+
+    // 语言走显式 --lang 逃生通道后，分组读取不再碰 config.toml。
+    lsm_with_config(&config)
+        .args(["--lang", "en", "group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: tdd"));
 }
 
 #[test]
 fn groups_members_must_be_strings() {
     let config = TempDir::new().unwrap();
-    write_config(&config, "[groups]\nfrontend = [1]\n");
+    write_groups(&config, "frontend = [1]\n");
 
     lsm_with_config(&config)
         .args(["group", "list"])
         .assert()
         .code(1)
-        .stderr(predicate::str::contains("invalid [groups]"))
+        .stderr(predicate::str::contains("invalid groups file"))
         .stderr(predicate::str::contains("frontend"));
 }
 
@@ -3379,10 +3443,7 @@ fn pull_group_reports_a_cycle_and_keeps_going() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
-    write_config(
-        &config,
-        "[groups]\na = [\"@b\"]\nb = [\"@a\"]\ngood = [\"alpha\"]\n",
-    );
+    write_groups(&config, "a = [\"@b\"]\nb = [\"@a\"]\ngood = [\"alpha\"]\n");
 
     lsm_with_config(&config)
         .env("LSM_HOME", home.path())
@@ -3500,7 +3561,7 @@ fn pull_group_reports_unknown_and_empty_groups_and_keeps_going() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
-    write_config(&config, "[groups]\ngood = [\"alpha\"]\nempty = []\n");
+    write_groups(&config, "good = [\"alpha\"]\nempty = []\n");
 
     lsm_with_config(&config)
         .env("LSM_HOME", home.path())
@@ -3526,7 +3587,7 @@ fn pull_group_missing_member_keeps_going() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
-    write_config(&config, "[groups]\ncommon = [\"alpha\", \"missing\"]\n");
+    write_groups(&config, "common = [\"alpha\", \"missing\"]\n");
 
     lsm_with_config(&config)
         .env("LSM_HOME", home.path())
@@ -3599,7 +3660,7 @@ fn pull_group_suggests_a_close_group_name() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
-    write_config(&config, "[groups]\npredevelop = [\"alpha\"]\n");
+    write_groups(&config, "predevelop = [\"alpha\"]\n");
 
     lsm_with_config(&config)
         .env("LSM_HOME", home.path())
