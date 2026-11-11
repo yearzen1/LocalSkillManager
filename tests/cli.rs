@@ -766,7 +766,9 @@ fn pull_requires_name_or_all() {
         .args(["pull"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("needs a skill name, --group, or --all"));
+        .stderr(predicate::str::contains(
+            "needs a skill name, --group, or --all",
+        ));
 }
 
 #[test]
@@ -2923,15 +2925,14 @@ fn pull_group_reports_unknown_and_empty_groups_and_keeps_going() {
     let home = home_dir();
     let project = TempDir::new().unwrap();
     install_global(&home, "alpha", "A.");
-    write_config(
-        &config,
-        "[groups]\ngood = [\"alpha\"]\nempty = []\n",
-    );
+    write_config(&config, "[groups]\ngood = [\"alpha\"]\nempty = []\n");
 
     lsm_with_config(&config)
         .env("LSM_HOME", home.path())
         .current_dir(project.path())
-        .args(["pull", "--group", "missing", "--group", "empty", "--group", "good"])
+        .args([
+            "pull", "--group", "missing", "--group", "empty", "--group", "good",
+        ])
         .assert()
         .code(1)
         .stdout(predicate::str::contains("pulled 1, skipped 0, failed 2"))
@@ -3020,7 +3021,9 @@ fn pull_group_skips_existing_targets_without_force() {
         .stdout(predicate::str::contains("pulled 0, skipped 1, failed 0"));
 
     let local = project.path().join(".agents/skills/alpha/SKILL.md");
-    assert!(fs::read_to_string(local).unwrap().contains("Local version."));
+    assert!(fs::read_to_string(local)
+        .unwrap()
+        .contains("Local version."));
 }
 
 #[test]

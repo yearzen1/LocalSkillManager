@@ -1,5 +1,6 @@
 //! 唯一的「各层窄错误 → `AppError`」适配点，hint 也在这里配置。
 
+use crate::domain::group::GroupNameError;
 use crate::domain::lang::LangError;
 use crate::domain::meta::MetaError;
 use crate::domain::name::NameError;
@@ -37,6 +38,23 @@ impl From<NameError> for AppError {
             }
             NameError::Reserved { input } => {
                 AppError::usage(MsgKey::SkillNameReserved).with_args([input])
+            }
+        }
+    }
+}
+
+/// 分组名入参校验：用法错误，文案用分组而不是 skill。
+impl From<GroupNameError> for AppError {
+    fn from(err: GroupNameError) -> Self {
+        match err.0 {
+            NameError::Format { input } => AppError::usage(MsgKey::GroupInvalid)
+                .with_args([input])
+                .with_hint(MsgKey::GroupInvalidHint),
+            NameError::TooLong { len, .. } => {
+                AppError::usage(MsgKey::GroupTooLong).with_args([len.to_string()])
+            }
+            NameError::Reserved { input } => {
+                AppError::usage(MsgKey::GroupReserved).with_args([input])
             }
         }
     }
@@ -174,6 +192,18 @@ impl From<ConfigError> for AppError {
                     .with_args([raw])
                     .with_hint_args(MsgKey::ConfigFixHint, [shown])
             }
+            ConfigError::InvalidGroups { path, detail } => {
+                let shown = path.display().to_string();
+                AppError::runtime(MsgKey::GroupConfigInvalid)
+                    .with_args([shown.clone(), detail])
+                    .with_hint_args(MsgKey::ConfigFixHint, [shown])
+            }
+            ConfigError::GroupExists { name } => AppError::runtime(MsgKey::GroupAlreadyExists)
+                .with_args([name])
+                .with_hint(MsgKey::SkillAlreadyExistsHint),
+            ConfigError::GroupNotFound { name } => AppError::runtime(MsgKey::GroupNotFound)
+                .with_args([name])
+                .with_hint(MsgKey::GroupNotFoundHint),
         }
     }
 }

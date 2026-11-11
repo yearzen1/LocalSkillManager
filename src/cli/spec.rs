@@ -32,6 +32,7 @@ pub fn build(lang: Lang) -> Command {
         .subcommand(pull_command(lang))
         .subcommand(push_command(lang))
         .subcommand(remove_command(lang))
+        .subcommand(group_command(lang))
         .subcommand(upgrade_command(lang))
         .subcommand(config_command(lang));
 
@@ -161,6 +162,13 @@ fn pull_command(lang: Lang) -> Command {
                 .help(tr(lang, MsgKey::PullAllFlag)),
         )
         .arg(
+            Arg::new("group")
+                .long("group")
+                .value_name("GROUP")
+                .action(clap::ArgAction::Append)
+                .help(tr(lang, MsgKey::PullGroupFlag)),
+        )
+        .arg(
             Arg::new("force")
                 .long("force")
                 .action(clap::ArgAction::SetTrue)
@@ -215,6 +223,89 @@ fn remove_command(lang: Lang) -> Command {
         );
 
     with_help_flag(command, lang)
+}
+
+fn group_command(lang: Lang) -> Command {
+    let list = with_help_flag(
+        Command::new("list")
+            .about(tr(lang, MsgKey::GroupListAbout))
+            .arg(
+                Arg::new("json")
+                    .long("json")
+                    .action(clap::ArgAction::SetTrue)
+                    .help(tr(lang, MsgKey::GroupJsonFlag)),
+            ),
+        lang,
+    );
+
+    let set = with_help_flag(
+        Command::new("set")
+            .about(tr(lang, MsgKey::GroupSetAbout))
+            .arg(
+                Arg::new("group")
+                    .required(true)
+                    .value_name("GROUP")
+                    .help(tr(lang, MsgKey::GroupNameArg)),
+            )
+            .arg(
+                Arg::new("skill")
+                    .required(true)
+                    .num_args(1..)
+                    .value_name("SKILL")
+                    .help(tr(lang, MsgKey::GroupSkillArg)),
+            )
+            .arg(
+                Arg::new("force")
+                    .long("force")
+                    .action(clap::ArgAction::SetTrue)
+                    .help(tr(lang, MsgKey::GroupSetForceFlag)),
+            ),
+        lang,
+    );
+
+    let add = with_help_flag(
+        Command::new("add")
+            .about(tr(lang, MsgKey::GroupAddAbout))
+            .arg(
+                Arg::new("group")
+                    .required(true)
+                    .value_name("GROUP")
+                    .help(tr(lang, MsgKey::GroupNameArg)),
+            )
+            .arg(
+                Arg::new("skill")
+                    .required(true)
+                    .num_args(1..)
+                    .value_name("SKILL")
+                    .help(tr(lang, MsgKey::GroupSkillArg)),
+            ),
+        lang,
+    );
+
+    let remove = with_help_flag(
+        Command::new("remove")
+            .about(tr(lang, MsgKey::GroupRemoveAbout))
+            .arg(
+                Arg::new("group")
+                    .required(true)
+                    .num_args(1..)
+                    .value_name("GROUP")
+                    .help(tr(lang, MsgKey::GroupNameArg)),
+            ),
+        lang,
+    );
+
+    with_help_flag(
+        Command::new("group")
+            .about(tr(lang, MsgKey::GroupAbout))
+            .subcommand_required(true)
+            .arg_required_else_help(true)
+            .subcommand(list)
+            .subcommand(set)
+            .subcommand(add)
+            .subcommand(remove),
+        lang,
+    )
 }
 
 /// `upgrade` 不带位置参数，也没有短选项（不参与归一化）。

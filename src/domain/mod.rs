@@ -3,6 +3,7 @@
 pub mod action;
 pub mod config;
 pub mod entry;
+pub mod group;
 pub mod lang;
 pub mod meta;
 pub mod name;

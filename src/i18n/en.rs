@@ -32,8 +32,10 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UsageRemoveMissingNameHint => {
             "to remove a skill named 'global' or 'project', write `lsm remove <name> <scope>`"
         }
-        MsgKey::UsagePullTargetMissing => "{0} needs a skill name or --all",
-        MsgKey::UsagePullTargetConflict => "{0} takes either a skill name or --all, not both",
+        MsgKey::UsagePullTargetMissing => "{0} needs a skill name, --group, or --all",
+        MsgKey::UsagePullTargetConflict => {
+            "{0} takes a skill name, --group, or --all, but not more than one"
+        }
         MsgKey::UsageEmptyQuery => "search needs a non-empty query",
         MsgKey::UsageMixedForms => "cannot mix short flags with subcommands",
         MsgKey::UsageHintForms => "examples: lsm -a foo.md -g | lsm add foo.md global",
@@ -73,6 +75,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::PullAbout => "Pull global skills into the current project",
         MsgKey::PullNameArg => "Skill names to pull",
         MsgKey::PullAllFlag => "Pull every global skill",
+        MsgKey::PullGroupFlag => "Pull every skill in a group (repeatable)",
         MsgKey::PullAllEmpty => "no global skills to pull",
         MsgKey::PullAllSkipped => "skipped {0}: already exists in project",
         MsgKey::PullAllSummary => "pulled {0}, skipped {1}, failed {2}",
@@ -132,6 +135,34 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::ConfigWriteFailed => "failed to write config file: {0}",
         MsgKey::ConfigUnknownKey => "unknown config key '{0}'",
         MsgKey::ConfigFixHint => "fix or delete {0}",
+
+        MsgKey::GroupAbout => "Manage skill groups",
+        MsgKey::GroupListAbout => "List skill groups",
+        MsgKey::GroupSetAbout => "Create or replace a skill group",
+        MsgKey::GroupAddAbout => "Append skills to a group",
+        MsgKey::GroupRemoveAbout => "Remove skill groups",
+        MsgKey::GroupNameArg => "Group name",
+        MsgKey::GroupSetForceFlag => "Overwrite an existing group",
+        MsgKey::GroupSkillArg => "Skill names in the group",
+        MsgKey::GroupJsonFlag => "Print machine-readable JSON",
+        MsgKey::GroupInvalid => "invalid group name '{0}'",
+        MsgKey::GroupInvalidHint => "group names use lowercase letters, digits and single hyphens",
+        MsgKey::GroupTooLong => "group name is too long: {0} > 64 characters",
+        MsgKey::GroupReserved => "group name '{0}' is reserved on Windows",
+        MsgKey::GroupAlreadyExists => "group '{0}' already exists",
+        MsgKey::GroupNotFound => "group '{0}' not found",
+        MsgKey::GroupNotFoundHint => "run `lsm group list` to see available groups",
+        MsgKey::GroupEmpty => "group '{0}' is empty",
+        MsgKey::GroupEmptyHint => "add members with `lsm group add {0} <skill>...`",
+        MsgKey::GroupNoGroups => "No groups found.",
+        MsgKey::GroupLine => "{0}: {1}",
+        MsgKey::GroupEmptyMembers => "(empty)",
+        MsgKey::GroupSaved => "group '{0}' saved ({1} skills) -> {2}",
+        MsgKey::GroupRemoved => "removed group '{0}'",
+        MsgKey::GroupBatchSummary => "removed {0}, failed {1}",
+        MsgKey::GroupBatchFailed => "{0} group(s) failed to remove",
+        MsgKey::GroupBatchFailedHint => "fix the groups above, then run `lsm group remove` again",
+        MsgKey::GroupConfigInvalid => "invalid [groups] in config file {0}: {1}",
 
         MsgKey::SkillAlreadyExists => "skill '{0}' already exists at {1}",
         MsgKey::SkillAlreadyExistsHint => "use --force to overwrite",

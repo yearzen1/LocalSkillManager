@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use super::config::ConfigKey;
+use super::group::GroupName;
 use super::lang::Lang;
 use super::name::SkillName;
 use super::scope::Scope;
@@ -38,6 +39,7 @@ pub enum Action {
         names: Vec<SkillName>,
         force: bool,
     },
+    Group(GroupCommand),
     Config(ConfigCommand),
     Upgrade {
         check: bool,
@@ -45,11 +47,32 @@ pub enum Action {
     },
 }
 
-/// `pull` / `push` 的目标：一个或多个 skill，或整个作用域。
+/// `pull` / `push` 的目标：一个或多个 skill、分组，或整个作用域。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransferTarget {
     Many(Vec<SkillName>),
+    Groups(Vec<GroupName>),
     All,
+}
+
+/// `group` 子命令。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GroupCommand {
+    List {
+        json: bool,
+    },
+    Set {
+        name: GroupName,
+        members: Vec<SkillName>,
+        force: bool,
+    },
+    Add {
+        name: GroupName,
+        members: Vec<SkillName>,
+    },
+    Remove {
+        names: Vec<GroupName>,
+    },
 }
 
 /// `search` 的匹配字段（Q52）。

@@ -2,6 +2,7 @@
 
 pub mod add;
 pub mod config;
+pub mod group;
 pub mod list;
 pub mod pull;
 pub mod push;
@@ -24,6 +25,7 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
             force,
         } => add::run(ctx, source, scope, force),
         Action::Config(command) => config::run(ctx, command),
+        Action::Group(command) => group::run(ctx, command),
         Action::List { scope, json } => list::run(ctx, scope, json),
         Action::Search {
             query,

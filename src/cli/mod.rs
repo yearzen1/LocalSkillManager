@@ -10,8 +10,9 @@ use std::path::PathBuf;
 
 use clap::ArgMatches;
 
-use crate::domain::action::{Action, ConfigCommand, SearchField, TransferTarget};
+use crate::domain::action::{Action, ConfigCommand, GroupCommand, SearchField, TransferTarget};
 use crate::domain::config::ConfigKey;
+use crate::domain::group::GroupName;
 use crate::domain::lang::Lang;
 use crate::domain::name::SkillName;
 use crate::domain::scope::Scope;
@@ -118,6 +119,7 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
             }
         }
         "config" => Action::Config(parse_config(sub)?),
+        "group" => Action::Group(parse_group(sub)?),
         "remove" => {
             let (names, scope) = remove_target(sub)?;
             Action::Remove {
@@ -136,21 +138,28 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
     Ok(Outcome::Action(action))
 }
 
-/// `pull` / `push` 的目标：`<NAME>...` 与 `--all` 必须二选一。
+/// `pull` / `push` 的目标：`<NAME>...`、`--group`、`--all` 三者只能选一个。
 fn transfer_target(
     matches: &ArgMatches,
     command: &'static str,
 ) -> Result<TransferTarget, AppError> {
     let names = skill_names(matches)?;
+    let groups = group_names(matches)?;
     let all = matches.get_flag("all");
 
-    match (names.is_empty(), all) {
-        (false, false) => Ok(TransferTarget::Many(names)),
-        (true, true) => Ok(TransferTarget::All),
-        (false, true) => Err(AppError::usage(MsgKey::UsagePullTargetConflict)
+    let selected = [!names.is_empty(), !groups.is_empty(), all]
+        .into_iter()
+        .filter(|chosen| *chosen)
+        .count();
+
+    match selected {
+        0 => Err(AppError::usage(MsgKey::UsagePullTargetMissing)
             .with_args([command])
             .with_hint(MsgKey::UsageHelpHint)),
-        (true, false) => Err(AppError::usage(MsgKey::UsagePullTargetMissing)
+        1 if !names.is_empty() => Ok(TransferTarget::Many(names)),
+        1 if !groups.is_empty() => Ok(TransferTarget::Groups(groups)),
+        1 => Ok(TransferTarget::All),
+        _ => Err(AppError::usage(MsgKey::UsagePullTargetConflict)
             .with_args([command])
             .with_hint(MsgKey::UsageHelpHint)),
     }
@@ -158,9 +167,30 @@ fn transfer_target(
 
 /// 读取全部 `name` 并校验；重复 name 去重，保留首次出现的顺序。
 fn skill_names(matches: &ArgMatches) -> Result<Vec<SkillName>, AppError> {
+    skill_values(matches, "name")
+}
+
+/// 读取全部 `--group` 并校验；重复组名去重，保留首次出现的顺序。
+fn group_names(matches: &ArgMatches) -> Result<Vec<GroupName>, AppError> {
+    let Ok(values) = matches.try_get_many::<String>("group") else {
+        return Ok(Vec::new()); // `push` 没有 `--group`
+    };
+
+    let mut groups = Vec::new();
+    let mut seen = HashSet::new();
+    for raw in values.into_iter().flatten() {
+        let group = GroupName::parse(raw)?;
+        if seen.insert(group.clone()) {
+            groups.push(group);
+        }
+    }
+    Ok(groups)
+}
+
+fn skill_values(matches: &ArgMatches, id: &str) -> Result<Vec<SkillName>, AppError> {
     let mut names = Vec::new();
     let mut seen = HashSet::new();
-    for raw in matches.get_many::<String>("name").into_iter().flatten() {
+    for raw in matches.get_many::<String>(id).into_iter().flatten() {
         let name = SkillName::parse(raw)?;
         if seen.insert(name.clone()) {
             names.push(name);
@@ -211,6 +241,48 @@ fn trailing_scope(raw: &[String]) -> Option<Scope> {
         "project" => Some(Scope::Project),
         _ => None,
     }
+}
+
+/// `group` 的嵌套子命令；所有组名/成员名在构造 `Action` 前完成校验。
+fn parse_group(matches: &ArgMatches) -> Result<GroupCommand, AppError> {
+    let (name, sub) = matches
+        .subcommand()
+        .ok_or_else(|| AppError::usage(MsgKey::UsageMissingSubcommand))?;
+
+    match name {
+        "list" => Ok(GroupCommand::List {
+            json: sub.get_flag("json"),
+        }),
+        "set" => Ok(GroupCommand::Set {
+            name: group_value(sub, "group")?,
+            members: skill_values(sub, "skill")?,
+            force: sub.get_flag("force"),
+        }),
+        "add" => Ok(GroupCommand::Add {
+            name: group_value(sub, "group")?,
+            members: skill_values(sub, "skill")?,
+        }),
+        "remove" => Ok(GroupCommand::Remove {
+            names: group_values(sub, "group")?,
+        }),
+        other => Err(AppError::usage(MsgKey::UsageInvalidSubcommand).with_args([other])),
+    }
+}
+
+fn group_value(matches: &ArgMatches, id: &str) -> Result<GroupName, AppError> {
+    Ok(GroupName::parse(&required(matches, id))?)
+}
+
+fn group_values(matches: &ArgMatches, id: &str) -> Result<Vec<GroupName>, AppError> {
+    let mut groups = Vec::new();
+    let mut seen = HashSet::new();
+    for raw in matches.get_many::<String>(id).into_iter().flatten() {
+        let group = GroupName::parse(raw)?;
+        if seen.insert(group.clone()) {
+            groups.push(group);
+        }
+    }
+    Ok(groups)
 }
 
 fn parse_config(matches: &ArgMatches) -> Result<ConfigCommand, AppError> {

@@ -7,13 +7,14 @@ use std::path::Path;
 
 use crate::domain::action::TransferTarget;
 use crate::domain::entry::SkillEntry;
+use crate::domain::group::GroupName;
 use crate::domain::lang::Lang;
 use crate::domain::name::SkillName;
 use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
 use crate::i18n::MsgKey;
 use crate::infra::fsops::{self, FsError};
-use crate::infra::{frontmatter, paths, scan};
+use crate::infra::{config, frontmatter, paths, scan};
 use crate::output;
 use crate::output::error as error_output;
 use crate::Ctx;
@@ -92,8 +93,81 @@ pub(super) fn run(
         TransferTarget::Many(names) => {
             transfer_many(ctx, spec, &source_dir, &destination_dir, &names, force)
         }
+        TransferTarget::Groups(groups) => {
+            transfer_groups(ctx, spec, &source_dir, &destination_dir, &groups, force)
+        }
         TransferTarget::All => transfer_all(ctx, spec, &source_dir, &destination_dir, force),
     }
+}
+
+/// 展开 `--group` 后复用多 name 的逐条流程（Q55）。
+fn transfer_groups(
+    ctx: &Ctx,
+    spec: &TransferSpec,
+    source_dir: &Path,
+    destination_dir: &Path,
+    groups: &[GroupName],
+    force: bool,
+) -> Result<(), AppError> {
+    let definitions = config::load_groups(&ctx.env)?;
+    let available = scan::dir_names(source_dir)?;
+
+    let mut names: Vec<SkillName> = Vec::new();
+    let mut seen = HashSet::new();
+    let mut failed = 0usize;
+
+    for input in groups {
+        let Some(definition) = definitions.iter().find(|group| group.name == *input) else {
+            failed += 1;
+            let err = AppError::runtime(MsgKey::GroupNotFound)
+                .with_args([input.as_str()])
+                .with_hint(MsgKey::GroupNotFoundHint);
+            output::emit_stderr(&error_output::render_block(&err, ctx.lang));
+            continue;
+        };
+
+        if definition.members.is_empty() {
+            failed += 1;
+            let err = AppError::runtime(MsgKey::GroupEmpty)
+                .with_args([input.as_str()])
+                .with_hint_args(MsgKey::GroupEmptyHint, [input.as_str()]);
+            output::emit_stderr(&error_output::render_block(&err, ctx.lang));
+            continue;
+        }
+
+        for member in &definition.members {
+            match resolve_name(member, &available, spec.source, not_found(spec, member)) {
+                Ok(name) if seen.insert(name.clone()) => names.push(name),
+                Ok(_) => {}
+                Err(err) => {
+                    failed += 1;
+                    output::emit_stderr(&error_output::render_block(&err, ctx.lang));
+                }
+            }
+        }
+    }
+
+    let mut done = 0usize;
+    let mut skipped = 0usize;
+
+    for name in &names {
+        if !force && fsops::is_present(&destination_dir.join(name.as_str())) {
+            skipped += 1;
+            output::warn(ctx.lang, &Msg::with_args(spec.skipped, [name.as_str()]));
+            continue;
+        }
+
+        match transfer_one(ctx, spec, source_dir, destination_dir, name, force) {
+            Ok(()) => done += 1,
+            Err(err) => {
+                failed += 1;
+                output::emit_stderr(&error_output::render_block(&err, ctx.lang));
+            }
+        }
+    }
+
+    emit_summary(ctx, spec, done, skipped, failed);
+    finish_failed(spec.many_failed, spec.many_failed_hint, failed)
 }
 
 /// 逐条复制多个 name；单条失败只记账，不中断（Q44）。
