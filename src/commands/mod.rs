@@ -40,6 +40,11 @@ pub fn dispatch(ctx: &Ctx, action: Action) -> Result<(), AppError> {
             names,
             force,
         } => remove::run(ctx, scope, names, force),
-        Action::Upgrade { check, force } => upgrade::run(ctx, check, force),
+        Action::Upgrade {
+            check,
+            force,
+            verbose,
+            progress,
+        } => upgrade::run(ctx, check, force, verbose, progress),
     }
 }

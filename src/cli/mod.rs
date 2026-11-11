@@ -131,6 +131,8 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
         "upgrade" => Action::Upgrade {
             check: sub.get_flag("check"),
             force: sub.get_flag("force"),
+            verbose: sub.get_flag("verbose"),
+            progress: sub.get_flag("progress"),
         },
         other => return Err(AppError::usage(MsgKey::UsageInvalidSubcommand).with_args([other])),
     };

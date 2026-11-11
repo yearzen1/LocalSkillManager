@@ -323,6 +323,18 @@ fn upgrade_command(lang: Lang) -> Command {
                 .long("force")
                 .action(clap::ArgAction::SetTrue)
                 .help(tr(lang, MsgKey::UpgradeForceFlag)),
+        )
+        .arg(
+            Arg::new("verbose")
+                .long("verbose")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::UpgradeVerboseFlag)),
+        )
+        .arg(
+            Arg::new("progress")
+                .long("progress")
+                .action(clap::ArgAction::SetTrue)
+                .help(tr(lang, MsgKey::UpgradeProgressFlag)),
         );
 
     with_help_flag(command, lang)

@@ -1,7 +1,7 @@
 //! `upgrade`：比较当前版本与最新 release。下载与替换在后续切片接入。
 
 use std::cmp::Ordering;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::domain::lang::Lang;
 use crate::domain::release::{self, Asset, Release};
@@ -45,17 +45,78 @@ pub fn decide(current: Version, latest: Version) -> Check {
     }
 }
 
-/// `upgrade [--check] [--force]` 的命令入口。
-pub fn run(ctx: &Ctx, check: bool, force: bool) -> Result<(), AppError> {
+/// `upgrade [--check] [--force] [--verbose] [--progress]` 的命令入口。
+pub fn run(
+    ctx: &Ctx,
+    check: bool,
+    force: bool,
+    verbose: bool,
+    progress: bool,
+) -> Result<(), AppError> {
+    let mut reporter = Reporter::new(ctx.lang, verbose || progress, progress);
+    let outcome = perform(ctx, check, force, &mut reporter);
+    reporter.finish();
+
+    match outcome? {
+        Outcome::Report(verdict) => {
+            output::emit_stdout(&format!("{}\n", render(verdict, ctx.lang)));
+        }
+        Outcome::Installed {
+            current,
+            latest,
+            exe,
+        } => {
+            let key = if latest < current {
+                MsgKey::UpgradeDowngraded
+            } else {
+                MsgKey::UpgradeUpgraded
+            };
+            output::emit_stdout(&format!(
+                "{}\n",
+                tr_args(
+                    ctx.lang,
+                    key,
+                    &[
+                        &current.to_string(),
+                        &latest.tag(),
+                        &exe.display().to_string()
+                    ]
+                )
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// stdout 上要打印的那一行结果。
+enum Outcome {
+    /// 只报告版本关系，不安装。
+    Report(Check),
+    /// 二进制已替换。
+    Installed {
+        current: Version,
+        latest: Version,
+        exe: PathBuf,
+    },
+}
+
+/// 中间步骤：联网、下载、校验、替换。过程输出只经 `reporter` 进 stderr。
+fn perform(
+    ctx: &Ctx,
+    check: bool,
+    force: bool,
+    reporter: &mut Reporter,
+) -> Result<Outcome, AppError> {
     let current = current_version();
+    reporter.stage(MsgKey::UpgradeCheckingRelease, &[]);
     let release = net::fetch_latest_release(ctx.env.upgrade_api.as_deref(), current)?;
     let latest = release.tag();
     let verdict = decide(current, latest);
 
     let install = !check && (force || matches!(verdict, Check::Available { .. }));
     if !install {
-        output::emit_stdout(&format!("{}\n", render(verdict, ctx.lang)));
-        return Ok(());
+        return Ok(Outcome::Report(verdict));
     }
 
     let exe = process::current_exe()?;
@@ -65,8 +126,12 @@ pub fn run(ctx: &Ctx, check: bool, force: bool) -> Result<(), AppError> {
     let temp = fsops::upgrade_temp_path(&exe)?;
     fsops::discard(&temp);
 
-    download_and_verify(asset, &temp, latest)?;
+    if let Err(err) = download_with_report(asset, &temp, latest, reporter) {
+        reporter.finish();
+        return Err(err);
+    }
 
+    reporter.stage(MsgKey::UpgradeReplacing, &[&exe.display().to_string()]);
     let report = fsops::replace_self(&exe, &temp)
         .map_err(|err| error::replace_failed(&exe, &err.to_string()))?;
 
@@ -84,25 +149,133 @@ pub fn run(ctx: &Ctx, check: bool, force: bool) -> Result<(), AppError> {
         output::warn(ctx.lang, &Msg::new(MsgKey::UpgradeCargoInstallWarning));
     }
 
-    let key = if latest < current {
-        MsgKey::UpgradeDowngraded
-    } else {
-        MsgKey::UpgradeUpgraded
-    };
-    output::emit_stdout(&format!(
-        "{}\n",
-        tr_args(
-            ctx.lang,
-            key,
-            &[
-                &current.to_string(),
-                &latest.tag(),
-                &exe.display().to_string()
-            ]
-        )
-    ));
+    Ok(Outcome::Installed {
+        current,
+        latest,
+        exe,
+    })
+}
 
-    Ok(())
+/// 过程反馈的开关与状态；默认全关时不产生任何中间输出（Q59）。
+struct Reporter {
+    lang: Lang,
+    verbose: bool,
+    progress: bool,
+    /// `--verbose` 的下载行是否已经打印。
+    started: bool,
+    /// 已画出的整数百分比；`None` 表示还没有进度行。
+    drawn: Option<u64>,
+    /// 上一次绘制时的已收字节与行宽（用于未知总长节流与清尾）。
+    last_bytes: u64,
+    last_width: usize,
+}
+
+impl Reporter {
+    fn new(lang: Lang, verbose: bool, progress: bool) -> Self {
+        Self {
+            lang,
+            verbose,
+            progress,
+            started: false,
+            drawn: None,
+            last_bytes: 0,
+            last_width: 0,
+        }
+    }
+
+    fn silent() -> Self {
+        Self::new(Lang::En, false, false)
+    }
+
+    /// 阶段提示：只有开了 `--verbose` 才写，一行一条、无前缀。
+    fn stage(&self, key: MsgKey, args: &[&str]) {
+        if !self.verbose {
+            return;
+        }
+        output::status(self.lang, &Msg::with_args(key, args.iter().copied()));
+    }
+
+    /// 下载进度：`--progress` 重绘进度行，否则 `--verbose` 只打一行开始提示。
+    fn tick(&mut self, asset: &Asset, tick: net::Tick) {
+        if self.progress {
+            let due = match tick.total {
+                Some(total) => self.drawn != Some(output::percent(tick.received, total)),
+                None => {
+                    self.drawn.is_none()
+                        || tick.received.saturating_sub(self.last_bytes) >= 256 * 1024
+                }
+            };
+            if due {
+                self.draw(asset, tick);
+            }
+            return;
+        }
+
+        if self.verbose && !self.started {
+            self.started = true;
+            match tick.total {
+                Some(total) => self.stage(
+                    MsgKey::UpgradeDownloading,
+                    &[&asset.name, &output::bytes(total)],
+                ),
+                None => self.stage(MsgKey::UpgradeDownloadingUnknown, &[&asset.name]),
+            }
+        }
+    }
+
+    fn draw(&mut self, asset: &Asset, tick: net::Tick) {
+        let text = progress_text(self.lang, &asset.name, tick.received, tick.total);
+
+        // 用空格补到上一次的宽度，避免末尾残留旧字符。
+        let width = text.chars().count();
+        let pad = self.last_width.saturating_sub(width);
+        output::progress(&format!("{text}{}", " ".repeat(pad)));
+
+        self.drawn = tick
+            .total
+            .map(|total| output::percent(tick.received, total));
+        self.last_bytes = tick.received;
+        self.last_width = width;
+    }
+
+    /// 下载结束：给进度行补换行。
+    fn download_finished(&mut self) {
+        if self.progress {
+            self.finish();
+        }
+    }
+
+    /// 幂等收尾：有打开的进度行时补一个换行，让后续输出另起一行。
+    fn finish(&mut self) {
+        if self.drawn.is_some() {
+            output::progress_end();
+            self.drawn = None;
+            self.last_bytes = 0;
+            self.last_width = 0;
+        }
+    }
+}
+
+/// 进度行的纯文本：有总长时画条并报百分比，否则只报已下载字节。
+fn progress_text(lang: Lang, asset: &str, received: u64, total: Option<u64>) -> String {
+    match total {
+        Some(total) => tr_args(
+            lang,
+            MsgKey::UpgradeDownloadProgress,
+            &[
+                asset,
+                &output::bar(received, total),
+                &output::percent(received, total).to_string(),
+                &output::bytes(received),
+                &output::bytes(total),
+            ],
+        ),
+        None => tr_args(
+            lang,
+            MsgKey::UpgradeDownloadProgressUnknown,
+            &[asset, &output::bytes(received)],
+        ),
+    }
 }
 
 /// 当前平台的资产：命名表里没有该组合、或 release 里没有这个名字，都按「缺资产」报。
@@ -165,9 +338,23 @@ pub fn verify_output(stdout: &str, expected: Version) -> Result<(), AppError> {
 
 /// 下载到 `dest` 并校验；任一步失败都删掉 `dest`。
 pub fn download_and_verify(asset: &Asset, dest: &Path, expected: Version) -> Result<(), AppError> {
-    let result = net::download_asset(&asset.url, dest)
+    download_with_report(asset, dest, expected, &mut Reporter::silent())
+}
+
+/// 带过程反馈的下载与校验。
+fn download_with_report(
+    asset: &Asset,
+    dest: &Path,
+    expected: Version,
+    reporter: &mut Reporter,
+) -> Result<(), AppError> {
+    let result = net::download_asset(&asset.url, dest, &mut |tick| reporter.tick(asset, tick))
         .map_err(|err| error::download_failed(&asset.name, err))
-        .and_then(|()| verify_binary(dest, expected));
+        .and_then(|()| {
+            reporter.download_finished();
+            reporter.stage(MsgKey::UpgradeVerifying, &[]);
+            verify_binary(dest, expected)
+        });
 
     if result.is_err() {
         fsops::discard(dest);
@@ -331,5 +518,21 @@ mod tests {
         let err = verify_output("", current_version()).expect_err("should reject");
 
         assert_eq!(err.msg.key, MsgKey::UpgradeVerifyFailed);
+    }
+
+    #[test]
+    fn progress_text_shows_the_bar_percent_and_sizes() {
+        assert_eq!(
+            progress_text(Lang::En, "lsm-linux-x64", 5, Some(10)),
+            "downloading lsm-linux-x64 [##########----------] 50%  5 B/10 B"
+        );
+    }
+
+    #[test]
+    fn progress_text_falls_back_to_received_bytes_without_a_total() {
+        assert_eq!(
+            progress_text(Lang::En, "lsm-linux-x64", 5, None),
+            "downloading lsm-linux-x64 5 B"
+        );
     }
 }

@@ -44,6 +44,8 @@ pub enum Action {
     Upgrade {
         check: bool,
         force: bool,
+        verbose: bool,
+        progress: bool,
     },
 }
 

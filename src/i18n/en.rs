@@ -213,6 +213,10 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UpgradeAbout => "Update lsm itself",
         MsgKey::UpgradeCheckFlag => "Only check for a newer release",
         MsgKey::UpgradeForceFlag => "Reinstall the same version or downgrade",
+        MsgKey::UpgradeVerboseFlag => "Print each upgrade step to stderr",
+        MsgKey::UpgradeProgressFlag => {
+            "Draw a download progress bar on stderr (also prints each step)"
+        }
         MsgKey::UpgradeUpToDate => "lsm {0} is up to date",
         MsgKey::UpgradeAvailable => "new version available: {0} (current {1})",
         MsgKey::UpgradeCurrentNewer => "lsm {0} is newer than {1}",
@@ -242,5 +246,12 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UpgradeCargoInstallWarning => {
             "lsm is installed by cargo, consider cargo install --force local-skill-manager"
         }
+        MsgKey::UpgradeCheckingRelease => "checking for the latest release...",
+        MsgKey::UpgradeDownloading => "downloading {0} ({1})...",
+        MsgKey::UpgradeDownloadingUnknown => "downloading {0}...",
+        MsgKey::UpgradeDownloadProgress => "downloading {0} {1} {2}%  {3}/{4}",
+        MsgKey::UpgradeDownloadProgressUnknown => "downloading {0} {1}",
+        MsgKey::UpgradeVerifying => "verifying the downloaded binary...",
+        MsgKey::UpgradeReplacing => "replacing {0}...",
     }
 }

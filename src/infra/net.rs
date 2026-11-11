@@ -1,5 +1,6 @@
-//! 升级的网络出口：取 release 元数据。只有本模块允许访问网络。
+//! 升级的网络出口：取 release 元数据与下载资产。只有本模块允许访问网络。
 
+use std::io::{Read, Write};
 use std::path::Path;
 use std::time::Duration;
 
@@ -61,8 +62,21 @@ pub fn fetch_latest_release(endpoint: Option<&str>, current: Version) -> Result<
     Release::parse_metadata(&body).map_err(|source| NetError::Parse { source })
 }
 
+/// 下载进度：已收字节与响应声明的总长。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Tick {
+    pub received: u64,
+    pub total: Option<u64>,
+}
+
 /// 下载资产到 `dest`，超时 5 分钟（Q36）；内容校验由调用方负责。
-pub fn download_asset(url: &str, dest: &Path) -> Result<(), NetError> {
+///
+/// 收到响应头后先回调一次 `received: 0`（带上 `Content-Length`），之后每写一块回调一次。
+pub fn download_asset(
+    url: &str,
+    dest: &Path,
+    on_tick: &mut dyn FnMut(Tick),
+) -> Result<(), NetError> {
     let agent = agent(ASSET_TIMEOUT);
     let response = agent.get(url).call().map_err(|err| NetError::Network {
         detail: err.to_string(),
@@ -76,15 +90,33 @@ pub fn download_asset(url: &str, dest: &Path) -> Result<(), NetError> {
     }
 
     let mut response = response;
+    let total = response.body().content_length();
     let mut file = std::fs::File::create(dest).map_err(|err| NetError::Network {
         detail: format!("{}: {err}", dest.display()),
     })?;
 
-    std::io::copy(&mut response.body_mut().as_reader(), &mut file).map_err(|err| {
-        NetError::Network {
+    on_tick(Tick { received: 0, total });
+
+    let mut reader = response.body_mut().as_reader();
+    let mut buffer = [0_u8; 32 * 1024];
+    let mut received = 0_u64;
+
+    loop {
+        let read = reader.read(&mut buffer).map_err(|err| NetError::Network {
             detail: format!("{}: {err}", dest.display()),
+        })?;
+        if read == 0 {
+            break;
         }
-    })?;
+
+        file.write_all(&buffer[..read])
+            .map_err(|err| NetError::Network {
+                detail: format!("{}: {err}", dest.display()),
+            })?;
+
+        received += read as u64;
+        on_tick(Tick { received, total });
+    }
 
     #[cfg(unix)]
     {
@@ -291,9 +323,31 @@ mod tests {
         let dest = dir.path().join("payload");
         let stub = Stub::start(200, "binary-payload");
 
-        download_asset(stub.endpoint(), &dest).expect("should download");
+        download_asset(stub.endpoint(), &dest, &mut |_| {}).expect("should download");
 
         assert_eq!(std::fs::read(&dest).expect("dest"), b"binary-payload");
+        stub.request();
+    }
+
+    #[test]
+    fn reports_received_bytes_against_the_content_length() {
+        let dir = tempfile::TempDir::new().expect("temp dir");
+        let dest = dir.path().join("payload");
+        let stub = Stub::start(200, "0123456789");
+        let mut ticks = Vec::new();
+
+        download_asset(stub.endpoint(), &dest, &mut |tick| ticks.push(tick)).expect("download");
+
+        assert_eq!(
+            ticks.last().copied(),
+            Some(Tick {
+                received: 10,
+                total: Some(10)
+            })
+        );
+        assert!(ticks
+            .windows(2)
+            .all(|pair| pair[0].received <= pair[1].received));
         stub.request();
     }
 
@@ -304,7 +358,7 @@ mod tests {
         let stub = Stub::start(404, "");
 
         assert_eq!(
-            download_asset(stub.endpoint(), &dest),
+            download_asset(stub.endpoint(), &dest, &mut |_| {}),
             Err(NetError::Status { code: 404 })
         );
         assert!(!dest.exists(), "failed download must not leave a file");
@@ -320,7 +374,7 @@ mod tests {
         drop(listener);
 
         assert!(matches!(
-            download_asset(&format!("http://{address}/asset"), &dest),
+            download_asset(&format!("http://{address}/asset"), &dest, &mut |_| {}),
             Err(NetError::Network { .. })
         ));
         assert!(!dest.exists());

@@ -205,6 +205,8 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UpgradeAbout => "更新 lsm 自身",
         MsgKey::UpgradeCheckFlag => "只检查是否有新版本",
         MsgKey::UpgradeForceFlag => "同版本重装或降级",
+        MsgKey::UpgradeVerboseFlag => "把每一步升级动作写到 stderr",
+        MsgKey::UpgradeProgressFlag => "在 stderr 上显示下载进度条（同时打印每一步）",
         MsgKey::UpgradeUpToDate => "lsm {0} 已是最新版本",
         MsgKey::UpgradeAvailable => "有新版本可用：{0}（当前 {1}）",
         MsgKey::UpgradeCurrentNewer => "lsm {0} 比 {1} 更新",
@@ -226,5 +228,12 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UpgradeCargoInstallWarning => {
             "lsm 由 cargo 安装，建议改用 cargo install --force local-skill-manager"
         }
+        MsgKey::UpgradeCheckingRelease => "正在查询最新 release...",
+        MsgKey::UpgradeDownloading => "正在下载 {0}（{1}）...",
+        MsgKey::UpgradeDownloadingUnknown => "正在下载 {0}...",
+        MsgKey::UpgradeDownloadProgress => "正在下载 {0} {1} {2}%  {3}/{4}",
+        MsgKey::UpgradeDownloadProgressUnknown => "正在下载 {0} {1}",
+        MsgKey::UpgradeVerifying => "正在校验下载的二进制...",
+        MsgKey::UpgradeReplacing => "正在替换 {0}...",
     }
 }

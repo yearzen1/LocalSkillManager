@@ -217,6 +217,8 @@ keys!(
     UpgradeAbout,
     UpgradeCheckFlag,
     UpgradeForceFlag,
+    UpgradeVerboseFlag,
+    UpgradeProgressFlag,
     UpgradeInvalidVersion,
     UpgradeInvalidVersionHint,
     UpgradeUpToDate,
@@ -238,6 +240,13 @@ keys!(
     UpgradeReplaceFailedHint,
     UpgradeBackupLeftover,
     UpgradeCargoInstallWarning,
+    UpgradeCheckingRelease,
+    UpgradeDownloading,
+    UpgradeDownloadingUnknown,
+    UpgradeDownloadProgress,
+    UpgradeDownloadProgressUnknown,
+    UpgradeVerifying,
+    UpgradeReplacing,
 );
 
 /// 取一条文案。
