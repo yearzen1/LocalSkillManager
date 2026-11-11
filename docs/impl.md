@@ -10,6 +10,7 @@
 
 | 文档 | 内容 | 何时读 |
 |---|---|---|
+| [README.md](README.md) | 用户文档入口（教程 / 指南 / 参考 / 解释） | 面向使用者查文档 |
 | [impl/storage.md](impl/storage.md) | 作用域与路径、SKILL.md、add/list/pull、文件系统 | 实现核心功能 |
 | [impl/cli.md](impl/cli.md) | i18n、CLI、help、输出与错误 | 实现命令行与输出 |
 | [impl/config.md](impl/config.md) | 配置文件路径、格式、语言持久化、`config` 命令 | 实现持久化语言 |

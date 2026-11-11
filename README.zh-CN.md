@@ -1,6 +1,6 @@
 # Local Skill Manager（`lsm`）
 
-把 agent skill 安装到 `~/.agents/skills` 或 `<项目>/.agents/skills`，把全局 skill 拉取到当前项目、把项目 skill 推送到全局，也能更新 `lsm` 自身二进制。
+把 agent skill 安装到 `~/.agents/skills` 或 `<项目>/.agents/skills`，把全局 skill 拉取到当前项目、把项目 skill 推送到全局，把常用 skill 放进分组，也能更新 `lsm` 自身二进制。
 
 [English](README.md) | 中文
 
@@ -36,6 +36,22 @@ lsm add my-skill.md global
 lsm pull my-skill
 ```
 
+## 文档
+
+用户文档按 Diátaxis 四象限组织，按你此刻的需求选入口：
+
+| 我想…… | 读这篇 |
+|---|---|
+| 从零学会 | [入门教程](docs/tutorials/getting-started.md) |
+| 完成一个具体任务 | [管理 skill 分组](docs/how-to/manage-skill-groups.md) · [修复配置问题](docs/how-to/fix-config-problems.md) |
+| 查命令、配置或文件格式 | [命令索引](docs/reference/cli.md) · [配置文件](docs/reference/config.md) · [SKILL.md](docs/reference/skill-md.md) |
+| 理解为什么这样设计 | [核心概念](docs/explanation/concepts.md) |
+| 参与开发 | [实现方案索引](docs/impl.md) · [决策记录](docs/decisions.md) |
+
+完整入口：[`docs/README.md`](docs/README.md)。
+
+命令与参数的唯一定义仍在 [`docs/impl/cli.md`](docs/impl/cli.md) §2.1；参考页只做索引与链接，不复制第二份参数表。
+
 ## 目录约定
 
 | 作用域 | 位置 | 覆盖方式 |
@@ -43,200 +59,11 @@ lsm pull my-skill
 | global | `~/.agents/skills/<name>/` | `LSM_HOME` 指向 `.agents` 这一层 |
 | project | `<cwd>/.agents/skills/<name>/` | 无 |
 
-`project` 固定为**当前工作目录**，不会向上查找项目根目录。请在项目根目录执行；在子目录执行就会装到子目录里。
-
-本工具只维护 `.agents/skills` 这一份目录，不代理其他 agent 的私有目录（如 `.claude/skills`）。
-
-## SKILL.md 格式
-
-```markdown
----
-name: my-skill
-description: 审查 diff 的正确性与风格。
----
-
-# My Skill
-
-（正文）
-```
-
-校验规则：
-
-- 文件开头必须有 `---` 包裹的 frontmatter 块；
-- `name` 与 `description` 必填且不能为空白；
-- `name` 匹配 `^[a-z0-9]+(-[a-z0-9]+)*$`，最多 **64** 个字符；
-- `description` 最多 **1024** 个字符（按 Unicode 字符计，不按字节）；
-- `name` 不能是 Windows 保留设备名（`con`、`prn`、`aux`、`nul`、`com1`–`com9`、`lpt1`–`lpt9`）；
-- 安装目录时，目录名必须与 frontmatter 的 `name` 一致。
-
-超限一律报错，**不截断、不自动修复**。
-
-## 命令参考
-
-```
-lsm add <source> [<global|project>] [--force]
-lsm list [<global|project>] [--json]
-lsm search <query> [<global|project>] [--name] [--description] [--json]
-lsm pull <name>... [--force]
-lsm pull --group <group>... [--force]
-lsm pull --all [--force]
-lsm push <name>... [--force]
-lsm push --all [--force]
-lsm remove <name>... [<global|project>] [--force]
-lsm group list [--json]
-lsm group set <group> <skill>... [--force]
-lsm group add <group> <skill>...
-lsm group remove <group>...
-lsm upgrade [--check] [--force]
-lsm config get lang
-lsm config set lang <en|zh>
-lsm --lang <en|zh> <command> ...
-```
-
-命令、参数与退出码只在 [`docs/impl/cli.md`](docs/impl/cli.md) 定义一次；本 README 只记录当前二进制支持的能力。
-
-缩减版只支持分离写法（不支持 `-lg` 这种合并写法）：
-
-| 缩减版 | 等价于 |
-|---|---|
-| `lsm -a foo.md -g` | `lsm add foo.md global` |
-| `lsm -a foo.md -p` | `lsm add foo.md project` |
-| `lsm -a foo.md` | `lsm add foo.md project` |
-| `lsm -l -g` | `lsm list global` |
-| `lsm -l -p --json` | `lsm list project --json` |
-| `lsm -l` | `lsm list project` |
-| `lsm -r foo -p` | `lsm remove foo project` |
-| `lsm -r foo` | `lsm remove foo project` |
-| `lsm -r a b -p` | `lsm remove a b project` |
-
-`add`、`list`、`search`、`remove` 的 `<global|project>` 均可省略，省略时为 `project`；缩减版不写 `-g`/`-p` 也是同样效果。
-
-`-g` 与 `-p` 不能同时使用、不能与 `pull` 一起用，也不能与完整子命令写法混用。`search` 与 `push` 没有短选项。`pull` 也没有短选项：`-p` 始终表示 `project`，`-c` 已在 0.5.0 移除。
-
-> **从 0.4.x 迁移**：`lsm copy ...` 现在叫 `lsm pull ...`；`lsm -c ...` 已不可用。请使用 `lsm pull <name>...` 或 `lsm pull --all`。
-
-### add
-
-- 接受 `.md` 文件或 skill 目录。作用域可省略，省略时为 `project`；要装到全局需显式写 `global`。目录源**不做任何排除**：隐藏文件、`scripts/`、`assets/`、`.git` 全部复制。
-- 目录源包含 `.git` 时照常完整复制，并向 stderr 打印 `警告: 源目录包含 .git 目录，将被完整复制`。
-- 安装是原子的：内容先构建到 `.tmp-<name>-<pid>`，带 `--force` 时旧目录移到 `.bak-<name>-<pid>`，再整体换位；任一步失败都会回滚且不残留。
-- 目标位于源目录内部（例如 `lsm add . project`）时直接报错，不会递归复制。
-
-### list
-
-```
-名称         描述
------------  ------------------------------------------
-broken       [invalid] missing SKILL.md
-
-code-review  审查 diff 的正确性与风格，标出合并前需要确认的风险点，并给出
-             具体修改建议。
-
-my-skill     一句话说明。
-```
-
-- 条目之间空一行，表头后与末尾不空，折行后的 description 不会和下一个条目粘在一起；
-- description 会压成单行，按 60 个显示列换行（宽字符按 2 列计），续行悬挂缩进到描述列；最多 3 行，第 3 行末尾补 `...`；
-- 非法 skill 目录标记 `[invalid]`，不会中断整体输出；
-- `--json` 输出单个 JSON 数组（2 空格缩进，空目录为 `[]`），含 `name`、`description`、`path`、`valid`，非法项额外带 `error`；warning 永远不会写进 stdout。
-
-### search
-
-- `lsm search <query> [<global|project>]` 对 `name` 与 `description` 做大小写不敏感的子串匹配；一次只搜一个作用域，省略时为 `project`。
-- `--name` 只匹配名称，`--description` 只匹配描述；都不写或都写时取两者并集。非法项的描述为空，因此 `--description` 不会命中它们。
-- 输出复用 `list` 表格（非法项仍标 `[invalid]`）；`--json` 复用 `list` 的 JSON 数组字段。
-- 无匹配不算失败：退出码 0，文本模式打印 `在 <scope> 中没有匹配 '<query>' 的 skill`（JSON 为 `[]`）。空查询退 2。
-
-### pull
-
-- 源必须是合法的全局 skill：存在 `SKILL.md` 且其 `name` 与目录名一致。
-- 源与目标相同、或目标位于源内部时拒绝；目标已存在需要 `--force`。
-- `name` 在拼任何路径之前完成校验，`..`、`/`、`\` 与保留设备名都以退出码 2 失败。多个 name 时先全部校验，任一个非法则一条都不拉取。
-- 支持唯一前缀：`global` 里只有 `code-review` 时，`lsm pull code` 直接拉取它；多个名字共享前缀则退出 1 并列出候选，精确同名始终优先。
-- 多个 name 时单条失败不中断：目标已存在且无 `--force` 算跳过，源缺失/非法算失败，结束打印 `成功 N 个，跳过 M 个，失败 K 个`。任一失败退 1，只有跳过退 0。
-- `--all` 拉取全部合法全局 skill。目标已存在时默认跳过（`--force` 覆盖）；非法 skill 逐条报错但不中断。跳过不算失败：只有真的拉取失败才退出码 1。
-- `--group <GROUP>` 可重复，拉取已保存分组内的全部 skill；与 `<name>...`、`--all` 三者互斥。多个组按给出顺序展开，组内保留定义顺序，重复 skill 只拉一次；组不存在、组为空、成员缺失都会逐条报错并继续，即使只展开出 1 个 skill 也打印成功/跳过/失败计数。
-
-### group
-
-- 分组保存在全局 `config.toml` 的 `[groups]` 下，每个组是一个扁平的 skill 名数组，例如 `frontend = ["tdd", "grill"]`。
-- `lsm group list [--json]` 按组名字典序输出，成员保留定义顺序；空组显示 `(empty)`，没有任何组时输出 `No groups found.`（JSON 为 `[]`）。
-- `lsm group set <group> <skill>...` 创建分组；覆盖已存在的组需要 `--force`。`lsm group add` 在组不存在时自动创建，追加成员时自动去重。
-- `lsm group remove <group>...` 批量删除分组，不需要 `--force`；不存在的组逐条报错、其余继续，任一失败退 1。
-- 组名与成员名使用与 skill 名相同的规则，成员不要求当前已安装。只有 `pull --group` 与 `group ...` 会读取 `[groups]`，该表写坏不会影响其他命令。
-
-### push
-
-- `lsm push <name>...` 是 `pull` 的反向操作：project（当前目录）→ global。源必须是合法项目 skill，目录名与 `SKILL.md` 的 `name` 一致。
-- 目标已存在需要 `--force`；`--all` 推送全部合法项目 skill，成功/跳过/失败语义与 `pull --all` 相同。
-- 多个 name、先校验后执行、汇总行的行为与 `pull` 完全一致，同样支持唯一前缀（`lsm push code` → `code-review`）。
-- 源不存在时 hint 指向 `lsm list project`；没有短选项。
-
-### remove
-
-- `lsm remove <name>... [<global|project>]` 卸载一个或多个 skill，作用域省略时为 `project`。无 `--force` 时只删合法 skill 目录（存在 `SKILL.md` 且其 `name` 与目录名一致），其余必须显式加 `--force`。
-- 末尾的 `global` / `project` 会当作作用域：`lsm remove foo global` 删全局副本，`lsm remove foo` 删项目副本。要卸载本身就叫 `global` / `project` 的技能，请写全作用域，例如 `lsm remove global project`。
-- 删除是原子的：先把目标 rename 到同级 `.tmp-remove-*`，再递归删除；rename 失败时原目录保持完整。
-- 多个 name 时先全部校验，再逐条删除；单条失败不中断，结束打印 `成功 N 个，失败 M 个`。任一失败退 1。
-- 目标不存在退出码 1，hint 指向 `lsm search`；`name` 在拼任何路径之前完成校验，`..` 与保留设备名以退出码 2 失败。
-- `name` 也接受唯一前缀；前缀有歧义时退出 1，该条不会删除任何目录。
-
-### upgrade
-
-- `lsm upgrade` 取最新 GitHub release，与当前版本比较后**原地替换**二进制：路径与文件名都不变（`lsm.exe`，或你改名后的名字）。
-- `--check` 只报告——`已是最新版本` 或 `有新版本可用`——不下载、不写盘。发现新版本不算失败：退出码 0。
-- `--force` 允许同版本重装，也允许 release 比当前版本旧时降级。
-- 下载后先跑 `<新文件> --version`，输出必须包含 release tag 的版本号才算通过；校验失败会删掉临时文件，原可执行文件不动。
-- 可执行文件所在目录必须可写；替换失败会回滚，旧二进制仍然可以运行。
-- 只有显式执行 `upgrade` 才联网。HTTP 403/429 按限流提示，`LSM_UPGRADE_API` 可指向返回同样 JSON 的镜像。
-
-## 语言
-
-输出、help 与错误支持英文（`en`）与中文（`zh`）。
-
-优先级：`--lang` > `LSM_LANG` > 配置文件 > `en`。
-
-```bash
-lsm --lang zh --help
-LSM_LANG=zh lsm list global
-lsm config set lang zh   # 持久化默认语言
-lsm config get lang      # 输出裸值：en / zh
-```
-
-配置文件与 `LSM_HOME` 相互独立：
-
-| 平台 | 默认路径 |
-|---|---|
-| Windows | `%APPDATA%\lsm\config.toml` |
-| Linux | `~/.config/lsm/config.toml` |
-| macOS | `~/Library/Application Support/lsm/config.toml` |
-
-`LSM_CONFIG_DIR` 可覆盖配置目录（空串按未设置处理）。`config set` 会保留文件里的注释与未知键。
-
-读取是惰性的：`--lang` 或 `LSM_LANG` 合法时根本不读配置文件，所以坏配置不会被触发——这是有意的逃生通道，不是漏检。两者都没有时，坏配置会让命令以退出码 1 失败，并提示 `修复或删除 <path>`。
-
-## 输出示例
-
-```
-$ lsm --lang en add my-skill.md global
-installed my-skill -> /home/me/.agents/skills/my-skill
-
-$ lsm --lang zh add my-skill.md global
-已安装 my-skill -> /home/me/.agents/skills/my-skill
-
-$ lsm --lang zh list global
-错误: 不支持符号链接：/home/me/.agents/skills/bad/link
-```
+`project` 固定为**当前工作目录**，不会向上查找项目根目录。请在项目根目录执行；在子目录执行就会装到子目录里。本工具只维护 `.agents/skills` 这一份目录，不代理其他 agent 的私有目录（如 `.claude/skills`）。
 
 ## 退出码
 
-| 退出码 | 含义 | 例子 |
-|---|---|---|
-| 0 | 成功 | 空目录执行 `list`、显式 `--help` |
-| 1 | 运行时错误 | 源不存在、frontmatter 非法、目标已存在、配置损坏 |
-| 2 | 用法错误 | 缺参数、`-g` 与 `-p` 同用、非法 `--lang`、非法 skill 名称、未知配置键、无子命令 |
-
-`--help` / `--version` 输出到 stdout 并退出 0；无子命令时 help 输出到 **stderr** 并退出 2。
+成功 `0`，运行时失败 `1`，用法错误 `2`。完整表格见 [`docs/reference/cli.md`](docs/reference/cli.md)。
 
 ## 开发
 

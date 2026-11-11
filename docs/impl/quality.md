@@ -223,19 +223,18 @@ rm -f /tmp/lsm-check
 
 ### 2.2 内容大纲
 
-`README.md`（英文，主文件）与 `README.zh-CN.md`（中文）结构一致：
+`README.md`（英文，主文件）与 `README.zh-CN.md`（中文）结构一致，只做落地页，不重复用户文档正文：
 
 1. 一句话介绍 + 语言切换链接。
 2. 安装：`cargo install --path .`、本地 release 构建。
 3. 快速开始：写一个 `my-skill.md`，`lsm add my-skill.md global`，`lsm pull my-skill`。
-4. 目录约定：`~/.agents/skills`、`<project>/.agents/skills`；提示"在项目根目录执行"。
-5. SKILL.md 模板与字段校验规则（64 / 1024 上限）。
-6. 命令参考：完整版 + 缩减版对照表 + `--lang` + `config get/set`，并注明命令与参数的唯一真源是 [`cli.md`](cli.md) §2.1。
-7. 语言持久化：`config set lang zh`、`config get lang`、配置文件路径（三平台）、四级优先级、`LSM_CONFIG_DIR`、坏配置会报错。
-8. 双语输出示例。
-9. 退出码与错误处理。
-10. 开发：`cargo test`、`cargo clippy --all-targets -- -D warnings`、`cargo fmt --check`。
-11. License：MIT，链接 `LICENSE`。
+4. 文档入口：按 Diátaxis 四问链接到 [`../README.md`](../README.md) 下的教程 / 指南 / 参考 / 解释。
+5. 目录约定：`~/.agents/skills`、`<project>/.agents/skills`；提示"在项目根目录执行"。
+6. 退出码摘要，完整表格链接到 [`../reference/cli.md`](../reference/cli.md)。
+7. 开发：`cargo test`、`cargo clippy --all-targets -- -D warnings`、`cargo fmt --check`。
+8. License：MIT，链接 `LICENSE`。
+
+用户文档目录（教程 / 指南 / 参考 / 解释）的职责与入口由 [`../README.md`](../README.md) 定义；README 只链接，不复制命令参数、配置字段或 SKILL.md 校验表。
 
 ### 2.3 许可证
 

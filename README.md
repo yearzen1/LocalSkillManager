@@ -1,6 +1,6 @@
 # Local Skill Manager (`lsm`)
 
-Install agent skills into `~/.agents/skills` or `<project>/.agents/skills`, pull a global skill into the current project, push a project skill to the global directory, and update the `lsm` binary itself.
+Install agent skills into `~/.agents/skills` or `<project>/.agents/skills`, pull a global skill into the current project, push a project skill back to the global directory, keep frequently used skills in groups, and update the `lsm` binary itself.
 
 English | [中文](README.zh-CN.md)
 
@@ -36,6 +36,22 @@ lsm add my-skill.md global
 lsm pull my-skill
 ```
 
+## Documentation
+
+User documentation is written in Chinese and organised by Diátaxis. Pick the entry that matches what you need:
+
+| I want to... | Read |
+|---|---|
+| Learn from scratch | [Getting started](docs/tutorials/getting-started.md) |
+| Finish a specific task | [Manage skill groups](docs/how-to/manage-skill-groups.md) · [Fix config problems](docs/how-to/fix-config-problems.md) |
+| Look up a command, setting or file format | [CLI index](docs/reference/cli.md) · [Config file](docs/reference/config.md) · [SKILL.md](docs/reference/skill-md.md) |
+| Understand why it works this way | [Concepts](docs/explanation/concepts.md) |
+| Contribute to lsm | [Implementation index](docs/impl.md) · [Decision records](docs/decisions.md) |
+
+Full documentation index: [`docs/README.md`](docs/README.md).
+
+Command and argument definitions live only in [`docs/impl/cli.md`](docs/impl/cli.md) §2.1; the reference pages link to it instead of defining a second copy.
+
 ## Directory conventions
 
 | Scope | Location | Override |
@@ -43,200 +59,11 @@ lsm pull my-skill
 | global | `~/.agents/skills/<name>/` | `LSM_HOME` points at the `.agents` level |
 | project | `<cwd>/.agents/skills/<name>/` | none |
 
-`project` is fixed to the **current working directory** and never walks up to find a project root. Run the command at your project root; running it in a subdirectory installs into that subdirectory.
-
-Only `.agents/skills` is maintained — other agents' private directories (e.g. `.claude/skills`) are not touched.
-
-## SKILL.md format
-
-```markdown
----
-name: my-skill
-description: Reviews a diff for correctness and style.
----
-
-# My Skill
-
-(body)
-```
-
-Validation rules:
-
-- the file must start with a `---` frontmatter block;
-- `name` and `description` are required and must not be blank;
-- `name` matches `^[a-z0-9]+(-[a-z0-9]+)*$`, at most **64** characters;
-- `description` is at most **1024** characters (counted in Unicode characters, not bytes);
-- `name` must not be a Windows reserved device name (`con`, `prn`, `aux`, `nul`, `com1`–`com9`, `lpt1`–`lpt9`);
-- when installing a directory, the directory name must equal the frontmatter `name`.
-
-Limits are never truncated or auto-fixed: violating them is an error.
-
-## Command reference
-
-```
-lsm add <source> [<global|project>] [--force]
-lsm list [<global|project>] [--json]
-lsm search <query> [<global|project>] [--name] [--description] [--json]
-lsm pull <name>... [--force]
-lsm pull --group <group>... [--force]
-lsm pull --all [--force]
-lsm push <name>... [--force]
-lsm push --all [--force]
-lsm remove <name>... [<global|project>] [--force]
-lsm group list [--json]
-lsm group set <group> <skill>... [--force]
-lsm group add <group> <skill>...
-lsm group remove <group>...
-lsm upgrade [--check] [--force]
-lsm config get lang
-lsm config set lang <en|zh>
-lsm --lang <en|zh> <command> ...
-```
-
-Commands, arguments and exit codes are defined once in [`docs/impl/cli.md`](docs/impl/cli.md) (in Chinese). This README only documents what the current binary supports.
-
-Short forms (separate arguments only — `-lg` is not supported):
-
-| Short | Expands to |
-|---|---|
-| `lsm -a foo.md -g` | `lsm add foo.md global` |
-| `lsm -a foo.md -p` | `lsm add foo.md project` |
-| `lsm -a foo.md` | `lsm add foo.md project` |
-| `lsm -l -g` | `lsm list global` |
-| `lsm -l -p --json` | `lsm list project --json` |
-| `lsm -l` | `lsm list project` |
-| `lsm -r foo -p` | `lsm remove foo project` |
-| `lsm -r foo` | `lsm remove foo project` |
-| `lsm -r a b -p` | `lsm remove a b project` |
-
-`<global|project>` is optional and defaults to `project` for `add`, `list`, `search` and `remove`; omitting `-g`/`-p` does the same for the short forms.
-
-`-g`/`-p` may not be combined, may not be used with `pull`, and may not be mixed with the long subcommand form. `search` and `push` have no short forms. `pull` has no short form either: `-p` always means `project`, and `-c` was removed in 0.5.0.
-
-> **Migrating from 0.4.x:** `lsm copy ...` is now `lsm pull ...`; `lsm -c ...` is gone. Use `lsm pull <name>...` or `lsm pull --all`.
-
-### add
-
-- Accepts a `.md` file or a skill directory. The scope is optional and defaults to `project`; pass `global` explicitly to install globally. Directory sources are copied **without any exclusions** — hidden files, `scripts/`, `assets/` and `.git` are all copied.
-- A directory source containing `.git` is copied in full and prints `warning: source contains .git directory, it will be copied` on stderr.
-- Installations are atomic: content is built in `.tmp-<name>-<pid>`, the previous directory (with `--force`) is moved to `.bak-<name>-<pid>`, then renamed into place. Failures roll back and leave nothing behind.
-- If the destination is inside the source directory (e.g. `lsm add . project`), the command fails instead of copying recursively.
-
-### list
-
-```
-NAME         DESCRIPTION
------------  ------------------------------------------
-broken       [invalid] missing SKILL.md
-
-code-review  Review a diff for correctness and style, flagging risky
-             changes before they reach main.
-
-my-skill     One-line description.
-```
-
-- entries are separated by a blank line; there is no blank line after the header or at the end, so folded descriptions never touch the next entry;
-- descriptions are collapsed to one line, wrapped at 60 display columns (wide CJK characters count as two), and continuation lines are indented to the description column — at most 3 lines, the third ending with `...`;
-- invalid skill directories are marked `[invalid]` and never abort the listing;
-- `--json` prints a single JSON array (pretty-printed, `[]` when empty) with `name`, `description`, `path`, `valid`, and `error` for invalid entries. Warnings never go to stdout.
-
-### search
-
-- `lsm search <query> [<global|project>]` matches `name` and `description` case-insensitively; only one scope is searched at a time and it defaults to `project`.
-- `--name` matches names only, `--description` matches descriptions only; with neither or with both, the union is searched. Invalid entries have an empty description, so `--description` never matches them.
-- Output reuses the `list` table (invalid entries keep the `[invalid]` marker) or the `list` JSON array with `--json`.
-- No matches is not an error: the command exits 0 and prints `No skills matched '<query>' in <scope>` (JSON: `[]`). An empty query exits 2.
-
-### pull
-
-- The source must be a valid global skill: `SKILL.md` present and its `name` must match the directory.
-- Pulling onto the same path, or into the source itself, is refused; an existing target needs `--force`.
-- `name` is validated before any path is built, so `..`, `/`, `\` and reserved device names exit with code 2. With several names, every name is validated before anything is pulled.
-- A unique prefix is enough: when only `code-review` is installed, `lsm pull code` pulls it. If several names share the prefix, the command exits 1 and lists the candidates; an exact name always wins.
-- Multiple names keep going after a failure: existing targets without `--force` are skipped, invalid/missing sources fail, and a final line reports `pulled N, skipped M, failed K`. Any failure exits 1; only skips exit 0.
-- `--all` pulls every valid global skill. Existing targets are skipped unless `--force`; invalid skills are reported and the batch keeps going. Skipped skills are not failures: the command exits 1 only when a skill actually failed to pull.
-- `--group <GROUP>` (repeatable) pulls every skill in a saved group. It is mutually exclusive with `<name>...` and `--all`. Groups are expanded in the order given, members keep their definition order, and duplicates are pulled once. Unknown groups, empty groups and missing members are reported while the batch keeps going; a summary is printed even when only one skill is pulled.
-
-### group
-
-- Groups are stored under `[groups]` in the global `config.toml`; each group is a flat list of skill names, for example `frontend = ["tdd", "grill"]`.
-- `lsm group list [--json]` prints groups sorted by name; members keep their definition order. An empty group shows `(empty)`; with no groups it prints `No groups found.` (JSON: `[]`).
-- `lsm group set <group> <skill>...` creates a group; replacing an existing group needs `--force`. `lsm group add` creates the group when missing and appends members without duplicates.
-- `lsm group remove <group>...` deletes one or more groups without `--force`; missing groups are reported while the rest are removed, and any failure exits 1.
-- Group and member names use the same rules as skill names; members do not need to be installed yet. Only `pull --group` and `group ...` read `[groups]`, so a malformed section never blocks other commands.
-
-### push
-
-- `lsm push <name>...` is the reverse of `pull`: project (cwd) → global. The source must be a valid project skill and the directory name must match `SKILL.md`.
-- Existing global targets need `--force`; `--all` pushes every valid project skill with the same success/skip/failure semantics as `pull --all`.
-- Multiple names, validation-before-work, and the summary line behave exactly like `pull`, including unique-prefix resolution (`lsm push code` → `code-review`).
-- A missing source points at `lsm list project`; the command has no short form.
-
-### remove
-
-- `lsm remove <name>... [<global|project>]` uninstalls one or more skills; the scope defaults to `project`. Without `--force` only a valid skill directory is deleted (`SKILL.md` present and its `name` matching the directory); anything else needs `--force`.
-- A trailing `global` or `project` is read as the scope, so `lsm remove foo global` removes the global copy and `lsm remove foo` removes the project one. To remove a skill that is itself named `global` or `project`, spell the scope out: `lsm remove global project`.
-- Deletion is atomic: the target is renamed to a sibling `.tmp-remove-*` first, then removed. If the rename fails, the original directory stays intact.
-- With several names, all names are validated first, then each is removed; failures do not stop the batch and a final line reports `removed N, failed M`. Any failure exits 1.
-- A missing target exits with code 1 and the hint points at `lsm search`; `name` is validated before any path is built, so `..` and reserved device names exit with code 2.
-- `name` also accepts a unique prefix; an ambiguous prefix exits 1 and deletes nothing for that name.
-
-### upgrade
-
-- `lsm upgrade` fetches the latest GitHub release, compares it with the running version, and replaces the binary **in place**: the path and file name stay the same (`lsm.exe`, or whatever you renamed it to).
-- `--check` only reports — `up to date` or `new version available` — and never downloads or writes. A newer release is not an error: exit code 0.
-- `--force` reinstalls the same version and also allows a downgrade when the release is older than the running build.
-- The download is verified by running `<new file> --version` and requiring the release tag's version. Failed verification deletes the temp file and leaves the original executable alone.
-- The directory holding the executable must be writable; a failed replacement rolls back, so the old binary stays runnable.
-- Network is touched only when you run `upgrade`. HTTP 403/429 are reported as rate limiting, and `LSM_UPGRADE_API` can point at a mirror serving the same JSON shape.
-
-## Language
-
-Output, help and errors are available in English (`en`) and Chinese (`zh`).
-
-Priority: `--lang` > `LSM_LANG` > config file > `en`.
-
-```bash
-lsm --lang zh --help
-LSM_LANG=zh lsm list global
-lsm config set lang zh   # persisted default
-lsm config get lang      # prints a bare value: en / zh
-```
-
-The configuration file is independent of `LSM_HOME`:
-
-| Platform | Default path |
-|---|---|
-| Windows | `%APPDATA%\lsm\config.toml` |
-| Linux | `~/.config/lsm/config.toml` |
-| macOS | `~/Library/Application Support/lsm/config.toml` |
-
-`LSM_CONFIG_DIR` overrides the directory (empty string counts as unset). `config set` preserves comments and unknown keys in the file.
-
-Reading is lazy: when `--lang` or `LSM_LANG` is valid, the file is not read at all, so a broken config cannot block you — that is the escape hatch, not a missing check. Without either, a broken config file exits 1 and tells you to `fix or delete <path>`.
-
-## Output examples
-
-```
-$ lsm --lang en add my-skill.md global
-installed my-skill -> /home/me/.agents/skills/my-skill
-
-$ lsm --lang zh add my-skill.md global
-已安装 my-skill -> /home/me/.agents/skills/my-skill
-
-$ lsm --lang zh list global
-错误: 不支持符号链接：/home/me/.agents/skills/bad/link
-```
+`project` is fixed to the **current working directory** and never walks up to find a project root. Run commands at your project root; running them in a subdirectory installs into that subdirectory. Only `.agents/skills` is maintained — other agents' private directories (e.g. `.claude/skills`) are not touched.
 
 ## Exit codes
 
-| Code | Meaning | Examples |
-|---|---|---|
-| 0 | success | `list` on an empty directory, explicit `--help` |
-| 1 | runtime error | missing source, invalid frontmatter, existing target, broken config |
-| 2 | usage error | missing argument, `-g` with `-p`, invalid `--lang`, invalid skill name, unknown config key, no subcommand |
-
-`--help` / `--version` print to stdout and exit 0. Running `lsm` with no subcommand prints help to **stderr** and exits 2.
+`0` on success, `1` on runtime failures, `2` on usage errors. The full table is in [`docs/reference/cli.md`](docs/reference/cli.md).
 
 ## Development
 
