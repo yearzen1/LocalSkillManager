@@ -1,4 +1,4 @@
-## 使用tdd、grill、intent-lock、conventional-commit skill
+## 加载项目的skill，除了grill（grill只能我手动加载）
 
 ## 改 CLI 的顺序（命令与参数）
 
