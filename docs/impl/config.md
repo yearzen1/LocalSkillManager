@@ -8,13 +8,14 @@
 
 ### 1.1 路径
 
-| 平台 | 默认路径 |
-|---|---|
-| Windows | `%APPDATA%\lsm\config.toml` |
-| Linux | `~/.config/lsm/config.toml` |
-| macOS | `~/Library/Application Support/lsm/config.toml` |
+| 文件 | 内容 | Windows 默认路径 |
+|---|---|---|
+| `config.toml` | 输出语言 `lang` | `%APPDATA%\lsm\config.toml` |
+| `groups.toml` | skill 分组 | `%APPDATA%\lsm\groups.toml` |
 
-- 基础目录优先取环境变量 `LSM_CONFIG_DIR`，否则 `dirs::config_dir()/lsm`；文件名固定 `config.toml`。
+- Linux 为 `~/.config/lsm/<文件名>`，macOS 为 `~/Library/Application Support/lsm/<文件名>`。
+- 基础目录优先取环境变量 `LSM_CONFIG_DIR`，否则 `dirs::config_dir()/lsm`；两个文件名固定。
+- 两个文件同目录但互不读写：`config set` 不碰 `groups.toml`，`group *` 不碰 `config.toml`。这是 Q61 的拆分理由——语言是机器偏好，分组是可以单独同步/分享的数据。
 - `LSM_CONFIG_DIR` 与 `LSM_HOME` 是两件独立的事：前者只放 `lsm` 自己的配置，后者只决定 skills 根目录。
 - 配置文件**不放在** `.agents` 下：那是与其他 agent 共享的 skill 目录，不属于本工具的私有状态。
 - 路径解析统一在 `infra::paths`：
@@ -29,38 +30,45 @@
 
 ### 1.2 文件格式
 
-TOML，v1 有 `lang` 与 `[groups]` 两项：
+两份都是 TOML。`config.toml` 只存语言：
 
 ```toml
 # Output language: en | zh
 lang = "zh"
+```
 
-[groups]
+`groups.toml` 是**顶层表**「组名 → 成员数组」，不再有 `[groups]` 包裹：
+
+```toml
+# Skill groups: name = [skill, "@group"]
 frontend = ["tdd", "grill", "intent-lock"]
-common = ["conventional-commit"]
+common = ["@frontend", "conventional-commit"]
 ```
 
 - UTF-8 编码；含 BOM 时先去 BOM 再解析。
 - `lang` 值只接受 `en`/`zh` 及其别名（`en-US`/`zh-CN`）；**落盘永远写规范形式** `en`/`zh`。
 - 文件可手改：注释与未知键在 `config set` / `group *` 写盘时原样保留（用 `toml_edit` 做读改写）。
-- 未知键不报错；当前版本不读取它们，也不删除它们。
-- 缺文件、缺 `lang` 键、缺 `[groups]` 表都表示"未设置"，不是错误。
+- `config.toml` 里的未知键不报错；当前版本不读取它们，也不删除它们。
+- 缺文件、缺 `lang` 键、缺 `groups.toml` 都表示"未设置"，不是错误。
 
-### 1.4 分组（`[groups]`）
+### 1.4 分组（`groups.toml`）
 
-- `[groups]` 是表，键是分组名，值是成员数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
+- 顶层表，键是分组名，值是成员数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
 - 成员有两种写法：`tdd` 是 skill 名；`@common` 是组引用（引用另一个分组）。因为 skill 名不允许 `@`，不需要转义。
 - 分组名与 skill 名共用同一套校验（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名）；大写输入在格式错误 hint 里提示对应的全小写写法（如 `Predevelop` → `predevelop`），但不会自动改写。
 - skill 成员在 `group set` / `group add` 写入前要求已安装在 **global**，并按「精确 → 唯一前缀」解析后写入全名（`code` → `code-review`）。
 - `@ref` 在写入前要求目标分组已定义，并按「精确 → 唯一前缀」解析；拒绝自引用与成环（`a -> b -> a`）。
 - 任一成员缺失、多候选或引用成环时整组不写盘：逐条打印错误，最后汇总退 1。缺失时若存在相近名字（子串或编辑距离，最多 3 条），hint 列出候选。
-- 直接手改 `config.toml` 仍可写入未安装的 skill 或悬空引用；展开时（`group list --resolved`、`pull --group`）检测缺失引用与环，并逐条失败。
+- 直接手改 `groups.toml` 仍可写入未安装的 skill 或悬空引用；展开时（`group list --resolved`、`pull --group`）检测缺失引用与环，并逐条失败。
 - 展开规则：深度优先，`@ref` 在原位置插入被引用组的成员，skill 按首次出现去重；顶层组展开为空时 `pull --group` 记为失败。
 - `group remove`、`group delete` 与 `pull --group` 的组名按「精确 → 唯一前缀」解析：恰好一个组匹配时用全名；多候选或零命中按该条失败，零命中时 hint 列出相近组名；`group set` / `group add` 的目标组名保持精确。
 - `group remove` 只删除成员/引用；`group delete` 删除整组，被其他组引用时默认拒绝，`--force` 才删除并同时移除这些引用。
 - `group list --json` 输出 `[{"name":...,"skills":[...],"includes":[...]}]`；`skills` 是直接 skill 成员，`includes` 是 `@ref`；`--resolved` 时 `skills` 换成展开后的列表。
-- 结构非法（`groups` 不是表、成员不是字符串、名字不合法）→ 运行时错误退 1，提示修复或删除配置文件。
-- **惰性读取**：只有 `pull --group` 与 `group list/set/add/remove/delete` 读取 `[groups]`；`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 与语言解析完全不碰它，`[groups]` 写坏不影响这些命令。
+- 结构非法（值不是数组、成员不是字符串、名字不合法）→ 运行时错误退 1，提示修复或删除 `groups.toml`。
+- **惰性读取**：只有 `pull --group` 与 `group list/set/add/remove/delete` 读取 `groups.toml`；`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 与语言解析完全不碰它，`groups.toml` 写坏不影响这些命令。
+- **迁移（Q61）**：`groups.toml` 不存在时读回退到 `config.toml` 的 `[groups]`（0.8.0 及更早的存放位置）；第一次写盘把当前生效的分组写进 `groups.toml`，并尽力删除 `config.toml` 里的旧表。删除失败只打一条 warning（`GroupLegacyLeftover`）、退出码仍为 0，旧表从此被忽略。`groups.toml` 存在时旧表完全不读，也不在写盘时合并。
+- 迁移是**一次性**的：`[groups]` 里手写的注释不会搬过去（值会完整保留），文档在 `how-to/fix-config-problems.md` 里说明。
+- 迁移窗口内（`groups.toml` 尚未生成）读回退仍需解析 `config.toml`，因此坏掉的 `config.toml` 仍会让 `group *` 失败；一旦写过分组就完全隔离。
 
 ### 1.3 数据结构
 
@@ -79,27 +87,55 @@ pub enum ConfigError {
     Write { path, source },          // 建目录 / 临时文件 / rename 失败
     Parse { path, source },          // TOML 语法非法
     InvalidValue { path, raw },      // lang 值不受支持
-    InvalidGroups { path, detail },  // [groups] 结构或成员名非法
-    GroupExists { name },            // group set 覆盖已存在的组且未加 --force
-    GroupNotFound { name },          // 要 add/remove 的组不存在
 }
 
 pub fn load(env: &Env) -> Result<Option<Lang>, ConfigError>;
 pub fn set_lang(env: &Env, value: Lang) -> Result<PathBuf, ConfigError>; // 返回写入路径
 
-pub struct GroupSaveReport { pub path: PathBuf, pub members: usize }
-pub fn load_groups(env: &Env) -> Result<Vec<Group>, ConfigError>;        // 按组名字典序
-pub fn set_group(env: &Env, name: &GroupName, members: &[SkillName], force: bool)
-    -> Result<GroupSaveReport, ConfigError>;
-pub fn add_group(env: &Env, name: &GroupName, members: &[SkillName])
-    -> Result<GroupSaveReport, ConfigError>;                            // 不存在则创建，已存在则追加去重
-pub fn remove_group(env: &Env, name: &GroupName) -> Result<PathBuf, ConfigError>;
+// src/infra/groups.rs
+pub enum GroupError {
+    Path(PathError),                 // 配置目录无法确定
+    Io { path, source },
+    Write { path, source },
+    Parse { path, source },
+    Invalid { path, detail },        // 结构或成员名非法
+    GroupExists { name },            // group set 覆盖已存在的组且未加 --force
+    GroupNotFound { name },          // 要 add/remove/delete 的组不存在
+}
+
+pub struct GroupWriteReport {
+    pub path: PathBuf,                   // 写盘后的 groups.toml
+    pub members: usize,                  // 成员总数；delete 固定 0
+    pub legacy_leftover: Option<PathBuf>, // 旧 [groups] 没删掉时带回路径
+}
+
+pub struct StripReport {
+    pub stripped: Vec<(GroupName, GroupName)>,
+    pub legacy_leftover: Option<PathBuf>,
+}
+
+pub fn load_groups(env: &Env) -> Result<Vec<Group>, GroupError>;        // 按组名字典序
+pub fn set_group(env: &Env, name: &GroupName, members: &[Member], force: bool)
+    -> Result<GroupWriteReport, GroupError>;
+pub fn add_group(env: &Env, name: &GroupName, members: &[Member])
+    -> Result<GroupWriteReport, GroupError>;                            // 不存在则创建，已存在则追加去重
+pub fn replace_group_members(env: &Env, name: &GroupName, members: &[Member])
+    -> Result<GroupWriteReport, GroupError>;                            // group remove 用
+pub fn strip_group_references(env: &Env, targets: &[GroupName])
+    -> Result<StripReport, GroupError>;                                 // group delete --force 用
+pub fn remove_group(env: &Env, name: &GroupName) -> Result<GroupWriteReport, GroupError>;
+
+// src/infra/tomlfile.rs —— 两份文件共用的读改写
+pub fn read(path: &Path) -> Result<(DocumentMut, bool), TomlFileError>;  // bool = 文件不存在
+pub fn write(path: &Path, doc: &DocumentMut) -> Result<(), TomlFileError>;
+pub fn write_rendered(path: &Path, rendered: &str) -> Result<(), TomlFileError>;
 ```
 
-- `GroupSaveReport.members` 是写盘后的成员总数，供成功提示显示。
-- 所有写操作复用同一套「读 → `toml_edit` 改 → 临时文件 → rename」流程，保留注释与未知键；`[groups]` 删空时整表移除。
-
-- `ConfigError` 定义在 `infra::config`；`error::mapping` 把它转成 `AppError { kind: Runtime }`，不在 infra 内构造 `AppError`。
+- `GroupWriteReport.members` 是写盘后的成员总数，供成功提示显示；`legacy_leftover` 由命令层转成 warning。
+- 所有写操作复用 `infra::tomlfile` 的「读 → `toml_edit` 改 → 临时文件 → rename」流程，保留注释与未知键。临时文件名按目标文件生成：`.config.toml.tmp-<pid>` / `.groups.toml.tmp-<pid>`。
+- `group delete` 删到空表时保留空的 `groups.toml`（带文件头），不做文件删除。
+- 替换成员数组时**原地改 `Item`**，不重建键：键上挂的注释不会因为 `group set/add` 丢失。
+- `ConfigError` / `GroupError` 定义在 `infra`；`error::mapping` 把它们转成 `AppError { kind: Runtime }`，不在 infra 内构造 `AppError`。
 - 只有 `domain::lang::Lang` 一个语言类型：`--lang`、`LSM_LANG`、配置文件值都走同一个 `Lang::parse`，不存在两套归一化。
 
 ## 2. 加载与优先级
@@ -180,6 +216,9 @@ pub fn run(args: impl Iterator<Item = OsString>) -> ExitCode;
 | TOML 解析失败 | 运行时错误，提示 `fix or delete <path>` | 1 |
 | `lang = "fr"` 等非法值 | 运行时错误，提示合法值与 `fix or delete <path>` | 1 |
 | `config set` 遇到损坏文件 | 不覆盖，报运行时错误并提示修复或删除 | 1 |
+| `groups.toml` 语法或结构非法 | 运行时错误，只影响 `group *` 与 `pull --group` | 1 |
+| `groups.toml` 缺失且 `config.toml` 的 `[groups]` 非法 | 运行时错误，提示修复或删除 `config.toml`（迁移窗口内） | 1 |
+| 旧 `[groups]` 删除失败 | 分组已写入 `groups.toml`，打 warning，旧表被忽略 | 0 |
 
 - 不采用"忽略坏配置 + stderr warning 继续跑"：那样"为什么语言不对"会变成迷宫，而 `--lang` 已经提供了安全的逃生通道。
 - 坏配置的报错走 stderr；`--json` 模式下 stdout **一个字节都不输出**，符合 `cli.md`「`--json` 下 stdout 只允许 JSON」。
@@ -249,7 +288,8 @@ lsm group delete <GROUP>... [--force]
 - `group add`：组不存在则创建；已存在则把新成员追加到末尾，重复成员静默去重；成功退 0。
 - `group remove <GROUP> <ITEM>...`：只从该组移除成员或引用，组本身保留；成员按组内已有成员前缀解析，找不到时整组不修改并退 1；只给组名退 2，hint 指向 `group delete`。
 - `group delete <GROUP>...`：删除整组；被其他组引用时默认拒绝并列出依赖者，`--force` 时同时移除这些引用；不存在的组逐条报错、其余继续，结束打印成功/失败计数，任一失败退 1。
-- 写入失败、坏 TOML、`[groups]` 结构非法都退 1，hint 指向修复或删除配置文件。
+- 写入失败、`groups.toml` 坏 TOML 或结构非法都退 1，hint 指向修复或删除 `groups.toml`；旧 `config.toml` 的 `[groups]` 删除失败只打 warning、退 0。
+- 所有写操作都先落 `groups.toml`，再尝试清理旧表；两个文件的临时名分别是 `.config.toml.tmp-<pid>` 与 `.groups.toml.tmp-<pid>`。
 - 成功提示：`group 'frontend' saved (3 skills) -> <配置路径>`、`removed 'tdd' from group 'frontend'` 与 `removed group 'frontend'`，按当前语言渲染。
 
 ## 5. 消息键
@@ -307,7 +347,7 @@ lsm group delete <GROUP>... [--force]
 | `GroupRefMissing` | group '{0}' references undefined group '{1}' | 分组 '{0}' 引用了不存在的分组 '{1}' |
 | `GroupRefMissingHint` | run `lsm group list` to see defined groups | 运行 `lsm group list` 查看已定义的分组 |
 | `GroupCycle` | group reference cycle: {0} | 分组引用成环：{0} |
-| `GroupCycleHint` | remove one of the references in [groups] | 移除 [groups] 中的一条引用 |
+| `GroupCycleHint` | remove one of the references in groups.toml | 移除 groups.toml 中的一条引用 |
 | `GroupSelfReference` | group '{0}' cannot include itself | 分组 '{0}' 不能引用自身 |
 | `GroupDeleteReferenced` | group '{0}' is referenced by: {1} | 分组 '{0}' 被以下分组引用：{1} |
 | `GroupDeleteReferencedHint` | use --force to delete it and remove the references | 使用 --force 删除并移除这些引用 |
@@ -322,7 +362,10 @@ lsm group delete <GROUP>... [--force]
 | `GroupBatchSummary` | removed {0}, failed {1} | 成功 {0} 个，失败 {1} 个 |
 | `GroupBatchFailed` | {0} group(s) failed to remove | {0} 个分组删除失败 |
 | `GroupBatchFailedHint` | fix the groups above, then run `lsm group delete` again | 修复上面的分组后重新运行 `lsm group delete` |
-| `GroupConfigInvalid` | invalid [groups] in config file {0}: {1} | 配置文件中的 [groups] 非法：{0}：{1} |
+| `GroupParseFailed` | cannot parse groups file: {0} | 无法解析分组文件：{0} |
+| `GroupWriteFailed` | failed to write groups file: {0} | 写入分组文件失败：{0} |
+| `GroupFileInvalid` | invalid groups file {0}: {1} | 分组文件 {0} 非法：{1} |
+| `GroupLegacyLeftover` | could not remove [groups] from {0}; it is now ignored | 无法从 {0} 删除旧 [groups]；该表已被忽略 |
 | `PullGroupFlag` | Pull every skill in a group (repeatable) | 拉取分组内的全部 skill（可重复） |
 
 - `config get` 的输出是裸值，不经过消息表。
@@ -333,11 +376,12 @@ lsm group delete <GROUP>... [--force]
 - Q27：语言持久化（配置文件 + `config get/set`，TOML + `toml_edit`）。
 - Q28：优先级与失效策略（惰性读取、坏配置退 1、不做项目级配置）。
 - Q29：分层收敛（`Lang` 唯一、`Env` 快照、`decide` 纯决策表、错误映射与渲染在边界）。
-- Q53 / Q54：分组存放于全局 `config.toml` 的 `[groups]`；分组读写惰性加载。
-- Q55：`group list/set/add/remove` 的命令形态与批量语义。
+- Q53 / Q54：分组定义、读取与排序规则；Q61 起存放位置改为 `groups.toml`。
+- Q55：`group list/set/add/remove/delete` 的命令形态与批量语义。
 - Q56：`group set` 覆盖已存在的组必须 `--force`；`group delete` 删除被引用的组需要 `--force`。
 - Q57：分组属于 v0.7.0。
 - Q58：`group set/add` 的成员写入前必须存在于 global 并解析前缀；组名读取支持唯一前缀；大写组名只给提示，不自动改写。
 - Q60：成员支持 `@组名` 引用；展开去重并检测环；`group remove` 删成员、`group delete` 删组；`--resolved` 与 JSON `includes`。
+- Q61：分组从 `config.toml` 的 `[groups]` 拆到同目录的 `groups.toml`（顶层表）；读取时回退旧表，首次写盘迁移并清理；版本升到 0.9.0。
 
 完整决策见 [decisions.md](../decisions.md)。

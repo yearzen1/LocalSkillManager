@@ -146,13 +146,13 @@ v0.6.1 help 汉化：
 
 skill 分组（Q53–Q57，v0.7.0）：
 
-89. `group set frontend tdd grill` → 退出 0，`config.toml` 出现 `[groups]` 与两个成员；`group list` 输出 `frontend: tdd, grill`。
+89. `group set frontend tdd grill` → 退出 0，`groups.toml` 出现 `frontend` 与两个成员；`group list` 输出 `frontend: tdd, grill`；`config.toml` 不被创建或修改。
 90. 再次 `group set frontend ...` 无 `--force` → 退出 1 且旧成员不变；加 `--force` → 覆盖成功。
 91. `group set Frontend tdd` / `group set frontend Bad-Name` → 退出 2，配置文件不产生任何新组。
 92. `group add frontend grill tdd`：组不存在时自动创建；已有成员静默去重，成员顺序保持首次出现。
 93. `group list` 无组 → 退出 0 输出 `No groups found.`；`--json` 输出 `[]`；有组时 JSON 字段为 `name` / `skills`，组按字典序、成员保留定义顺序。
 94. `group delete a missing` → 退出 1，`a` 被删除、`missing` 报错，结束打印成功/失败计数；删除未被引用的组不需要 `--force`。
-95. `[groups]` 结构非法（`groups = "bad"`、成员是数字）→ `group list` / `pull --group` 退 1，提示修复或删除配置文件；`list` / `search` / 其他命令仍正常。
+95. `groups.toml` 结构非法（`frontend = "bad"`、成员是数字）→ `group list` / `pull --group` 退 1，提示修复或删除 `groups.toml`；`list` / `search` / 其他命令仍正常。
 96. `pull --group common`（成员 `alpha`、`beta`）→ 两个 skill 都进入项目，结束打印 `pulled 2, skipped 0, failed 0`；只有 1 个成员时也打印计数。
 97. `pull --group a --group b` 展开后重复 skill 只拉取一次；组不存在、组为空、成员缺失都逐条报错并继续，任一失败退 1。
 98. `pull alpha --group common`、`pull --group common --all` → 退出 2，不复制任何 skill。
@@ -169,7 +169,7 @@ skill 分组（Q53–Q57，v0.7.0）：
 106. `group delete predev`（已存在 `predevelop`）→ 删除 `predevelop`；存在多个同前缀组时退 1 并列出候选。
 107. `pull --group predev`（已存在 `predevelop`）→ 展开 `predevelop`，输出显示全名。
 108. 已有 `predevelop` 时 `group add predev x` → 创建新组 `predev`，不做前缀解析。
-109. 手改 `[groups]` 写入 global 不存在的成员后执行 `pull --group` → 该成员按条失败，其余继续（原 97 的兜底不变）。
+109. 手改 `groups.toml` 写入 global 不存在的成员后执行 `pull --group` → 该成员按条失败，其余继续（原 97 的兜底不变）。
 
 组引用与成员删除（Q60，v0.8.0）：
 
@@ -187,6 +187,12 @@ skill 分组（Q53–Q57，v0.7.0）：
 121. `group delete common` 被 `frontend` 引用时退 1 并列依赖者；加 `--force` 后删除 `common` 并移除 `frontend` 里的 `@common`。
 122. `group delete a missing` 批量删除：`a` 被删、`missing` 报错，结束打印计数并退 1。
 123. `group list --json` 输出 `name` / `skills` / `includes`，`skills` 不含 `@ref`。
+124. `group set frontend tdd` 后 `groups.toml` 出现顶层 `frontend = ["tdd"]` 与文件头 `# Skill groups`；`config.toml` 不被创建或修改。
+125. 旧版 `config.toml` 含 `[groups]` 且没有 `groups.toml`：`group list` 读到旧分组且不写盘；随后 `group add` 写出 `groups.toml` 并删除旧 `[groups]`，`lang` 与注释保留。
+126. `groups.toml` 与旧 `[groups]` 同时存在时以 `groups.toml` 为准，旧表被忽略。
+127. `config.toml` 语法坏、`groups.toml` 正常：`--lang en group list` 成功；不带 `--lang` 仍因语言解析退 1。
+128. `groups.toml` 语法坏时不回退旧表：报 `cannot parse groups file` 并指向 `groups.toml`。
+129. 旧 `[groups]` 删除失败（如 `config.toml` 只读）→ 分组已写入 `groups.toml`，stderr 打 warning，退出码仍为 0。
 
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
@@ -242,6 +248,12 @@ lsm group remove frontend @base                # 只移除引用
 lsm group set frontend sample
 lsm group remove frontend sample               # 只移除成员
 lsm group delete base                          # 无引用时直接删除
+
+# v0.9.0：分组独立存储
+lsm group set frontend sample
+lsm group list                                 # frontend: sample
+cat "$LSM_CONFIG_DIR/groups.toml"              # 顶层 frontend = ["sample"]；未设变量时用平台默认路径
+lsm config set lang zh                         # 只改 config.toml，不动 groups.toml
 
 # 离线：只验子命令存在与非法参数，不联网
 lsm upgrade --help                              # 列出 --check / --force / --verbose / --progress，退出 0

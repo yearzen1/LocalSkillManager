@@ -146,8 +146,10 @@ LocalSkillManager/
 │   ├── infra/             # 所有文件系统与环境访问
 │   │   ├── mod.rs
 │   │   ├── env.rs         # 环境快照：LSM_HOME / LSM_CONFIG_DIR / LSM_LANG / LSM_UPGRADE_API / CARGO_HOME
-│   │   ├── paths.rs       # 纯函数：skills_dir(&Env, ...)、config_file(&Env)
-│   │   ├── config.rs      # config.toml 读写与校验
+│   │   ├── paths.rs       # 纯函数：skills_dir(&Env, ...)、config_file(&Env)、groups_file(&Env)
+│   │   ├── config.rs      # config.toml 读写与校验（只有 lang）
+│   │   ├── groups.rs      # groups.toml 读写、旧 [groups] 迁移
+│   │   ├── tomlfile.rs    # 两份文件共用的读改写与原子写入
 │   │   ├── frontmatter.rs # 解析 SKILL.md
 │   │   ├── fsops.rs       # 递归复制、原子安装、覆盖、自包含检测、原地替换自身
 │   │   ├── net.rs         # 取最新 release、下载资产（唯一网络访问点）
@@ -198,8 +200,10 @@ LocalSkillManager/
 | `domain::action` | 解析后的用户意图 | `Action::{Add, List, Search, Pull, Push, Remove, Group, Upgrade, Config}` |
 | `domain::entry` | list 的展示数据 | `SkillEntry`（name/description/path/valid/error） |
 | `infra::env` | 进程环境快照（唯一读环境点） | `Env::read() -> Env`、`Env::{home, config_dir, lang, upgrade_api, cargo_bin_dir}` |
-| `infra::paths` | 纯函数路径解析 | `skills_dir(&Env, Scope, &Path) -> Result<PathBuf, PathError>`、`config_file(&Env) -> Result<PathBuf, PathError>` |
-| `infra::config` | 读写并校验 `config.toml` | `load()`、`set_lang(Lang)`、`load_groups()`、`set_group` / `add_group` / `remove_group` |
+| `infra::paths` | 纯函数路径解析 | `skills_dir(&Env, Scope, &Path)`、`config_file(&Env)`、`groups_file(&Env)` |
+| `infra::config` | 读写并校验 `config.toml`（只有 `lang`） | `load()`、`set_lang(Lang)` |
+| `infra::groups` | 读写 `groups.toml`，回退并迁移旧 `[groups]` | `load_groups()`、`set_group` / `add_group` / `replace_group_members` / `strip_group_references` / `remove_group`（错误为 `GroupError`） |
+| `infra::tomlfile` | 两份配置文件共用的读改写与原子写入 | `read` / `write` / `write_rendered`（错误为 `TomlFileError`） |
 | `infra::frontmatter` | 读取并解析 SKILL.md | `parse_skill_md(&Path) -> Result<SkillMeta, FrontmatterError>` |
 | `infra::fsops` | 复制、原子安装、覆盖、自包含、原地替换自身 | `install_skill_dir/file`、`contains_path`、`replace_self`（错误为 `FsError`） |
 | `infra::net` | 取 release 元数据、下载资产（唯一网络点） | `fetch_latest_release(Option<&str>, Version)`、`download_asset(&str, &Path)` |
@@ -299,6 +303,7 @@ pub struct Ctx {
 | v0.7.1 范围 | `group set/add` 成员必须存在于 global 并解析唯一前缀；组名读取支持唯一前缀；未命中给相近候选；大写组名提示全小写写法 | [decisions.md](decisions.md) Q58 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「name 前缀解析」 |
 | v0.7.2 范围 | `upgrade` 新增 `--verbose` / `--progress`：阶段提示与下载进度条只写 stderr，默认仍完全静默；固定 20 列 ASCII 条，不探测终端 | [decisions.md](decisions.md) Q59 / [upgrade.md](impl/upgrade.md)「过程输出」 |
 | v0.8.0 范围 | `[groups]` 支持 `@组名` 引用；`group remove` 改为删成员、新增 `group delete`；`group list --resolved`、JSON `includes`；`pull --group` 递归展开并检测环 | [decisions.md](decisions.md) Q60 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「pull」 |
+| v0.9.0 范围 | 分组从 `config.toml` 的 `[groups]` 拆到同目录 `groups.toml`（顶层表）；读取回退旧表，首次写盘迁移并清理；`config` 与 `groups` 互不读写 | [decisions.md](decisions.md) Q61 / [config.md](impl/config.md)「配置文件」「分组」 |
 
 ## 6. 文档维护规则
 
@@ -444,4 +449,13 @@ pub struct Ctx {
 - [x] `group remove <GROUP> <ITEM>...` 移除成员/引用；`group delete <GROUP>... [--force]` 删除整组，被引用时默认拒绝。
 - [x] `group list --resolved` 与 JSON `includes`；`pull --group` 递归展开后复用批量语义。
 - [x] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md`、分组 how-to 与配置参考同步。
+
+### 8.11 v0.9.0 分组独立为 groups.toml（已实现）
+
+- [x] `infra::paths` 新增 `groups_file`；`infra::config` 只保留 `lang`，分组迁到 `infra::groups`。
+- [x] `infra::tomlfile` 承载两份文件共用的读改写；临时文件名按目标文件生成。
+- [x] `groups.toml` 为顶层表；读取时 `groups.toml` 优先，缺失才回退 `config.toml` 的 `[groups]`。
+- [x] 首次写盘迁移：落 `groups.toml` 后尽力删除旧表，失败打 warning 且退 0；`groups.toml` 存在时旧表被忽略。
+- [x] `group set/add/remove/delete` 与 `pull --group` 全部改走 `infra::groups`；成功提示里的路径变成 `groups.toml`。
+- [x] `impl/config.md`、`impl.md`、`impl/storage.md`、`impl/cli.md`、`impl/quality.md`、配置参考、两份 how-to、核心概念与 `docs/README.md` 同步。
 

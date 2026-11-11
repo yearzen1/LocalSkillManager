@@ -15,7 +15,7 @@
 
 - project **不做**向上查找 `.git` / `.agents`。在子目录执行就会装到子目录，这是明确接受的行为；README 需提示"请在项目根目录执行"。
 - `LSM_HOME` 指向 `.agents` 这一层（便于测试整体重定向），`skills` 由程序拼接。
-- **配置文件不在 skills 目录下**：`config.toml` 位于 `dirs::config_dir()/lsm`（可用 `LSM_CONFIG_DIR` 覆盖），`LSM_HOME` 只影响 skills 根目录，两者互不影响；详见 [config.md](config.md)。
+- **配置文件不在 skills 目录下**：`config.toml`（语言）与 `groups.toml`（分组）位于 `dirs::config_dir()/lsm`（可用 `LSM_CONFIG_DIR` 覆盖），`LSM_HOME` 只影响 skills 根目录，两者互不影响；详见 [config.md](config.md)。
 - Windows 家目录由 `dirs::home_dir()` 得到，例如 `C:\Users\jiahui\.agents\skills`。
 - 所有路径使用 `PathBuf`，禁止硬编码 `/` 或 `\`。
 - `Env::read()` 一次读全环境，返回快照；空串按未设置处理，`LSM_LANG` 非 UTF-8 同样按未设置。除 `LSM_HOME` / `LSM_CONFIG_DIR` / `LSM_LANG` 外还快照 `LSM_UPGRADE_API` 与 `current_exe()`（供 `upgrade` 使用，规则见 [upgrade.md](upgrade.md)）。
@@ -323,8 +323,8 @@ pull 同样执行 `.git` 警告与自包含检查（目标在源内时拒绝）�
 
 `--group` 分支（Q55）：
 
-1. 读取 `[groups]`（惰性加载；结构非法退 1）。多个 `--group` 按给出顺序展开，组内按定义顺序，重复 skill 按首次出现去重。
-2. 组名先按 `[groups]` 的键精确匹配，未命中再按唯一前缀解析（与 §3.7 同一规则）；多候选或零命中时该条失败并继续处理其他组，零命中的 hint 列出相近组名。组为空也记一条失败。
+1. 读取 `groups.toml`（惰性加载；结构非法退 1；缺失时回退 `config.toml` 的旧 `[groups]`）。多个 `--group` 按给出顺序展开，组内按定义顺序，重复 skill 按首次出现去重。
+2. 组名先按 `groups.toml` 的键精确匹配，未命中再按唯一前缀解析（与 §3.7 同一规则）；多候选或零命中时该条失败并继续处理其他组，零命中的 hint 列出相近组名。组为空也记一条失败。
 3. 递归展开 `@ref`：深度优先，被引用组的成员插入引用所在位置，skill 按首次出现去重；缺失引用或成环按该组失败并继续，环错误打印 `a -> b -> a`。
 4. 展开后的 skill 复用 §3.3 的单条流程：目标已存在且无 `--force` 算跳过，源缺失/非法或 I/O 错误算失败，单条失败不中断。
 5. 即使只展开出 1 个 skill，结束也打印成功/跳过/失败计数；任一失败退 1，只有跳过或全部成功退 0。
@@ -428,7 +428,7 @@ lsm push --all [--force]
 
 组名与分组成员复用同一规则（Q58 / Q60）：
 
-- `group remove <GROUP> <ITEM>...`、`group delete <GROUP>...` 与 `pull --group <GROUP>...` 的 `<GROUP>` 先按 `[groups]` 键精确匹配，未命中再按唯一前缀解析；零命中时 not-found hint 用子串/编辑距离列出最多 3 个相近组名。
+- `group remove <GROUP> <ITEM>...`、`group delete <GROUP>...` 与 `pull --group <GROUP>...` 的 `<GROUP>` 先按 `groups.toml` 的键精确匹配，未命中再按唯一前缀解析；零命中时 not-found hint 用子串/编辑距离列出最多 3 个相近组名。
 - `group set` / `group add` 的 skill 成员在写盘前按同一规则解析并写入全名（`code` → `code-review`）；任一成员缺失或多候选则整组不写盘，逐条报错后汇总退 1。
 - `@ref` 在已定义组里按同一规则解析；写入时拒绝自引用与成环，展开时再次检测缺失引用与环。
 - `group set` / `group add` 的目标组名不做前缀解析，避免 `--force` 误覆盖相近的已有组。
@@ -514,6 +514,8 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError>;
 - Q31：自更新用原地替换，`exe` 路径与文件名不变（`fsops::replace_self` 只实现替换与回滚）。
 - Q40：`pull --all` 逐条复制、冲突跳过、失败继续，任一失败退 1（拉动方向由 Q48 从 `copy` 改名）。
 - Q41：`remove` 只删合法 skill 目录，`--force` 才放开；rename 到临时目录再递归删。
-- Q53–Q57：`pull --group` 展开分组后复用 Q44 的批量语义；组名/成员格式随 CLI 校验，成员不要求已安装。Q58：v0.7.1 起 `group set/add` 写入前校验 global 存在性并解析唯一前缀，组名读取支持唯一前缀。
+- Q53–Q57：`pull --group` 展开分组后复用 Q44 的批量语义；组名/成员格式随 CLI 校验，成员不要求已安装。
+- Q61：分组改存 `groups.toml`；`pull --group` 读取时优先该文件，缺失才回退 `config.toml` 的旧 `[groups]`。
+- Q58：v0.7.1 起 `group set/add` 写入前校验 global 存在性并解析唯一前缀，组名读取支持唯一前缀。
 
 完整决策见 [decisions.md](../decisions.md)。

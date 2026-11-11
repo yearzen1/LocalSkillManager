@@ -51,7 +51,7 @@ export LSM_HOME="$HOME/lsm-tutorial/agents"
 export LSM_CONFIG_DIR="$HOME/lsm-tutorial/config"
 ```
 
-`LSM_HOME` 决定全局 skills 根目录，`LSM_CONFIG_DIR` 决定配置文件位置。把它们指向临时目录，后面的 `add`、`pull`、`group` 都不会污染日常环境。
+`LSM_HOME` 决定全局 skills 根目录，`LSM_CONFIG_DIR` 决定配置文件所在目录。把它们指向临时目录，后面的 `add`、`pull`、`group` 都不会污染日常环境。
 
 创建两个 skill 文件：
 

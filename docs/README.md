@@ -9,12 +9,12 @@
 ## 我想做：完成一个具体任务
 
 - [如何管理 skill 分组](how-to/manage-skill-groups.md) —— 创建、追加、查看、用组拉取、删除分组。
-- [配置或分组损坏时怎么办](how-to/fix-config-problems.md) —— 坏 TOML、非法 `lang`、非法 `[groups]`、配置目录不可用。
+- [配置或分组损坏时怎么办](how-to/fix-config-problems.md) —— 坏 TOML、非法 `lang`、写坏的 `groups.toml`、配置目录不可用。
 
 ## 我想查：找准确的事实
 
 - [命令索引](reference/cli.md) —— 命令列表、`--help` 入口、全局选项与退出码。
-- [配置文件参考](reference/config.md) —— `config.toml` 的路径、`lang` 与 `[groups]` 结构。
+- [配置文件参考](reference/config.md) —— `config.toml` 与 `groups.toml` 的路径、`lang` 与分组结构。
 - [SKILL.md 参考](reference/skill-md.md) —— frontmatter 字段、校验规则与目录名约束。
 
 ## 我想懂：理解设计与取舍

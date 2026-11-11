@@ -111,7 +111,7 @@ $ lsm --lang zh --help
 - `pull` 的 `--group` 可重复，与 `<NAME>...`、`--all` 三者互斥；规则见 [storage.md](storage.md)「pull」与 [config.md](config.md)「分组」。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
-- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）；分组成员校验与模糊匹配属于 v0.7.1（Q58）；`upgrade` 的 `--verbose` / `--progress` 属于 v0.7.2（Q59）；组组合与 `group remove/delete` 新语义属于 v0.8.0（Q60）。
+- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）；分组成员校验与模糊匹配属于 v0.7.1（Q58）；`upgrade` 的 `--verbose` / `--progress` 属于 v0.7.2（Q59）；组组合与 `group remove/delete` 新语义属于 v0.8.0（Q60）；分组独立为 `groups.toml` 属于 v0.9.0（Q61）。
 
 选项：
 
@@ -290,7 +290,7 @@ impl AppError {
 - Q29：分层收敛与错误映射（错误枚举在 `domain`/`infra`，`AppError` 只在边界构造，渲染归 `output`）。
 - Q30 / Q31 / Q32：`upgrade` 的命令形态、原地替换（文件名不变）、网络与资产契约（见 [upgrade.md](upgrade.md)）。
 - Q33 / Q37：命令表与选项表同属 CLI 真源，改动顺序与二进制一致性由 `tests/cli.rs` 强制。
-- Q53–Q57：分组存放于全局 `config.toml` 的 `[groups]`，提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。Q58：v0.7.1 起成员写盘前必须存在于 global 并解析前缀，组名读取支持唯一前缀。Q60：v0.8.0 起成员支持 `@组名` 引用，`group remove` 删成员、`group delete` 删组。
+- Q53–Q57：分组提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。Q58：v0.7.1 起成员写盘前必须存在于 global 并解析前缀，组名读取支持唯一前缀。Q60：v0.8.0 起成员支持 `@组名` 引用，`group remove` 删成员、`group delete` 删组。Q61：v0.9.0 起分组存放于 `groups.toml`（`config.toml` 只留 `lang`）。
 
 完整决策见 [decisions.md](../decisions.md)。
 
