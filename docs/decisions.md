@@ -62,6 +62,7 @@
 | Q55 | 分组命令面与 `pull --group` | 新增 `group list` / `group set` / `group add` / `group remove`；`pull --group <GROUP>...` 可重复，与 `<NAME>...`、`--all` 三者互斥（同给任两项退 2）；展开后复用 Q44 的批量语义，组不存在/组为空/成员缺失都按该条失败继续，即使只展开出 1 个也打印成功/跳过/失败计数，任一失败退 1 |
 | Q56 | 分组的破坏性规则 | `group set` 创建不存在的组不需要 `--force`，覆盖已存在的组必须 `--force`，否则退 1；`group add` 组不存在时自动创建、已有成员静默去重；`group remove <GROUP>...` 批量删除且不需要 `--force`，不存在的组逐条报错、其余继续，任一失败退 1；`set` 不给成员退 2 |
 | Q57 | v0.7.0 范围 | 只做分组：`[groups]` 持久化、`pull --group`、4 个 `group` 子命令与 `group list --json`；不把分组扩展到 `push`/`remove`/`list`/`search`，不做分组嵌套与通配；版本按 minor 升到 0.7.0 |
+| Q58 | 分组成员校验与模糊匹配 | 组名规则不变，仍拒绝大写；大写输入在格式错误 hint 里给出全小写建议（如 `Predevelop` → `predevelop`）。`group set` / `group add` 写入前要求每个成员存在于 **global**：先按「精确 → 唯一前缀」解析并写入全名，缺失或多候选则整组不写盘，逐条打印错误后汇总退 1；组名本身仍精确匹配，不做前缀（避免 `--force` 误覆盖）。`group remove` 与 `pull --group` 的组名支持唯一前缀，多候选/缺失按该条失败并列出候选。候选提示用子串匹配加手写编辑距离，最多 3 条，不引入新依赖。直接手改 `config.toml` 写入不存在的成员仍允许，由 `pull --group` 在拉取时逐条失败。版本按 patch 升到 0.7.1 |
 
 ## 维护规则
 

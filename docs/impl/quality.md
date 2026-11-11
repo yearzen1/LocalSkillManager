@@ -156,6 +156,18 @@ skill 分组（Q53–Q57，v0.7.0）：
 99. `pull --group` 的成员仍支持唯一前缀（成员 `code` → `code-review`）；目标已存在且无 `--force` 算跳过，退 0。
 100. `group --help` / `group list --help` / `group set --help` 两种语言均正常；`group set --help` 列出 `--force`，`group list --help` 列出 `--json`。
 
+分组成员校验与模糊匹配（Q58，v0.7.1）：
+
+101. `group set Frontend tdd` → 退出 2，hint 提示 `did you mean 'frontend'?`；组名规则未放宽。
+102. `group set frontend missing-skill`（global 只有 `grill`）→ 退出 1，hint 含 `grill`，配置文件不产生或修改 `frontend`。
+103. `group add frontend code`（global 只有 `code-review`）→ 退出 0，配置里存储 `code-review` 而不是 `code`。
+104. global 同时有 `code-lint`、`code-review` 时 `group add frontend code` → 退出 1 并列出两个候选，整组不写盘。
+105. 一次给多个坏成员 → 每个坏成员各打印一条错误，最后汇总一行并退 1；合法成员也不写入。
+106. `group remove predev`（已存在 `predevelop`）→ 删除 `predevelop`；存在多个同前缀组时退 1 并列出候选。
+107. `pull --group predev`（已存在 `predevelop`）→ 展开 `predevelop`，输出显示全名。
+108. 已有 `predevelop` 时 `group add predev x` → 创建新组 `predev`，不做前缀解析。
+109. 手改 `[groups]` 写入 global 不存在的成员后执行 `pull --group` → 该成员按条失败，其余继续（原 97 的兜底不变）。
+
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
 ### 1.3 手工验收（三平台）
@@ -191,6 +203,12 @@ lsm group list                                 # frontend: sample
 lsm pull --group frontend                      # 拉取整组
 lsm group add frontend another                 # 追加成员
 lsm group remove frontend                      # 删除分组
+
+# v0.7.1：分组成员校验与模糊匹配
+lsm group set Backend sample                   # 退出 2，hint 提示 'backend'
+lsm group set backend samp                     # 唯一前缀 → sample，写入全名
+lsm group set backend nope                     # 退出 1，不写盘
+lsm group remove back                          # 唯一前缀 → backend
 
 # 离线：只验子命令存在与非法参数，不联网
 lsm upgrade --help                              # 列出 --check / --force，退出 0

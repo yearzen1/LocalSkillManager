@@ -49,8 +49,11 @@ common = ["conventional-commit"]
 ### 1.4 分组（`[groups]`）
 
 - `[groups]` 是表，键是分组名，值是 skill 名数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
-- 分组名与 skill 名共用同一套校验（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名）；成员同样必须是合法 skill 名。
-- 组内成员**只校验格式**，不要求当前已安装在 global；缺失由 `pull --group` 按批处理记失败。
+- 分组名与 skill 名共用同一套校验（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名）；大写输入在格式错误 hint 里提示对应的全小写写法（如 `Predevelop` → `predevelop`），但不会自动改写。
+- 成员名同样必须是合法 skill 名；`group set` / `group add` 写入前要求成员已安装在 **global**，并按「精确 → 唯一前缀」解析后写入全名（`code` → `code-review`）。
+- 任一成员缺失或多候选时整组不写盘：逐条打印错误，最后汇总退 1。成员缺失时若存在相近名字（子串或编辑距离，最多 3 条），hint 列出候选。
+- 直接手改 `config.toml` 仍可写入未安装的成员；这类成员在 `pull --group` 时按批处理逐条失败（Q53 的读取兜底不变）。
+- `group remove` 与 `pull --group` 的组名按「精确 → 唯一前缀」解析：恰好一个组匹配时用全名；多候选或零命中按该条失败，零命中时 hint 列出相近组名；`group set` / `group add` 的目标组名保持精确。
 - 结构非法（`groups` 不是表、成员不是字符串、名字不合法）→ 运行时错误退 1，提示修复或删除配置文件。
 - **惰性读取**：只有 `pull --group` 与 `group list/set/add/remove` 读取 `[groups]`；`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 与语言解析完全不碰它，`[groups]` 写坏不影响这些命令。
 
@@ -274,6 +277,14 @@ lsm group remove <GROUP>...
 | `GroupAlreadyExists` | group '{0}' already exists | 分组 '{0}' 已存在 |
 | `GroupNotFound` | group '{0}' not found | 找不到分组 '{0}' |
 | `GroupNotFoundHint` | run `lsm group list` to see available groups | 运行 `lsm group list` 查看可用分组 |
+| `NameSuggestion` | did you mean: {0}? | 你是不是想找：{0}？ |
+| `GroupLowercaseHint` | did you mean '{0}'? group names must be lowercase | 你是不是想用 '{0}'？分组名只能小写 |
+| `GroupMemberMissing` | skill '{0}' is not installed in global | skill '{0}' 尚未安装到 global |
+| `GroupMemberMissingHint` | run `lsm list global` to see installed skills | 运行 `lsm list global` 查看已安装的 skill |
+| `GroupMembersFailed` | {0} skill(s) are unavailable in global; the group was not written | {0} 个 skill 在 global 中不可用，未写入任何分组 |
+| `GroupMembersFailedHint` | fix the skills above, then run the command again | 修正上面的 skill 名称后重新运行 |
+| `GroupAmbiguous` | group '{0}' matches more than one group: {1} | 分组 '{0}' 匹配到多个组：{1} |
+| `GroupAmbiguousHint` | use a longer prefix, or run `lsm group list` | 请使用更长的前缀，或运行 `lsm group list` |
 | `GroupEmpty` | group '{0}' is empty | 分组 '{0}' 为空 |
 | `GroupEmptyHint` | add members with `lsm group add {0} <skill>...` | 运行 `lsm group add {0} <skill>...` 添加成员 |
 | `GroupNoGroups` | No groups found. | 未找到任何分组。 |
@@ -295,9 +306,10 @@ lsm group remove <GROUP>...
 - Q27：语言持久化（配置文件 + `config get/set`，TOML + `toml_edit`）。
 - Q28：优先级与失效策略（惰性读取、坏配置退 1、不做项目级配置）。
 - Q29：分层收敛（`Lang` 唯一、`Env` 快照、`decide` 纯决策表、错误映射与渲染在边界）。
-- Q53 / Q54：分组存放于全局 `config.toml` 的 `[groups]`，成员只校验格式；分组读写惰性加载。
+- Q53 / Q54：分组存放于全局 `config.toml` 的 `[groups]`；分组读写惰性加载。
 - Q55：`group list/set/add/remove` 的命令形态与批量语义。
 - Q56：`group set` 覆盖已存在的组必须 `--force`；`group remove` 不需要。
 - Q57：分组属于 v0.7.0。
+- Q58：`group set/add` 的成员写入前必须存在于 global 并解析前缀；组名读取支持唯一前缀；大写组名只给提示，不自动改写。
 
 完整决策见 [decisions.md](../decisions.md)。

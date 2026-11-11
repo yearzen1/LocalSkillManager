@@ -41,7 +41,7 @@ cargo install --path .
 lsm --version
 ```
 
-预期输出以 `lsm ` 开头，例如 `lsm 0.7.0`。
+预期输出以 `lsm ` 开头，例如 `lsm 0.7.1`。
 
 ### 2. 准备隔离的练习目录
 

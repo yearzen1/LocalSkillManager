@@ -11,12 +11,12 @@
 不适用：
 
 - 想为每个项目保存不同的分组。分组目前存在**全局** `config.toml` 里，不是项目级配置；需要项目级差异时，请分别执行需要的 `lsm pull`。
-- 想按标签或子串自动匹配 skill。分组是显式名字列表，不支持通配与嵌套。
+- 想按标签或子串自动匹配 skill。分组是显式名字列表，只支持唯一前缀，不支持子串匹配、通配与嵌套。
 
 ## 前置条件
 
 - `lsm` 已安装，`lsm --version` 有输出；
-- 目标 skill 已经存在于全局目录，或你接受 `pull` 时逐条报缺失；
+- 目标 skill 已经安装在全局目录（`group set` / `group add` 会校验），或你直接手改配置文件并接受 `pull` 时逐条报缺失；
 - 你知道自己的配置目录（默认见[配置文件参考](../reference/config.md)）。
 
 ## 步骤
@@ -30,6 +30,14 @@ lsm group set frontend tdd grill
 成功标志：输出 `group 'frontend' saved (2 skills) -> <配置路径>`。
 
 `set` 是**整体替换**：组里最终只有这次列出的成员，顺序也按这次给出的顺序。
+
+成员必须在 global 中已安装。输入可以写唯一前缀，lsm 会解析成全名再保存：
+
+```bash
+lsm group set frontend conv tdd   # conv -> conventional-commit
+```
+
+只要有任一个成员找不到或前缀不唯一，整组都不会写盘，命令退出 1 并逐条列出问题；找不到时会给出相近名字的提示。
 
 如果分组已存在，必须显式覆盖：
 
@@ -95,7 +103,7 @@ lsm pull --group frontend
 lsm pull --group frontend --group docs
 ```
 
-多个组按给出顺序展开，重复 skill 只拉一次。组内成员仍支持唯一前缀解析：组里写 `code`、全局只有 `code-review` 时，会拉取 `code-review`。`--group` 不能与 `<name>...` 或 `--all` 同时使用：
+多个组按给出顺序展开，重复 skill 只拉一次。组名仍支持唯一前缀（`--group predev` → `predevelop`）；组内成员也支持唯一前缀：组里写 `code`、全局只有 `code-review` 时，会拉取 `code-review`。`--group` 不能与 `<name>...` 或 `--all` 同时使用：
 
 ```bash
 lsm pull tdd --group frontend   # 退出 2
@@ -131,10 +139,10 @@ lsm list project
 ## 常见问题
 
 - **`group 'x' already exists`**：这是 `set` 的覆盖保护。确认要替换时加 `--force`；如果只是想加成员，改用 `group add`。
-- **`invalid group name` / `invalid skill name`**：组名和成员名都使用 skill 名规则（小写字母、数字、单个连字符，≤64 字符，不能是 Windows 保留设备名）。命令在写盘前整体校验，失败时不会留下半个分组。
-- **`group 'x' not found`**：`pull --group` 引用了不存在的组。先用 `lsm group list` 确认；该组记为一次失败，其他组继续拉取。
+- **`invalid group name` / `invalid skill name`**：组名和成员名都使用 skill 名规则（小写字母、数字、单个连字符，≤64 字符，不能是 Windows 保留设备名）。组名写了大写时，hint 会给出对应的全小写写法。命令在写盘前整体校验，失败时不会留下半个分组。
+- **`group 'x' not found`**：`pull --group` 或 `group remove` 引用了不存在的组。先用 `lsm group list` 确认；也可以只写唯一前缀。该组记为一次失败，其他组继续。
 - **`group 'x' is empty`**：手改配置留下了空数组。用 `lsm group add x <skill>...` 补成员，或删除该组。
-- **某个成员 `not found in global`**：成员名只校验格式，不要求在定义分组时已安装。先 `lsm add` 补上该 skill，再重新拉取。
+- **某个成员 `not installed in global`**：`group set` / `group add` 在写盘前校验成员必须已安装在 global。先 `lsm add` 补上该 skill，或改成唯一前缀；命令会提示相近的名字。手改配置写入的缺失成员仍会在 `pull --group` 时逐条报错。
 - **目标已存在**：没有 `--force` 时算**跳过**，不算失败；需要覆盖时加 `lsm pull --group frontend --force`。
 
 分组文件结构与加载时机见[配置文件参考](../reference/config.md)；作用域与分组位置的取舍见[核心概念](../explanation/concepts.md)。

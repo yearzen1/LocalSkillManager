@@ -37,7 +37,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - 文案按语言拆到 `i18n/en.rs`、`i18n/zh.rs`，`mod.rs` 只做分发。
 - 所有 `error:` / `hint:` / 成功提示 / help 正文都从消息表取，禁止在业务代码里写死文案。
 - 中文前缀用 `错误:` / `提示:`，英文用 `error:` / `hint:`。
-- 版本号 `lsm 0.7.0`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
+- 版本号 `lsm 0.7.1`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
 - `list` / `search` 文本表格里的 `[invalid]` 详情与 JSON `error` 同源，固定英文；`pull` / `push` / `remove` 命令错误的 `<原因>` 参数（如目录名与 frontmatter `name` 不一致）按当前语言渲染。
 
 ### 1.3 help 与参数错误
@@ -46,7 +46,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - clap 自带的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）、受限取值的括号（`[possible values: …]`）与结尾提示，在渲染后按语言替换为 `用法:`、`命令:`、`选项:`、`参数:`、`[可选值: …]` 等；自带的 `-h/--help` 与 `-V/--version` 说明同样是英文，因此改为自建参数注入本地化文案。
 - 参数解析错误按 `clap::error::ErrorKind` 映射常用类型：缺参数、非法值、未知参数、多余参数、缺子命令、非法子命令，并带上 clap 记录的出错参数名；未覆盖的类型回退英文原文。
 - `DisplayHelp` / `DisplayVersion` 直接输出并退出 0。
-- 实测 help（v0.7.0，与 `cli/spec.rs` 一致）：
+- 实测 help（v0.7.1，与 `cli/spec.rs` 一致）：
 
 ```
 $ lsm --lang zh --help
@@ -103,12 +103,12 @@ $ lsm --lang zh --help
 | `upgrade` | `[--check] [--force]` | implemented |
 
 - `<SCOPE>`：`global` 或 `project`，大小写敏感；**可省略，省略时为 `project`**。`remove` 的最后一个参数恰好是 `global` / `project` 时按作用域处理，否则全部按 name（作用域默认 `project`）；技能名本身是 `global` / `project` 时必须显式写作用域（如 `lsm remove global project`）。
-- `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1）。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`（非法格式退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
-- `<GROUP>`：分组名，规则与 skill 名相同（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名），非法格式退 2；不存在的分组是运行时错误（退 1）。`pull` 的 `--group` 可重复，与 `<NAME>...`、`--all` 三者互斥；规则见 [storage.md](storage.md)「pull」与 [config.md](config.md)「分组」。
-- `<SKILL>`（`group set` / `group add`）：成员 skill 名，只校验格式，不要求当前已安装；缺失在 `pull --group` 时按批处理规则记失败。
+- `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1；有相近名字时 hint 列出候选）。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`（非法格式退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
+- `<GROUP>`：分组名，规则与 skill 名相同（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名），非法格式退 2；大写输入会额外提示对应的全小写写法（如 `Predevelop` → `predevelop`）。`group remove` 与 `pull --group` 的组名支持「精确优先、其次唯一前缀」；不存在的分组是运行时错误（退 1），有相近组名时 hint 列出候选。`group set` / `group add` 的目标组名不做前缀解析。`pull` 的 `--group` 可重复，与 `<NAME>...`、`--all` 三者互斥；规则见 [storage.md](storage.md)「pull」与 [config.md](config.md)「分组」。
+- `<SKILL>`（`group set` / `group add`）：成员 skill 名，先精确、后唯一前缀解析，且**必须已安装在 global**；写入的是解析后的全名（组里写 `code` 会存成 `code-review`）。任一成员缺失或多候选则整组不写盘，逐条报错后汇总退 1。格式非法仍在 `cli::parse` 退 2。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
-- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）。
+- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）；分组成员校验与模糊匹配属于 v0.7.1（Q58）。
 
 选项：
 
@@ -187,7 +187,7 @@ $ lsm --lang zh --help
 ### 2.4 无参数与帮助行为
 
 - `lsm --help` / `-h` / `lsm <command> --help`：本地化 help 输出到 **stdout**，退出码 0。
-- `lsm --version` / `-V`：输出 `lsm 0.7.0` 到 stdout，退出码 0。
+- `lsm --version` / `-V`：输出 `lsm 0.7.1` 到 stdout，退出码 0。
 - `lsm` 无子命令，或只有全局参数（如 `lsm --lang zh`）：本地化 help 输出到 **stderr**，退出码 2。
 - 嵌套子命令沿用同一规则：`lsm config` 无子命令 → help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
 - `lsm upgrade --help` 与 `lsm upgrade --check --help` 同样走 stdout、退出码 0，且不联网、不写盘。
@@ -283,7 +283,7 @@ impl AppError {
 - Q29：分层收敛与错误映射（错误枚举在 `domain`/`infra`，`AppError` 只在边界构造，渲染归 `output`）。
 - Q30 / Q31 / Q32：`upgrade` 的命令形态、原地替换（文件名不变）、网络与资产契约（见 [upgrade.md](upgrade.md)）。
 - Q33 / Q37：命令表与选项表同属 CLI 真源，改动顺序与二进制一致性由 `tests/cli.rs` 强制。
-- Q53–Q57：分组存放于全局 `config.toml` 的 `[groups]`，提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。
+- Q53–Q57：分组存放于全局 `config.toml` 的 `[groups]`，提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。Q58：v0.7.1 起成员写盘前必须存在于 global 并解析前缀，组名读取支持唯一前缀。
 
 完整决策见 [decisions.md](../decisions.md)。
 

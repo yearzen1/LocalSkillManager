@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.7.0 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49），v0.6.0 加 name 前缀解析、作用域默认 `project` 与 `search` 字段过滤（Q50–Q52），v0.6.1 补全 help 的 `[possible values]` 汉化并修正 `config` 键文案，v0.7.0 加 skill 分组与 `pull --group`（Q53–Q57）
+> 状态：v0.7.1 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49），v0.6.0 加 name 前缀解析、作用域默认 `project` 与 `search` 字段过滤（Q50–Q52），v0.6.1 补全 help 的 `[possible values]` 汉化并修正 `config` 键文案，v0.7.0 加 skill 分组与 `pull --group`（Q53–Q57），v0.7.1 给分组成员加 global 存在性校验与模糊匹配（Q58）
 > 最后更新：2026-11-13
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
@@ -70,7 +70,7 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 description = "Install, pull, and push agent skills under .agents/skills"
 license = "MIT"
@@ -296,6 +296,7 @@ pub struct Ctx {
 | v0.6.0 范围 | `pull`/`push`/`remove` 支持唯一 name 前缀；`add`/`list`/`search`/`remove` 的 scope 默认 `project`；`search` 新增 `--name`/`--description`；批量错误块之间空行 | [decisions.md](decisions.md) Q50–Q52 |
 | v0.6.1 范围 | help 的 `[possible values: …]` 跟随语言显示为 `[可选值: …]`；`config get/set` 的 `<KEY>` 文案由「输出语言」改为「配置键：lang」 | [cli.md](impl/cli.md)「help 与参数错误」/ [config.md](impl/config.md)「消息键」 |
 | v0.7.0 范围 | 全局 `config.toml` 的 `[groups]`、`pull --group`、`group list/set/add/remove`；只做扁平成员列表，不扩展到其他命令 | [decisions.md](decisions.md) Q53–Q57 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「pull」 |
+| v0.7.1 范围 | `group set/add` 成员必须存在于 global 并解析唯一前缀；组名读取支持唯一前缀；未命中给相近候选；大写组名提示全小写写法 | [decisions.md](decisions.md) Q58 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「name 前缀解析」 |
 
 ## 6. 文档维护规则
 
@@ -417,4 +418,12 @@ pub struct Ctx {
 - [x] `pull --group <GROUP>...` 展开分组后复用批量语义；与 `<NAME>...`、`--all` 互斥，未知组/空组/缺成员逐条报错并继续。
 - [x] `[groups]` 惰性加载：写坏只影响 `group *` 与 `pull --group`，不影响其他命令。
 - [x] 两份 README、`impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md` 与验收脚本同步。
+
+### 8.8 v0.7.1 分组成员校验与模糊匹配（已实现）
+
+- [x] `group set` / `group add` 写入前要求成员已安装到 global；按「精确 → 唯一前缀」解析后写入全名。
+- [x] 成员缺失或多候选时整组不写盘，逐条报错后汇总退 1；零命中 hint 列出最多 3 个相近 skill。
+- [x] `group remove` / `pull --group` 的组名支持唯一前缀；多候选与零命中按该条失败，零命中 hint 列出相近组名。
+- [x] 大写组名的格式错误 hint 给出全小写写法；组名规则本身不变。
+- [x] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md`、分组 how-to 与配置参考同步。
 
