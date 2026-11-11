@@ -37,7 +37,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - 文案按语言拆到 `i18n/en.rs`、`i18n/zh.rs`，`mod.rs` 只做分发。
 - 所有 `error:` / `hint:` / 成功提示 / help 正文都从消息表取，禁止在业务代码里写死文案。
 - 中文前缀用 `错误:` / `提示:`，英文用 `error:` / `hint:`。
-- 版本号 `lsm 0.7.1`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
+- 版本号 `lsm 0.7.2`、JSON 字段名、JSON 内的 `error` 文案保持英文，不参与翻译。
 - `list` / `search` 文本表格里的 `[invalid]` 详情与 JSON `error` 同源，固定英文；`pull` / `push` / `remove` 命令错误的 `<原因>` 参数（如目录名与 frontmatter `name` 不一致）按当前语言渲染。
 
 ### 1.3 help 与参数错误
@@ -46,7 +46,7 @@ pub fn tr_args(lang: Lang, key: MsgKey, args: &[&str]) -> String;
 - clap 自带的结构性标题（`Usage:`、`Commands:`、`Options:`、`Arguments:`）、受限取值的括号（`[possible values: …]`）与结尾提示，在渲染后按语言替换为 `用法:`、`命令:`、`选项:`、`参数:`、`[可选值: …]` 等；自带的 `-h/--help` 与 `-V/--version` 说明同样是英文，因此改为自建参数注入本地化文案。
 - 参数解析错误按 `clap::error::ErrorKind` 映射常用类型：缺参数、非法值、未知参数、多余参数、缺子命令、非法子命令，并带上 clap 记录的出错参数名；未覆盖的类型回退英文原文。
 - `DisplayHelp` / `DisplayVersion` 直接输出并退出 0。
-- 实测 help（v0.7.1，与 `cli/spec.rs` 一致）：
+- 实测 help（v0.7.2，与 `cli/spec.rs` 一致）：
 
 ```
 $ lsm --lang zh --help
@@ -71,7 +71,7 @@ $ lsm --lang zh --help
   -V, --version      打印版本
 ```
 
-- `upgrade` 的 help 只列 `--check` / `--force`，没有位置参数，也不联网。
+- `upgrade` 的 help 只列 `--check` / `--force` / `--verbose` / `--progress`，没有位置参数，也不联网。
 - 英文模式输出完全对应的英文版本。
 - `-h` 与 `--help` 走同一套渲染；`lsm add --lang zh --help` 同样生效。
 
@@ -100,7 +100,7 @@ $ lsm --lang zh --help
 | `group remove` | `<GROUP>...` | implemented |
 | `config get` | `lang` | implemented |
 | `config set` | `lang <LANG>` | implemented |
-| `upgrade` | `[--check] [--force]` | implemented |
+| `upgrade` | `[--check] [--force] [--verbose] [--progress]` | implemented |
 
 - `<SCOPE>`：`global` 或 `project`，大小写敏感；**可省略，省略时为 `project`**。`remove` 的最后一个参数恰好是 `global` / `project` 时按作用域处理，否则全部按 name（作用域默认 `project`）；技能名本身是 `global` / `project` 时必须显式写作用域（如 `lsm remove global project`）。
 - `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1；有相近名字时 hint 列出候选）。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`（非法格式退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
@@ -108,7 +108,7 @@ $ lsm --lang zh --help
 - `<SKILL>`（`group set` / `group add`）：成员 skill 名，先精确、后唯一前缀解析，且**必须已安装在 global**；写入的是解析后的全名（组里写 `code` 会存成 `code-review`）。任一成员缺失或多候选则整组不写盘，逐条报错后汇总退 1。格式非法仍在 `cli::parse` 退 2。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
-- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）；分组成员校验与模糊匹配属于 v0.7.1（Q58）。
+- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）；分组成员校验与模糊匹配属于 v0.7.1（Q58）；`upgrade` 的 `--verbose` / `--progress` 属于 v0.7.2（Q59）。
 
 选项：
 
@@ -132,6 +132,8 @@ $ lsm --lang zh --help
 | `remove` | `--force` | — | 关闭 | 允许删除非合法 skill 目录 |
 | `upgrade` | `--check` | — | 关闭 | 只查不装，发现新版本也退 0 |
 | `upgrade` | `--force` | — | 关闭 | 允许同版本重装与降级 |
+| `upgrade` | `--verbose` | — | 关闭 | 把查询/下载/校验/替换的阶段提示写到 stderr |
+| `upgrade` | `--progress` | — | 关闭 | 下载进度条写到 stderr；隐含 `--verbose` |
 
 - 选项表**不单列状态**：选项的存在性跟随命令表。
 - `全局` 选项对根命令与每个子命令都生效；`根命令` 选项只对 `lsm` 本身生效（`lsm add --version` 是用法错误）。
@@ -179,7 +181,7 @@ $ lsm --lang zh --help
 - `config` 子命令的 `get`/`set` 是嵌套子命令，键用 `value_parser(["lang"])`（v1 只有 `lang`），未知键由 clap 报用法错误。
 - `group` 子命令的 `list`/`set`/`add`/`remove` 同样是嵌套子命令；`group` 无子命令时按 §2.4 输出 help 到 stderr、退 2。
 - `pull --group <GROUP>` 用 `ArgAction::Append` 收集，可重复；与 `<NAME>...`、`--all` 的互斥在 `cli::parse` 里判定，以便输出本地化文案（不依赖 clap 的英文冲突提示）。
-- `upgrade` 只有两个布尔 flag：`--check`、`--force`，不带位置参数；行为与文案见 [upgrade.md](upgrade.md)。
+- `upgrade` 只有四个布尔 flag：`--check`、`--force`、`--verbose`、`--progress`，不带位置参数；过程输出只在显式加 flag 时写入 stderr，stdout 仍只有一行结果；行为与文案见 [upgrade.md](upgrade.md)。
 - clap 自带的 `-h` / `-V` 说明是英文，因此根命令与各子命令都 `disable_help_flag(true)` 后自建 `-h/--help`，根命令另外自建 `-V/--version`，说明文案来自消息表。
 - 参数校验错误统一由 `cli::parse` 转成 `AppError`，在 `lib::run` 边界渲染。
 - 代码落点：`cli/spec.rs`（构建 Command）、`cli/help.rs`（结构标题本地化）、`cli/lang.rs`（预扫描 + 决策表）、`cli/mod.rs`（解析为 `Action`）；`Action` 定义在 `domain/action.rs`，配置键定义在 `domain/config.rs`。
@@ -187,7 +189,7 @@ $ lsm --lang zh --help
 ### 2.4 无参数与帮助行为
 
 - `lsm --help` / `-h` / `lsm <command> --help`：本地化 help 输出到 **stdout**，退出码 0。
-- `lsm --version` / `-V`：输出 `lsm 0.7.1` 到 stdout，退出码 0。
+- `lsm --version` / `-V`：输出 `lsm 0.7.2` 到 stdout，退出码 0。
 - `lsm` 无子命令，或只有全局参数（如 `lsm --lang zh`）：本地化 help 输出到 **stderr**，退出码 2。
 - 嵌套子命令沿用同一规则：`lsm config` 无子命令 → help 到 stderr、退出码 2；`lsm config --help` → stdout、退出码 0。
 - `lsm upgrade --help` 与 `lsm upgrade --check --help` 同样走 stdout、退出码 0，且不联网、不写盘。

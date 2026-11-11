@@ -76,6 +76,9 @@
 43. `upgrade --help` 两种语言均输出到 stdout 且退出 0；`lsm -u`、`upgrade --bogus` → 退出 2。
 44. 升级成功后再次执行 `upgrade --check`（桩 tag 不变）→ 退出 0 且报告已最新。
 45. 真源一致性：`docs/impl/cli.md` §2.1 表的 `implemented` 行必须 `lsm <command> --help` 退出 0，`planned` 行必须被视为未知子命令（退出 2）——由 `tests/cli.rs::cli_reference_table_matches_binary` 强制。
+46. 不加过程 flag 时 `upgrade --force` 成功路径 **stderr 为空**，stdout 仍只有结果那一行（默认静默回归守护）。
+47. `upgrade --force --verbose` → stderr 含 `checking for the latest release`、`downloading`、`verifying`、`replacing`，stdout 不变；`upgrade --check --verbose` → stderr 只有 checking 行。
+48. `upgrade --force --progress` → stderr 含进度行（`downloading`、`%`、`\r` 重绘），最后一行以换行收尾；下载中途失败时错误块另起一行。
 
 v0.4.0 新增（Q43–Q47）：
 
@@ -210,8 +213,12 @@ lsm group set backend samp                     # 唯一前缀 → sample，写�
 lsm group set backend nope                     # 退出 1，不写盘
 lsm group remove back                          # 唯一前缀 → backend
 
+# v0.7.2：upgrade 过程反馈
+lsm upgrade --check --verbose                   # stderr 打印 checking 行，stdout 仍是结果行
+lsm upgrade --progress                          # 下载阶段 stderr 单行重绘进度条
+
 # 离线：只验子命令存在与非法参数，不联网
-lsm upgrade --help                              # 列出 --check / --force，退出 0
+lsm upgrade --help                              # 列出 --check / --force / --verbose / --progress，退出 0
 lsm upgrade --bogus                             # 退出 2
 ```
 

@@ -4,12 +4,12 @@
 >
 > 本文拥有以下规则的完整定义：`upgrade` 命令、版本比较、平台资产选择、下载与校验、原地替换与回滚、升级失败的行为。其他文档只做摘要和链接。
 >
-> 状态：v0.3.0 已实现（Windows 实测）。实现切片见 [impl.md](../impl.md)「实现顺序」第 13–18 片。
+> 状态：v0.3.0 已实现（Windows 实测）；v0.7.2 增加 `--verbose` / `--progress` 过程输出（Q59）。实现切片见 [impl.md](../impl.md)「实现顺序」第 13–18 片。
 
 ## 1. 命令与行为
 
 ```
-lsm upgrade [--check] [--force]
+lsm upgrade [--check] [--force] [--verbose] [--progress]
 ```
 
 | 输入 | 行为 | 退出码 |
@@ -18,6 +18,8 @@ lsm upgrade [--check] [--force]
 | `upgrade --check` | 只查询并报告，不下载、不写盘 | 0（发现新版本也是 0；查询失败为 1，见第 7 节） |
 | `upgrade --force` | 同版本也重装；latest 低于当前版本时执行降级 | 同上 |
 | `upgrade --check --force` | `--force` 对 `--check` 无意义，不报错，忽略 | 同上 |
+| `upgrade --verbose` | 同 `upgrade`，另把阶段提示写到 stderr | 同上 |
+| `upgrade --progress` | 同 `upgrade`，另在下载阶段写进度条（隐含 `--verbose`） | 同上 |
 
 - 版本关系判定：
   - latest > 当前：安装（`--check` 只报告）。
@@ -26,6 +28,26 @@ lsm upgrade [--check] [--force]
 - 升级只动当前可执行文件，**不读写 `.agents/skills`**，也不检查 skill 是否需要更新。
 - 不做自动检查、不做后台检查、不做启动时提示：只有显式执行 `upgrade` 才联网。
 - 不加短选项：`upgrade` 不参与 `cli::normalize` 的 `-a/-l/-r` 归一化，`lsm -u` 按未知参数退出 2。
+
+### 1.1 过程输出
+
+默认完全静默：不加 flag 时中间不产生任何输出，stdout 只有结果那一行。过程输出只走 **stderr**，且只在显式加 flag 时出现。
+
+| flag | 输出 | 时机 |
+|---|---|---|
+| `--verbose` | `checking for the latest release...` | 元数据请求之前（`--check` 也有） |
+| | `downloading lsm-windows-x64.exe (12.3 MB)...` | 选定资产、开始下载之前；大小只在响应带 `Content-Length` 时显示 |
+| | `verifying downloaded binary...` | 下载完成、冒烟校验之前 |
+| | `replacing C:\...\lsm.exe...` | 校验通过、替换之前 |
+| `--progress` | `downloading lsm-windows-x64.exe [##########----------]  47%  5.7/12.3 MB` | 下载过程中，单行 `\r` 重绘 |
+
+- `--progress` **隐含** `--verbose`：只给 `--progress` 也能看到查询与校验阶段在做什么。
+- 阶段行无前缀（不加 `info:` / `warning:`），一步一行，写出即 flush；中文文案同源，形如 `正在下载 ...`。
+- 进度条固定 20 列、纯 ASCII（`#` 已完成 / `-` 未完成），不探测终端宽度、不探测是否 TTY、不做颜色。
+- 重绘节流：整数百分比变化才写一次；响应没有 `Content-Length` 时降级为 `downloading <资产名>  5.7 MB`（无条、无百分比），每 256 KB 重绘一次。最后一行补换行。
+- 下载中途失败时先结束进度行（补换行）再输出 `error:` 块，不让错误粘在进度条尾部。
+- 已是最新、`--check` 有新版本等纯报告路径，阶段行之后仍照旧输出那一行结果。
+- stderr 被重定向时也按 flag 输出，行为只由 flag 决定，不随终端变化。
 
 ## 2. 版本与资产
 
@@ -144,9 +166,11 @@ lsm upgrade [--check] [--force]
 | 替换失败/目录不可写 | `error: cannot replace <exe 路径>: <原因>` + hint 权限与手动下载 | 1 |
 | 备份删除失败 | `warning: old binary left at <exe>.old-<pid>, it will be cleaned on next upgrade` | 0 |
 | cargo 安装场景 | `warning: lsm is installed by cargo, consider cargo install --force local-skill-manager` | 0（继续替换） |
+| `--verbose` 阶段提示 | stderr 逐行：`checking for the latest release...` / `downloading lsm-windows-x64.exe (12.3 MB)...` / `verifying downloaded binary...` / `replacing <exe 路径>...` | 不变 |
+| `--progress` 进度条 | stderr 单行：`downloading lsm-windows-x64.exe [##########----------]  47%  5.7/12.3 MB` | 不变 |
 
 - `--check` 从不写盘，也从不输出安装成功文案。
-- stdout 在成功路径上只有一行结果；不做进度条、不做百分比、不做 `--json`。
+- stdout 在成功路径上永远只有一行结果；过程输出只在显式加 `--verbose` / `--progress` 时写入 stderr，默认完全静默。不做 `--json`。
 
 ## 8. 测试策略
 
@@ -154,13 +178,14 @@ lsm upgrade [--check] [--force]
 
 - `domain::version`：合法/非法 tag、前导 `v`、三段比较、前导零、降级判断。
 - `domain::release`：资产选择（命中/缺失/同名重复/压缩包不匹配）、平台映射（三平台 + 未知组合）。
-- `infra::net`：用 `std::net::TcpListener` 起本地桩，覆盖 200、302 跳转、404、403、非 JSON、超时；断言请求头含 `User-Agent`；桩手写 HTTP 响应，不引额外测试依赖（Q42）。
+- `infra::net`：用 `std::net::TcpListener` 起本地桩，覆盖 200、302 跳转、404、403、非 JSON、超时；断言请求头含 `User-Agent`；桩手写 HTTP 响应，不引额外测试依赖（Q42）；下载回调报告已收字节与 `Content-Length`。
 - `infra::fsops`（自更新部分）：临时目录内替换成功、权限位保留、备份清理、回滚（新文件缺失时旧文件仍可执行）。
-- `commands::upgrade`：已最新、有新版本、`--check` 不落盘、`--force` 同版本重装与降级、不可写目录报错。
+- `output`：进度条与字节数的纯函数（0 字节、KB、MB、总长未知）。
+- `commands::upgrade`：已最新、有新版本、`--check` 不落盘、`--force` 同版本重装与降级、不可写目录报错；`--verbose` 只在 `--check` 时输出 checking 行。
 - 集成测试（`tests/cli.rs`）：
   - 把已构建的 `lsm` 二进制复制到临时目录后运行该副本，`current_exe()` 自然指向副本，**绝不替换 `target/` 下的真实构建产物**（Q42）；
   - 用 `LSM_UPGRADE_API` 指向本地回环桩，桩同时提供元数据与二进制（载荷为同一二进制追加 1 字节的副本）；
-  - 断言：`--check` 只打印不写盘；`upgrade --force` 后路径与文件名不变、内容长度等于载荷、`.old-*` 已清理；
+  - 断言：`--check` 只打印不写盘；`upgrade --force` 后路径与文件名不变、内容长度等于载荷、`.old-*` 已清理；不加 flag 时成功路径的 stderr 为空；`--verbose` 的 stderr 含阶段行、`--progress` 的 stderr 含 `%` 与 `\r`；
   - 覆盖资产缺失、404、限流、未知参数、`--help` 两种语言。
 - 不做真实 GitHub 的联网测试（真实请求只在发布前手工验收跑一次，Q42）；发布前手工验收见 [quality.md](quality.md)「手工验收」。
 
@@ -169,7 +194,7 @@ lsm upgrade [--check] [--force]
 - 不做 checksum / 签名校验（等发布端产出 `.sha256` 再立决策）。
 - 不读 `GITHUB_TOKEN`、不支持 `--token`、不做代理参数。
 - 不做自动/后台检查更新，不做启动时版本提示。
-- 不做 `--json`、进度条、`--version <tag>` 指定版本；回滚用 `upgrade --force`。
+- 不做 `--json`、`--version <tag>` 指定版本；回滚用 `upgrade --force`。
 - 不更新通过包管理器安装的副本（apt、brew、scoop 等），遇到只报权限错误或提示手动处理。
 - 不改 `Cargo.toml` 版本号：`upgrade` 只替换二进制，版本 bump 仍由发布流程负责。
 
@@ -179,5 +204,6 @@ lsm upgrade [--check] [--force]
 - Q31：校验与原地替换（文件名不变）。
 - Q32：网络端点、`LSM_UPGRADE_API`、资产名契约。
 - Q42：测试桩只走回环、集成测试只操作临时副本、真实联网只手工验收一次。
+- Q59：`--verbose` / `--progress` 过程输出（默认静默、只写 stderr、固定 20 列 ASCII 进度条）。
 
 完整决策见 [decisions.md](../decisions.md)。

@@ -1,7 +1,7 @@
 # LocalSkillManager 实现方案（索引）
 
 > 对应需求：`docs/Requirements.md`
-> 状态：v0.7.1 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49），v0.6.0 加 name 前缀解析、作用域默认 `project` 与 `search` 字段过滤（Q50–Q52），v0.6.1 补全 help 的 `[possible values]` 汉化并修正 `config` 键文案，v0.7.0 加 skill 分组与 `pull --group`（Q53–Q57），v0.7.1 给分组成员加 global 存在性校验与模糊匹配（Q58）
+> 状态：v0.7.2 已实现（Windows 实测；Linux/macOS 未实测）；v0.2.0 交付 `copy --all` + `remove`（Q38），v0.3.0 交付 `upgrade`（Q30–Q32、Q42），v0.4.0 交付多 name `copy`/`remove`、`search`、`push`（Q43–Q47），v0.5.0 把 `copy` 改名为 `pull`（Q48），v0.5.1 给 `list` 条目之间加空行（Q49），v0.6.0 加 name 前缀解析、作用域默认 `project` 与 `search` 字段过滤（Q50–Q52），v0.6.1 补全 help 的 `[possible values]` 汉化并修正 `config` 键文案，v0.7.0 加 skill 分组与 `pull --group`（Q53–Q57），v0.7.1 给分组成员加 global 存在性校验与模糊匹配（Q58），v0.7.2 给 `upgrade` 加 `--verbose` / `--progress` 过程反馈（Q59）
 > 最后更新：2026-11-13
 >
 > 本文只保留架构、跨文档约定与交付流程。具体规则按主题拆分，避免单文件过长与规则重复。命令与参数面的唯一真源是 [cli.md](impl/cli.md) §2.1 的状态表。
@@ -70,7 +70,7 @@
 ```toml
 [package]
 name = "local-skill-manager"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2021"
 description = "Install, pull, and push agent skills under .agents/skills"
 license = "MIT"
@@ -297,6 +297,7 @@ pub struct Ctx {
 | v0.6.1 范围 | help 的 `[possible values: …]` 跟随语言显示为 `[可选值: …]`；`config get/set` 的 `<KEY>` 文案由「输出语言」改为「配置键：lang」 | [cli.md](impl/cli.md)「help 与参数错误」/ [config.md](impl/config.md)「消息键」 |
 | v0.7.0 范围 | 全局 `config.toml` 的 `[groups]`、`pull --group`、`group list/set/add/remove`；只做扁平成员列表，不扩展到其他命令 | [decisions.md](decisions.md) Q53–Q57 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「pull」 |
 | v0.7.1 范围 | `group set/add` 成员必须存在于 global 并解析唯一前缀；组名读取支持唯一前缀；未命中给相近候选；大写组名提示全小写写法 | [decisions.md](decisions.md) Q58 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「name 前缀解析」 |
+| v0.7.2 范围 | `upgrade` 新增 `--verbose` / `--progress`：阶段提示与下载进度条只写 stderr，默认仍完全静默；固定 20 列 ASCII 条，不探测终端 | [decisions.md](decisions.md) Q59 / [upgrade.md](impl/upgrade.md)「过程输出」 |
 
 ## 6. 文档维护规则
 
@@ -426,4 +427,11 @@ pub struct Ctx {
 - [x] `group remove` / `pull --group` 的组名支持唯一前缀；多候选与零命中按该条失败，零命中 hint 列出相近组名。
 - [x] 大写组名的格式错误 hint 给出全小写写法；组名规则本身不变。
 - [x] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md`、分组 how-to 与配置参考同步。
+
+### 8.9 v0.7.2 upgrade 过程反馈（已实现）
+
+- [x] `upgrade --verbose` 把查询/下载/校验/替换四个阶段逐行写 stderr；`upgrade --progress` 隐含 `--verbose` 并在下载阶段重绘固定 20 列 ASCII 进度条。
+- [x] 默认不加 flag 时中间输出为零，stdout 仍只有一行结果；失败时先结束进度行再打错误体。
+- [x] `infra::net` 的下载回调报告已收字节与 `Content-Length`；`output` 提供字节数、进度条与百分比纯函数。
+- [x] `impl/cli.md`、`impl/upgrade.md`、`impl/quality.md` 与验收脚本第 17 步同步。
 
