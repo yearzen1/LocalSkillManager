@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use super::config::ConfigKey;
-use super::group::GroupName;
+use super::group::{GroupName, Member};
 use super::lang::Lang;
 use super::name::SkillName;
 use super::scope::Scope;
@@ -62,18 +62,24 @@ pub enum TransferTarget {
 pub enum GroupCommand {
     List {
         json: bool,
+        resolved: bool,
     },
     Set {
         name: GroupName,
-        members: Vec<SkillName>,
+        members: Vec<Member>,
         force: bool,
     },
     Add {
         name: GroupName,
-        members: Vec<SkillName>,
+        members: Vec<Member>,
     },
     Remove {
+        name: GroupName,
+        members: Vec<Member>,
+    },
+    Delete {
         names: Vec<GroupName>,
+        force: bool,
     },
 }
 

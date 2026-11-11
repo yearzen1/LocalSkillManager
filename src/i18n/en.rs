@@ -141,11 +141,14 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::GroupListAbout => "List skill groups",
         MsgKey::GroupSetAbout => "Create or replace a skill group",
         MsgKey::GroupAddAbout => "Append skills to a group",
-        MsgKey::GroupRemoveAbout => "Remove skill groups",
+        MsgKey::GroupRemoveAbout => "Remove skills from a group",
+        MsgKey::GroupDeleteAbout => "Delete skill groups",
         MsgKey::GroupNameArg => "Group name",
         MsgKey::GroupSetForceFlag => "Overwrite an existing group",
-        MsgKey::GroupSkillArg => "Skill names in the group",
+        MsgKey::GroupDeleteForceFlag => "Delete even if other groups reference it",
+        MsgKey::GroupSkillArg => "Skills or @group references",
         MsgKey::GroupJsonFlag => "Print machine-readable JSON",
+        MsgKey::GroupResolvedFlag => "Expand @group references",
         MsgKey::GroupInvalid => "invalid group name '{0}'",
         MsgKey::GroupInvalidHint => "group names use lowercase letters, digits and single hyphens",
         MsgKey::GroupTooLong => "group name is too long: {0} > 64 characters",
@@ -162,6 +165,26 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::GroupMembersFailedHint => "fix the skills above, then run the command again",
         MsgKey::GroupAmbiguous => "group '{0}' matches more than one group: {1}",
         MsgKey::GroupAmbiguousHint => "use a longer prefix, or run `lsm group list`",
+        MsgKey::GroupItemNotInGroup => "'{0}' is not in group '{1}'",
+        MsgKey::GroupRemoveFailed => {
+            "{0} item(s) are not in group '{1}'; the group was not changed"
+        }
+        MsgKey::GroupRemoveFailedHint => "fix the names above, then run the command again",
+        MsgKey::GroupSetFailed => "{0} item(s) could not be resolved; the group was not changed",
+        MsgKey::GroupSetFailedHint => "fix the names above, then run the command again",
+        MsgKey::GroupListFailed => "{0} group(s) could not be expanded",
+        MsgKey::GroupListFailedHint => {
+            "fix the @group references above, then run the command again"
+        }
+        MsgKey::GroupMemberRemoved => "removed '{0}' from group '{1}'",
+        MsgKey::GroupRefMissing => "group '{0}' references undefined group '{1}'",
+        MsgKey::GroupRefMissingHint => "run `lsm group list` to see defined groups",
+        MsgKey::GroupCycle => "group reference cycle: {0}",
+        MsgKey::GroupCycleHint => "remove one of the references in [groups]",
+        MsgKey::GroupSelfReference => "group '{0}' cannot include itself",
+        MsgKey::GroupDeleteReferenced => "group '{0}' is referenced by: {1}",
+        MsgKey::GroupDeleteReferencedHint => "use --force to delete it and remove the references",
+        MsgKey::GroupRefStripped => "removed reference '@{0}' from group '{1}'",
         MsgKey::GroupEmpty => "group '{0}' is empty",
         MsgKey::GroupEmptyHint => "add members with `lsm group add {0} <skill>...`",
         MsgKey::GroupNoGroups => "No groups found.",
@@ -171,7 +194,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::GroupRemoved => "removed group '{0}'",
         MsgKey::GroupBatchSummary => "removed {0}, failed {1}",
         MsgKey::GroupBatchFailed => "{0} group(s) failed to remove",
-        MsgKey::GroupBatchFailedHint => "fix the groups above, then run `lsm group remove` again",
+        MsgKey::GroupBatchFailedHint => "fix the groups above, then run `lsm group delete` again",
         MsgKey::GroupConfigInvalid => "invalid [groups] in config file {0}: {1}",
 
         MsgKey::SkillAlreadyExists => "skill '{0}' already exists at {1}",

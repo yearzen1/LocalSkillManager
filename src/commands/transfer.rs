@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::domain::action::TransferTarget;
 use crate::domain::entry::SkillEntry;
-use crate::domain::group::GroupName;
+use crate::domain::group::{expand, GroupName};
 use crate::domain::lang::Lang;
 use crate::domain::name::SkillName;
 use crate::domain::scope::Scope;
@@ -129,22 +129,26 @@ fn transfer_groups(
                 continue;
             }
         };
-        let definition = definitions
-            .iter()
-            .find(|group| group.name == resolved)
-            .expect("resolve_group returns a defined group name");
+        let skills = match expand(&definitions, &resolved) {
+            Ok(skills) => skills,
+            Err(err) => {
+                failed += 1;
+                output::emit_stderr(&error_output::render_block(&err.into(), ctx.lang));
+                continue;
+            }
+        };
 
-        if definition.members.is_empty() {
+        if skills.is_empty() {
             failed += 1;
             let err = AppError::runtime(MsgKey::GroupEmpty)
-                .with_args([input.as_str()])
-                .with_hint_args(MsgKey::GroupEmptyHint, [input.as_str()]);
+                .with_args([resolved.as_str()])
+                .with_hint_args(MsgKey::GroupEmptyHint, [resolved.as_str()]);
             output::emit_stderr(&error_output::render_block(&err, ctx.lang));
             continue;
         }
 
-        for member in &definition.members {
-            match resolve_name(member, &available, spec.source, not_found(spec, member)) {
+        for skill in &skills {
+            match resolve_name(skill, &available, spec.source, not_found(spec, skill)) {
                 Ok(name) if seen.insert(name.clone()) => names.push(name),
                 Ok(_) => {}
                 Err(err) => {

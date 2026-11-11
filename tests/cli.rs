@@ -2828,7 +2828,7 @@ fn group_set_reports_every_unavailable_member() {
         .code(1)
         .stderr(predicate::str::contains("skill 'missing-a'"))
         .stderr(predicate::str::contains("skill 'missing-b'"))
-        .stderr(predicate::str::contains("2 skill(s) are unavailable"));
+        .stderr(predicate::str::contains("2 item(s) could not be resolved"));
 
     assert!(!config_path(&config).exists());
 }
@@ -2871,7 +2871,7 @@ fn group_set_rejects_an_ambiguous_prefix_without_writing() {
 }
 
 #[test]
-fn group_remove_resolves_a_unique_group_prefix() {
+fn group_delete_resolves_a_unique_group_prefix() {
     let config = TempDir::new().unwrap();
     let home = home_dir();
     install_global(&home, "tdd", "T.");
@@ -2881,7 +2881,7 @@ fn group_remove_resolves_a_unique_group_prefix() {
         .success();
 
     lsm_with_home(&config, &home)
-        .args(["group", "remove", "predev"])
+        .args(["group", "delete", "predev"])
         .assert()
         .success()
         .stdout(predicate::str::contains("removed group 'predevelop'"));
@@ -2991,7 +2991,7 @@ fn group_list_sorts_groups_and_keeps_member_order() {
 }
 
 #[test]
-fn group_remove_is_batched_and_keeps_going() {
+fn group_delete_is_batched_and_keeps_going() {
     let config = TempDir::new().unwrap();
     let home = home_dir();
     install_global(&home, "tdd", "T.");
@@ -3006,7 +3006,7 @@ fn group_remove_is_batched_and_keeps_going() {
         .success();
 
     lsm_with_home(&config, &home)
-        .args(["group", "remove", "a", "missing"])
+        .args(["group", "delete", "a", "missing"])
         .assert()
         .code(1)
         .stdout(predicate::str::contains("removed 1, failed 1"))
@@ -3021,7 +3021,7 @@ fn group_remove_is_batched_and_keeps_going() {
 }
 
 #[test]
-fn group_remove_single_prints_a_plain_message() {
+fn group_delete_single_prints_a_plain_message() {
     let config = TempDir::new().unwrap();
     let home = home_dir();
     install_global(&home, "tdd", "T.");
@@ -3031,7 +3031,7 @@ fn group_remove_single_prints_a_plain_message() {
         .success();
 
     lsm_with_home(&config, &home)
-        .args(["group", "remove", "a"])
+        .args(["group", "delete", "a"])
         .assert()
         .success()
         .stdout(predicate::str::contains("removed group 'a'"))
@@ -3077,6 +3077,321 @@ fn groups_members_must_be_strings() {
         .code(1)
         .stderr(predicate::str::contains("invalid [groups]"))
         .stderr(predicate::str::contains("frontend"));
+}
+
+#[test]
+fn group_add_reference_and_list_resolved() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    install_global(&home, "grill", "G.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "common", "tdd", "grill"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "frontend", "@common"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: @common"));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list", "--resolved"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: tdd, grill"));
+}
+
+#[test]
+fn group_list_json_separates_skills_and_includes() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "common", "tdd"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "frontend", "@common"])
+        .assert()
+        .success();
+
+    let output = lsm_with_home(&config, &home)
+        .args(["group", "list", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let frontend = value
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|group| group["name"] == "frontend")
+        .unwrap();
+    assert_eq!(frontend["skills"], serde_json::json!([]));
+    assert_eq!(frontend["includes"], serde_json::json!(["common"]));
+
+    let output = lsm_with_home(&config, &home)
+        .args(["group", "list", "--json", "--resolved"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let frontend = value
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|group| group["name"] == "frontend")
+        .unwrap();
+    assert_eq!(frontend["skills"], serde_json::json!(["tdd"]));
+}
+
+#[test]
+fn group_remove_member_and_reference() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    install_global(&home, "grill", "G.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "common", "tdd"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "frontend", "@common", "grill"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "remove", "frontend", "@common"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "removed '@common' from group 'frontend'",
+        ));
+    lsm_with_home(&config, &home)
+        .args(["group", "remove", "frontend", "gri"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "removed 'grill' from group 'frontend'",
+        ));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: (empty)"))
+        .stdout(predicate::str::contains("common: tdd"));
+}
+
+#[test]
+fn group_remove_requires_a_member() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "frontend", "tdd"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "remove", "frontend"])
+        .assert()
+        .code(2);
+}
+
+#[test]
+fn group_remove_missing_member_keeps_the_group() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "frontend", "tdd"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "remove", "frontend", "missing"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("is not in group 'frontend'"));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: tdd"));
+}
+
+#[test]
+fn group_set_rejects_self_reference_and_cycles() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "a", "tdd"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "b", "@a"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "a", "@a", "--force"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("cannot include itself"));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "a", "@b", "--force"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("a -> b -> a"));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("a: tdd"));
+}
+
+#[test]
+fn group_delete_refuses_references_unless_forced() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "common", "tdd"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "frontend", "@common"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "delete", "common"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("is referenced by: frontend"));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "delete", "common", "--force"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("removed group 'common'"))
+        .stderr(predicate::str::contains(
+            "removed reference '@common' from group 'frontend'",
+        ));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("frontend: (empty)"))
+        .stdout(predicate::str::contains("common").not());
+}
+
+#[test]
+fn group_delete_batch_does_not_leave_dangling_references() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "a", "tdd"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "b", "@a"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "c", "@b"])
+        .assert()
+        .success();
+
+    // b 被 c 引用、a 被 b 引用：只要 c 不删，a 和 b 都不能删。
+    lsm_with_home(&config, &home)
+        .args(["group", "delete", "a", "b"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("is referenced by"));
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("a: tdd"))
+        .stdout(predicate::str::contains("b: @a"))
+        .stdout(predicate::str::contains("c: @b"));
+
+    // 一起删三个时，引用链整体消失。
+    lsm_with_home(&config, &home)
+        .args(["group", "delete", "a", "b", "c"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No groups found."));
+}
+
+#[test]
+fn pull_group_expands_references() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "tdd", "T.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "common", "tdd"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "frontend", "@common"])
+        .assert()
+        .success();
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "frontend"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled 1, skipped 0, failed 0"));
+
+    assert!(project.path().join(".agents/skills/tdd/SKILL.md").exists());
+}
+
+#[test]
+fn pull_group_reports_a_cycle_and_keeps_going() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "alpha", "A.");
+    write_config(
+        &config,
+        "[groups]\na = [\"@b\"]\nb = [\"@a\"]\ngood = [\"alpha\"]\n",
+    );
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "a", "--group", "good"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("pulled 1, skipped 0, failed 1"))
+        .stderr(predicate::str::contains("a -> b -> a"));
 }
 
 #[test]
@@ -3335,7 +3650,8 @@ fn group_help_lists_subcommands_and_flags() {
         .stdout(predicate::str::contains("list"))
         .stdout(predicate::str::contains("set"))
         .stdout(predicate::str::contains("add"))
-        .stdout(predicate::str::contains("remove"));
+        .stdout(predicate::str::contains("remove"))
+        .stdout(predicate::str::contains("delete"));
 
     lsm()
         .args(["group", "set", "--help"])
@@ -3347,7 +3663,14 @@ fn group_help_lists_subcommands_and_flags() {
         .args(["group", "list", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("--json"));
+        .stdout(predicate::str::contains("--json"))
+        .stdout(predicate::str::contains("--resolved"));
+
+    lsm()
+        .args(["group", "delete", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--force"));
 
     lsm()
         .args(["--lang", "zh", "group", "--help"])

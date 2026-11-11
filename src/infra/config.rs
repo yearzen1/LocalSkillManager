@@ -3,9 +3,8 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use crate::domain::group::{Group, GroupName};
+use crate::domain::group::{Group, GroupName, Member};
 use crate::domain::lang::Lang;
-use crate::domain::name::SkillName;
 
 use super::env::Env;
 use super::paths::{self, PathError};
@@ -109,7 +108,7 @@ pub fn load_groups(env: &Env) -> Result<Vec<Group>, ConfigError> {
 pub fn set_group(
     env: &Env,
     name: &GroupName,
-    members: &[SkillName],
+    members: &[Member],
     force: bool,
 ) -> Result<GroupSaveReport, ConfigError> {
     let path = config_path(env)?;
@@ -137,7 +136,7 @@ pub fn set_group(
 pub fn add_group(
     env: &Env,
     name: &GroupName,
-    members: &[SkillName],
+    members: &[Member],
 ) -> Result<GroupSaveReport, ConfigError> {
     let path = config_path(env)?;
     let (mut doc, _) = read_document(&path)?;
@@ -148,7 +147,7 @@ pub fn add_group(
             Some(item) => members_from_item(&path, name.as_str(), item)?,
             None => Vec::new(),
         };
-        let mut seen: HashSet<SkillName> = merged.iter().cloned().collect();
+        let mut seen: HashSet<Member> = merged.iter().cloned().collect();
         for member in members {
             if seen.insert(member.clone()) {
                 merged.push(member.clone());
@@ -163,6 +162,76 @@ pub fn add_group(
         path,
         members: merged.len(),
     })
+}
+
+/// 用给定成员整体替换一个已存在的分组；组不存在返回 [`ConfigError::GroupNotFound`]。
+pub fn replace_group_members(
+    env: &Env,
+    name: &GroupName,
+    members: &[Member],
+) -> Result<GroupSaveReport, ConfigError> {
+    let path = config_path(env)?;
+    let (mut doc, _) = read_document(&path)?;
+    let members = dedupe(members);
+
+    {
+        let table = groups_table_mut(&mut doc, &path)?;
+        if !table.contains_key(name.as_str()) {
+            return Err(ConfigError::GroupNotFound {
+                name: name.as_str().to_string(),
+            });
+        }
+        table.insert(name.as_str(), members_item(&members));
+    }
+
+    write_document(&path, &doc)?;
+    Ok(GroupSaveReport {
+        path,
+        members: members.len(),
+    })
+}
+
+/// 从所有分组中移除指向 `targets` 的 `@ref`；返回被移除的（拥有者, 引用）。
+pub fn strip_group_references(
+    env: &Env,
+    targets: &[GroupName],
+) -> Result<Vec<(GroupName, GroupName)>, ConfigError> {
+    let path = config_path(env)?;
+    let (mut doc, _) = read_document(&path)?;
+    let mut stripped = Vec::new();
+
+    {
+        let table = groups_table_mut(&mut doc, &path)?;
+        let names: Vec<String> = table.iter().map(|(name, _)| name.to_string()).collect();
+
+        for raw_name in names {
+            let owner = GroupName::parse(&raw_name)
+                .map_err(|_| invalid_groups(&path, format!("invalid group name '{raw_name}'")))?;
+            let Some(item) = table.get(&raw_name) else {
+                continue;
+            };
+            let mut members = members_from_item(&path, &raw_name, item)?;
+            let before = members.len();
+
+            members.retain(|member| match member {
+                Member::Group(reference) if targets.contains(reference) => {
+                    stripped.push((owner.clone(), reference.clone()));
+                    false
+                }
+                _ => true,
+            });
+
+            if members.len() != before {
+                table.insert(&raw_name, members_item(&members));
+            }
+        }
+    }
+
+    if !stripped.is_empty() {
+        write_document(&path, &doc)?;
+    }
+
+    Ok(stripped)
 }
 
 /// 删除一个分组；组不存在返回 [`ConfigError::GroupNotFound`]。
@@ -225,11 +294,11 @@ fn members_from_item(
     path: &Path,
     group: &str,
     item: &toml_edit::Item,
-) -> Result<Vec<SkillName>, ConfigError> {
+) -> Result<Vec<Member>, ConfigError> {
     let array = item.as_array().ok_or_else(|| {
         invalid_groups(
             path,
-            format!("group '{group}' must be an array of skill names"),
+            format!("group '{group}' must be an array of skill names or @group references"),
         )
     })?;
 
@@ -239,11 +308,8 @@ fn members_from_item(
         let raw = element.as_str().ok_or_else(|| {
             invalid_groups(path, format!("group '{group}' members must be strings"))
         })?;
-        let member = SkillName::parse(raw).map_err(|_| {
-            invalid_groups(
-                path,
-                format!("group '{group}' has invalid skill name '{raw}'"),
-            )
+        let member = Member::parse(raw).map_err(|_| {
+            invalid_groups(path, format!("group '{group}' has invalid member '{raw}'"))
         })?;
         if seen.insert(member.clone()) {
             members.push(member);
@@ -269,15 +335,15 @@ fn groups_table_mut<'a>(
     })
 }
 
-fn members_item(members: &[SkillName]) -> toml_edit::Item {
+fn members_item(members: &[Member]) -> toml_edit::Item {
     let mut array = toml_edit::Array::new();
     for member in members {
-        array.push(member.as_str());
+        array.push(member.to_string());
     }
     toml_edit::Item::Value(toml_edit::Value::Array(array))
 }
 
-fn dedupe(members: &[SkillName]) -> Vec<SkillName> {
+fn dedupe(members: &[Member]) -> Vec<Member> {
     let mut seen = HashSet::new();
     members
         .iter()
@@ -365,6 +431,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::domain::name::SkillName;
 
     fn env_in(dir: &TempDir) -> Env {
         Env {
@@ -511,8 +578,12 @@ mod tests {
         GroupName::parse(name).unwrap()
     }
 
-    fn skill(name: &str) -> SkillName {
-        SkillName::parse(name).unwrap()
+    fn skill(name: &str) -> Member {
+        Member::Skill(SkillName::parse(name).unwrap())
+    }
+
+    fn group_ref(name: &str) -> Member {
+        Member::Group(GroupName::parse(name).unwrap())
     }
 
     #[test]
@@ -536,9 +607,9 @@ mod tests {
 
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0].name.as_str(), "alpha");
-        assert_eq!(groups[0].members[0].as_str(), "c");
+        assert_eq!(groups[0].members[0].to_string(), "c");
         assert_eq!(groups[1].name.as_str(), "zeta");
-        let members: Vec<&str> = groups[1].members.iter().map(SkillName::as_str).collect();
+        let members: Vec<String> = groups[1].members.iter().map(ToString::to_string).collect();
         assert_eq!(members, ["b", "a"]);
     }
 
@@ -583,7 +654,10 @@ mod tests {
 
         let report = set_group(&env, &name, &[skill("grill")], true).unwrap();
         assert_eq!(report.members, 1);
-        assert_eq!(load_groups(&env).unwrap()[0].members[0].as_str(), "grill");
+        assert_eq!(
+            load_groups(&env).unwrap()[0].members[0].to_string(),
+            "grill"
+        );
     }
 
     #[test]
@@ -599,8 +673,39 @@ mod tests {
         assert_eq!(report.members, 2);
 
         let groups = load_groups(&env).unwrap();
-        let members: Vec<&str> = groups[0].members.iter().map(SkillName::as_str).collect();
+        let members: Vec<String> = groups[0].members.iter().map(ToString::to_string).collect();
         assert_eq!(members, ["tdd", "grill"]);
+    }
+
+    #[test]
+    fn group_refs_round_trip_and_can_be_stripped() {
+        let dir = TempDir::new().unwrap();
+        let env = env_in(&dir);
+        let name = group("frontend");
+
+        set_group(&env, &name, &[skill("tdd"), group_ref("common")], false).unwrap();
+
+        let content = fs::read_to_string(config_file_path(&env)).unwrap();
+        assert!(content.contains("\"@common\""), "{content:?}");
+        assert_eq!(
+            load_groups(&env).unwrap()[0].members,
+            [skill("tdd"), group_ref("common")]
+        );
+
+        let stripped = strip_group_references(&env, &[group("common")]).unwrap();
+        assert_eq!(stripped, [(group("frontend"), group("common"))]);
+        assert_eq!(load_groups(&env).unwrap()[0].members, [skill("tdd")]);
+    }
+
+    #[test]
+    fn replace_group_members_requires_an_existing_group() {
+        let dir = TempDir::new().unwrap();
+        let env = env_in(&dir);
+
+        assert!(matches!(
+            replace_group_members(&env, &group("frontend"), &[skill("tdd")]),
+            Err(ConfigError::GroupNotFound { .. })
+        ));
     }
 
     #[test]

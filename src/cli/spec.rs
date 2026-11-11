@@ -234,6 +234,12 @@ fn group_command(lang: Lang) -> Command {
                     .long("json")
                     .action(clap::ArgAction::SetTrue)
                     .help(tr(lang, MsgKey::GroupJsonFlag)),
+            )
+            .arg(
+                Arg::new("resolved")
+                    .long("resolved")
+                    .action(clap::ArgAction::SetTrue)
+                    .help(tr(lang, MsgKey::GroupResolvedFlag)),
             ),
         lang,
     );
@@ -248,10 +254,10 @@ fn group_command(lang: Lang) -> Command {
                     .help(tr(lang, MsgKey::GroupNameArg)),
             )
             .arg(
-                Arg::new("skill")
+                Arg::new("member")
                     .required(true)
                     .num_args(1..)
-                    .value_name("SKILL")
+                    .value_name("ITEM")
                     .help(tr(lang, MsgKey::GroupSkillArg)),
             )
             .arg(
@@ -273,10 +279,10 @@ fn group_command(lang: Lang) -> Command {
                     .help(tr(lang, MsgKey::GroupNameArg)),
             )
             .arg(
-                Arg::new("skill")
+                Arg::new("member")
                     .required(true)
                     .num_args(1..)
-                    .value_name("SKILL")
+                    .value_name("ITEM")
                     .help(tr(lang, MsgKey::GroupSkillArg)),
             ),
         lang,
@@ -288,9 +294,34 @@ fn group_command(lang: Lang) -> Command {
             .arg(
                 Arg::new("group")
                     .required(true)
+                    .value_name("GROUP")
+                    .help(tr(lang, MsgKey::GroupNameArg)),
+            )
+            .arg(
+                Arg::new("member")
+                    .required(true)
+                    .num_args(1..)
+                    .value_name("ITEM")
+                    .help(tr(lang, MsgKey::GroupSkillArg)),
+            ),
+        lang,
+    );
+
+    let delete = with_help_flag(
+        Command::new("delete")
+            .about(tr(lang, MsgKey::GroupDeleteAbout))
+            .arg(
+                Arg::new("group")
+                    .required(true)
                     .num_args(1..)
                     .value_name("GROUP")
                     .help(tr(lang, MsgKey::GroupNameArg)),
+            )
+            .arg(
+                Arg::new("force")
+                    .long("force")
+                    .action(clap::ArgAction::SetTrue)
+                    .help(tr(lang, MsgKey::GroupDeleteForceFlag)),
             ),
         lang,
     );
@@ -303,7 +334,8 @@ fn group_command(lang: Lang) -> Command {
             .subcommand(list)
             .subcommand(set)
             .subcommand(add)
-            .subcommand(remove),
+            .subcommand(remove)
+            .subcommand(delete),
         lang,
     )
 }

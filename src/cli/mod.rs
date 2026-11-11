@@ -12,7 +12,7 @@ use clap::ArgMatches;
 
 use crate::domain::action::{Action, ConfigCommand, GroupCommand, SearchField, TransferTarget};
 use crate::domain::config::ConfigKey;
-use crate::domain::group::GroupName;
+use crate::domain::group::{GroupName, Member};
 use crate::domain::lang::Lang;
 use crate::domain::name::SkillName;
 use crate::domain::scope::Scope;
@@ -201,6 +201,19 @@ fn skill_values(matches: &ArgMatches, id: &str) -> Result<Vec<SkillName>, AppErr
     Ok(names)
 }
 
+/// 分组命令的 `ITEM`：skill 名或 `@组名` 引用。
+fn member_values(matches: &ArgMatches, id: &str) -> Result<Vec<Member>, AppError> {
+    let mut members = Vec::new();
+    let mut seen = HashSet::new();
+    for raw in matches.get_many::<String>(id).into_iter().flatten() {
+        let member = Member::parse(raw)?;
+        if seen.insert(member.clone()) {
+            members.push(member);
+        }
+    }
+    Ok(members)
+}
+
 /// `remove` 的 scope 可省略：末尾恰好是 `global` / `project` 时当作用域（Q51）。
 fn remove_target(matches: &ArgMatches) -> Result<(Vec<SkillName>, Scope), AppError> {
     let mut raw: Vec<String> = matches
@@ -254,18 +267,24 @@ fn parse_group(matches: &ArgMatches) -> Result<GroupCommand, AppError> {
     match name {
         "list" => Ok(GroupCommand::List {
             json: sub.get_flag("json"),
+            resolved: sub.get_flag("resolved"),
         }),
         "set" => Ok(GroupCommand::Set {
             name: group_value(sub, "group")?,
-            members: skill_values(sub, "skill")?,
+            members: member_values(sub, "member")?,
             force: sub.get_flag("force"),
         }),
         "add" => Ok(GroupCommand::Add {
             name: group_value(sub, "group")?,
-            members: skill_values(sub, "skill")?,
+            members: member_values(sub, "member")?,
         }),
         "remove" => Ok(GroupCommand::Remove {
+            name: group_value(sub, "group")?,
+            members: member_values(sub, "member")?,
+        }),
+        "delete" => Ok(GroupCommand::Delete {
             names: group_values(sub, "group")?,
+            force: sub.get_flag("force"),
         }),
         other => Err(AppError::usage(MsgKey::UsageInvalidSubcommand).with_args([other])),
     }
