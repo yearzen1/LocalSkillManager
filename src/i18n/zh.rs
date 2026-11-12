@@ -39,6 +39,9 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UsageMixedForms => "不能混用短选项与子命令",
         MsgKey::UsageHintForms => "示例：lsm -a foo.md -g | lsm add foo.md global",
         MsgKey::UsageMissingArgument => "缺少必需参数 '{0}'",
+        MsgKey::UsageGroupItemMissingHint => {
+            "Windows PowerShell 会把开头的 @ 当成 splatting 展开，组引用请写成 '@组名'"
+        }
         MsgKey::UsageInvalidValue => "'{0}' 的值非法",
         MsgKey::UsageUnknownArgument => "未知参数 '{0}'",
         MsgKey::UsageUnexpectedArgument => "多余的参数 '{0}'",

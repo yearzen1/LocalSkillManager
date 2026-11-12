@@ -41,6 +41,9 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::UsageMixedForms => "cannot mix short flags with subcommands",
         MsgKey::UsageHintForms => "examples: lsm -a foo.md -g | lsm add foo.md global",
         MsgKey::UsageMissingArgument => "missing required argument '{0}'",
+        MsgKey::UsageGroupItemMissingHint => {
+            "Windows PowerShell splats a leading @, so write group references as '@group'"
+        }
         MsgKey::UsageInvalidValue => "invalid value for '{0}'",
         MsgKey::UsageUnknownArgument => "unknown argument '{0}'",
         MsgKey::UsageUnexpectedArgument => "unexpected argument '{0}'",

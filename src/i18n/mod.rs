@@ -57,6 +57,7 @@ keys!(
     UsageMixedForms,
     UsageHintForms,
     UsageMissingArgument,
+    UsageGroupItemMissingHint,
     UsageInvalidValue,
     UsageUnknownArgument,
     UsageUnexpectedArgument,

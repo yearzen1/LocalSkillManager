@@ -65,6 +65,7 @@ impl From<NormalizeError> for AppError {
 /// 解析整条命令行。`lang` 决定 help/错误的语言。
 pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppError> {
     let argv = normalize::normalize(argv)?;
+    let group_item = group_item_command(&argv);
 
     let mut full = Vec::with_capacity(argv.len() + 1);
     full.push(std::ffi::OsString::from("lsm"));
@@ -72,7 +73,7 @@ pub fn parse(lang: Lang, argv: Vec<std::ffi::OsString>) -> Result<Outcome, AppEr
 
     let matches = match spec::build(lang).try_get_matches_from_mut(full) {
         Ok(matches) => matches,
-        Err(err) => return clap_outcome(err, lang),
+        Err(err) => return clap_outcome(err, lang, group_item),
     };
 
     let (name, sub) = matches
@@ -353,8 +354,35 @@ fn search_field(matches: &ArgMatches) -> SearchField {
     }
 }
 
+/// `group set` / `group add` / `group remove`：这三条命令唯一以 `@` 开头的入参是 `ITEM`。
+///
+/// 只看 argv 而不是 clap 的 usage 文本，避免依赖 clap 内部格式化；
+/// 全局 `--lang <LANG>` / `--lang=<LANG>` 允许出现在子命令之前，先跳过。
+fn group_item_command(argv: &[std::ffi::OsString]) -> bool {
+    let mut words = Vec::with_capacity(argv.len());
+    let mut args = argv.iter().map(|arg| arg.to_string_lossy());
+
+    while let Some(word) = args.next() {
+        if word == "--lang" {
+            args.next();
+            continue;
+        }
+        if !word.starts_with("--lang=") {
+            words.push(word);
+        }
+    }
+
+    matches!(
+        (
+            words.first().map(|word| word.as_ref()),
+            words.get(1).map(|word| word.as_ref())
+        ),
+        (Some("group"), Some("set" | "add" | "remove"))
+    )
+}
+
 /// clap 的 help / version / 缺子命令：转成直接输出的文本。
-fn clap_outcome(err: clap::Error, lang: Lang) -> Result<Outcome, AppError> {
+fn clap_outcome(err: clap::Error, lang: Lang, group_item: bool) -> Result<Outcome, AppError> {
     use clap::error::ErrorKind as Kind;
 
     match err.kind() {
@@ -370,12 +398,12 @@ fn clap_outcome(err: clap::Error, lang: Lang) -> Result<Outcome, AppError> {
                 exit_code: 2,
             })
         }
-        kind => Err(map_clap_error(kind, &err)),
+        kind => Err(map_clap_error(kind, &err, group_item)),
     }
 }
 
 /// 常见参数错误映射到本地化文案；未覆盖的类型回退英文原文。
-fn map_clap_error(kind: clap::error::ErrorKind, err: &clap::Error) -> AppError {
+fn map_clap_error(kind: clap::error::ErrorKind, err: &clap::Error, group_item: bool) -> AppError {
     use clap::error::ErrorKind as Kind;
 
     let key = match kind {
@@ -388,6 +416,14 @@ fn map_clap_error(kind: clap::error::ErrorKind, err: &clap::Error) -> AppError {
     };
 
     let detail = offending(err).unwrap_or_else(|| first_line(&err.to_string()));
+
+    // `group set/add/remove` 缺 ITEM 时，最常见的原因是 Windows PowerShell 把 `@group`
+    // 当成 splatting 展开并丢掉整个参数，此时通用 hint 帮不上忙。
+    if group_item && kind == Kind::MissingRequiredArgument && detail.contains("ITEM") {
+        return AppError::usage(key)
+            .with_args([detail])
+            .with_hint(MsgKey::UsageGroupItemMissingHint);
+    }
 
     AppError::usage(key)
         .with_args([detail])
