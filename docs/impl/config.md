@@ -54,7 +54,7 @@ common = ["@frontend", "conventional-commit"]
 ### 1.4 分组（`groups.toml`）
 
 - 顶层表，键是分组名，值是成员数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
-- 成员有两种写法：`tdd` 是 skill 名；`@common` 是组引用（引用另一个分组）。因为 skill 名不允许 `@`，不需要转义。
+- 成员有两种写法：`tdd` 是 skill 名；`@common` 是组引用（引用另一个分组）。因为 skill 名不允许 `@`，TOML 层面不需要转义；但 Windows PowerShell 会把 token 开头的 `@组名` 当成 splatting 展开，命令行里必须写成 `'@组名'`（或用 `--%` 停止解析），否则该参数不会传进 lsm。
 - 分组名与 skill 名共用同一套校验（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名）；大写输入在格式错误 hint 里提示对应的全小写写法（如 `Predevelop` → `predevelop`），但不会自动改写。
 - skill 成员在 `group set` / `group add` 写入前要求已安装在 **global**，并按「精确 → 唯一前缀」解析后写入全名（`code` → `code-review`）。
 - `@ref` 在写入前要求目标分组已定义，并按「精确 → 唯一前缀」解析；拒绝自引用与成环（`a -> b -> a`）。

@@ -169,6 +169,7 @@ lsm list project
 
 ## 常见问题
 
+- **`missing required argument '<ITEM>...'`，但命令里明明写了 `@group`**：Windows PowerShell 把 token 开头的 `@name` 当成 splatting（展开名为 `name` 的变量），`lsm group set develop @predevelop @developing` 到 lsm 手里只剩 `group set develop`。加引号即可：`lsm group set develop '@predevelop' '@developing'`；也可以用 `lsm --% group set develop @predevelop @developing` 停止解析。bash / zsh 不受影响。
 - **`group 'x' already exists`**：这是 `set` 的覆盖保护。确认要替换时加 `--force`；如果只是想加成员，改用 `group add`。
 - **`invalid group name` / `invalid skill name`**：组名和成员名都使用 skill 名规则（小写字母、数字、单个连字符，≤64 字符，不能是 Windows 保留设备名）。组名写了大写时，hint 会给出对应的全小写写法。命令在写盘前整体校验，失败时不会留下半个分组。
 - **`group 'x' not found`**：`pull --group`、`group remove` 或 `group delete` 引用了不存在的组。先用 `lsm group list` 确认；也可以只写唯一前缀。批量操作中该组记为一次失败，其他组继续。

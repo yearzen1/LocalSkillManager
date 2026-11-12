@@ -106,7 +106,7 @@ $ lsm --lang zh --help
 - `<SCOPE>`：`global` 或 `project`，大小写敏感；**可省略，省略时为 `project`**。`remove` 的最后一个参数恰好是 `global` / `project` 时按作用域处理，否则全部按 name（作用域默认 `project`）；技能名本身是 `global` / `project` 时必须显式写作用域（如 `lsm remove global project`）。
 - `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1；有相近名字时 hint 列出候选）。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`（非法格式退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
 - `<GROUP>`：分组名，规则与 skill 名相同（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名），非法格式退 2；大写输入会额外提示对应的全小写写法（如 `Predevelop` → `predevelop`）。`group remove`、`group delete` 与 `pull --group` 的组名支持「精确优先、其次唯一前缀」；不存在的分组是运行时错误（退 1），有相近组名时 hint 列出候选。`group set` / `group add` 的目标组名不做前缀解析。
-- `<ITEM>`（`group set` / `group add` / `group remove`）：成员，两种写法。`tdd` 是 skill，先精确、后唯一前缀解析；`@common` 是组引用，按已定义组解析。`set` / `add` 写入时 skill 必须已安装在 global、引用组必须已定义，任一失败整组不写盘并汇总退 1；`remove` 在本组已有成员里做同样的前缀解析，找不到时给出候选。
+- `<ITEM>`（`group set` / `group add` / `group remove`）：成员，两种写法。`tdd` 是 skill，先精确、后唯一前缀解析；`@common` 是组引用，按已定义组解析。`set` / `add` 写入时 skill 必须已安装在 global、引用组必须已定义，任一失败整组不写盘并汇总退 1；`remove` 在本组已有成员里做同样的前缀解析，找不到时给出候选。三条命令缺 `ITEM` 时 hint 会额外提示 Windows PowerShell 的 `'@组名'` 写法（单独的 `@` 开头会被 splatting 吞掉）。
 - `<SKILL>` 格式非法仍在 `cli::parse` 退 2；`@` 后为空或组名非法同样退 2。
 - `pull` 的 `--group` 可重复，与 `<NAME>...`、`--all` 三者互斥；规则见 [storage.md](storage.md)「pull」与 [config.md](config.md)「分组」。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。

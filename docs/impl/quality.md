@@ -193,6 +193,7 @@ skill 分组（Q53–Q57，v0.7.0）：
 127. `config.toml` 语法坏、`groups.toml` 正常：`--lang en group list` 成功；不带 `--lang` 仍因语言解析退 1。
 128. `groups.toml` 语法坏时不回退旧表：报 `cannot parse groups file` 并指向 `groups.toml`。
 129. 旧 `[groups]` 删除失败（如 `config.toml` 只读）→ 分组已写入 `groups.toml`，stderr 打 warning，退出码仍为 0。
+130. `group set develop` / `group add develop` / `group remove develop`（不给成员）→ 退出 2，hint 含 `'@组名'`（Windows PowerShell 的 splatting 提示）；非 `group` 命令（如 `lsm add`）缺参数时 hint 仍是通用的 `lsm --help` 提示。
 
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
