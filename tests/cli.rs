@@ -2810,6 +2810,39 @@ fn group_set_validates_group_and_member_names_before_writing() {
 }
 
 #[test]
+fn group_missing_item_hints_at_powershell_quoting() {
+    let config = TempDir::new().unwrap();
+
+    for args in [
+        ["group", "set", "develop"],
+        ["group", "add", "develop"],
+        ["group", "remove", "develop"],
+    ] {
+        lsm_with_config(&config)
+            .args(args)
+            .assert()
+            .code(2)
+            .stderr(predicate::str::contains("missing required argument"))
+            .stderr(predicate::str::contains("'@group'"))
+            .stderr(predicate::str::contains("Windows PowerShell"));
+    }
+
+    lsm_with_config(&config)
+        .args(["--lang", "zh", "group", "set", "develop"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("'@组名'"));
+
+    // 非 group 命令沿用通用 hint，避免把 shell 提示铺到所有缺参场景。
+    lsm_with_config(&config)
+        .arg("add")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("run `lsm --help` for usage"))
+        .stderr(predicate::str::contains("'@").not());
+}
+
+#[test]
 fn group_set_requires_members_to_exist_in_global() {
     let config = TempDir::new().unwrap();
     let home = home_dir();
