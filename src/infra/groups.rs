@@ -502,10 +502,27 @@ mod tests {
     }
 
     #[test]
+    fn uppercase_group_names_roundtrip_and_sort_case_insensitively() {
+        let dir = TempDir::new().unwrap();
+        let env = env_in(&dir);
+        write_groups(&env, "Zebra = []\napple = []\nFrontend = []\n");
+
+        let groups = load_groups(&env).unwrap();
+        let names: Vec<&str> = groups.iter().map(|group| group.name.as_str()).collect();
+        assert_eq!(names, ["apple", "Frontend", "Zebra"]);
+
+        let report = set_group(&env, &group("Frontend"), &[member("tdd")], true).unwrap();
+        assert_eq!(report.members, 1);
+        assert_eq!(members_of(&load_groups(&env).unwrap()[1]), ["tdd"]);
+        let content = fs::read_to_string(groups_file(&env)).unwrap();
+        assert!(content.contains("Frontend = [\"tdd\"]"), "{content:?}");
+    }
+
+    #[test]
     fn rejects_invalid_structure() {
         let cases = [
             "frontend = [1]\n",
-            "Frontend = []\n",
+            "Front_end = []\n",
             "frontend = [\"Bad\"]\n",
             "frontend = \"tdd\"\n",
         ];

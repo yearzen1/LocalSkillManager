@@ -2788,11 +2788,13 @@ fn group_set_validates_group_and_member_names_before_writing() {
     let config = TempDir::new().unwrap();
 
     lsm_with_config(&config)
-        .args(["group", "set", "Frontend", "tdd"])
+        .args(["group", "set", "Front_end", "tdd"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("invalid group name"))
-        .stderr(predicate::str::contains("did you mean 'frontend'?"));
+        .stderr(predicate::str::contains(
+            "letters, digits and single hyphens",
+        ));
 
     lsm_with_config(&config)
         .args(["group", "set", "frontend", "Bad-Name"])
@@ -2807,6 +2809,117 @@ fn group_set_validates_group_and_member_names_before_writing() {
 
     assert!(!config_path(&config).exists());
     assert!(!groups_path(&config).exists());
+}
+
+#[test]
+fn uppercase_group_names_are_accepted_and_case_sensitive() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+
+    for name in ["frontend", "Frontend"] {
+        lsm_with_home(&config, &home)
+            .args(["group", "set", name, "tdd"])
+            .assert()
+            .success();
+    }
+
+    let output = lsm_with_home(&config, &home)
+        .args(["group", "list", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let names: Vec<&str> = value
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|group| group["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Frontend", "frontend"]);
+
+    lsm_with_home(&config, &home)
+        .args(["group", "delete", "Frontend"])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(groups_path(&config)).unwrap();
+    assert!(!content.contains("Frontend"), "{content:?}");
+    assert!(content.contains("frontend"), "{content:?}");
+}
+
+#[test]
+fn group_lookup_with_the_wrong_case_hints_at_the_actual_group() {
+    let config = TempDir::new().unwrap();
+    write_groups(&config, "frontend = [\"tdd\"]\n");
+
+    lsm_with_config(&config)
+        .args(["group", "delete", "Front"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("group 'Front' not found"))
+        .stderr(predicate::str::contains("frontend"));
+}
+
+#[test]
+fn group_list_separates_groups_with_a_blank_line() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "tdd", "T.");
+    install_global(&home, "grill", "G.");
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "common", "tdd"])
+        .assert()
+        .success();
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "frontend", "tdd", "grill"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout("common: tdd\n\nfrontend: tdd, grill\n");
+
+    lsm_with_home(&config, &home)
+        .args(["group", "list", "--resolved"])
+        .assert()
+        .success()
+        .stdout("common: tdd\n\nfrontend: tdd, grill\n");
+}
+
+#[test]
+fn group_list_with_a_single_group_has_no_trailing_blank_line() {
+    let config = TempDir::new().unwrap();
+    write_groups(&config, "only = [\"tdd\"]\n");
+
+    lsm_with_config(&config)
+        .args(["group", "list"])
+        .assert()
+        .success()
+        .stdout("only: tdd\n");
+}
+
+#[test]
+fn pull_group_accepts_uppercase_group_names() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "tdd", "T.");
+    write_groups(&config, "Frontend = [\"tdd\"]\n");
+
+    lsm_with_config(&config)
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "--group", "Frontend"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pulled 1, skipped 0, failed 0"));
+
+    assert!(project.path().join(".agents/skills/tdd/SKILL.md").exists());
 }
 
 #[test]

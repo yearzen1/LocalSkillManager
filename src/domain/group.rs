@@ -227,11 +227,26 @@ mod tests {
     }
 
     #[test]
-    fn group_names_use_skill_name_rules() {
-        assert_eq!(GroupName::parse("frontend").unwrap().as_str(), "frontend");
+    fn group_names_allow_uppercase_but_keep_the_format() {
+        for input in ["frontend", "Frontend", "FrontEnd", "API-2"] {
+            assert_eq!(GroupName::parse(input).unwrap().as_str(), input);
+        }
 
-        for input in ["Frontend", "a--b", "con", ""] {
+        for input in ["a--b", "-a", "a-", "a_", "中文", ""] {
             assert!(GroupName::parse(input).is_err(), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn group_names_reject_windows_reserved_names_case_insensitively() {
+        for input in ["con", "CON", "Con", "lpt9", "LPT9"] {
+            assert!(
+                matches!(
+                    GroupName::parse(input),
+                    Err(err) if matches!(err.0, super::NameError::Reserved { .. })
+                ),
+                "{input:?}"
+            );
         }
     }
 
@@ -239,8 +254,9 @@ mod tests {
     fn members_parse_skills_and_group_references() {
         assert_eq!(Member::parse("tdd"), Ok(skill("tdd")));
         assert_eq!(Member::parse("@common"), Ok(group("common")));
+        assert_eq!(Member::parse("@Common"), Ok(group("Common")));
         assert!(Member::parse("@").is_err());
-        assert!(Member::parse("@Bad").is_err());
+        assert!(Member::parse("@bad_name").is_err());
         assert!(Member::parse("Bad").is_err());
     }
 

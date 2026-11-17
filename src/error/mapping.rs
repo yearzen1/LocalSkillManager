@@ -403,15 +403,10 @@ mod tests {
     use crate::error::ErrorKind;
 
     #[test]
-    fn uppercase_group_names_hint_the_lowercase_form() {
-        let app: AppError = GroupName::parse("Predevelop").unwrap_err().into();
+    fn uppercase_group_names_are_valid() {
+        let name = GroupName::parse("Predevelop").expect("uppercase group names are allowed");
 
-        assert_eq!(app.exit_code(), 2);
-        assert_eq!(app.msg.key, MsgKey::GroupInvalid);
-        assert_eq!(app.msg.args, ["Predevelop"]);
-        let hint = app.hint.expect("uppercase names should suggest lowercase");
-        assert_eq!(hint.key, MsgKey::GroupLowercaseHint);
-        assert_eq!(hint.args, ["predevelop"]);
+        assert_eq!(name.as_str(), "Predevelop");
     }
 
     #[test]
@@ -426,18 +421,21 @@ mod tests {
 
     #[test]
     fn member_group_errors_keep_the_reference_marker() {
-        let app: AppError = crate::domain::group::Member::parse("@Predevelop")
+        let member = crate::domain::group::Member::parse("@Predevelop")
+            .expect("uppercase group references are allowed");
+        assert_eq!(member.to_string(), "@Predevelop");
+
+        let app: AppError = crate::domain::group::Member::parse("@pre_dev")
             .unwrap_err()
             .into();
 
         assert_eq!(app.exit_code(), 2);
         assert_eq!(app.msg.key, MsgKey::GroupInvalid);
-        assert_eq!(app.msg.args, ["@Predevelop"]);
-        let hint = app
-            .hint
-            .expect("uppercase references should suggest lowercase");
-        assert_eq!(hint.key, MsgKey::GroupLowercaseHint);
-        assert_eq!(hint.args, ["@predevelop"]);
+        assert_eq!(app.msg.args, ["@pre_dev"]);
+        assert_eq!(
+            app.hint.as_ref().map(|hint| hint.key),
+            Some(MsgKey::GroupInvalidHint)
+        );
     }
 
     #[test]
