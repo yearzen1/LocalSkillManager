@@ -340,7 +340,13 @@ fn groups_from_document(
         });
     }
 
-    groups.sort_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
+    groups.sort_by(|left, right| {
+        let left_lower = left.name.as_str().to_ascii_lowercase();
+        let right_lower = right.name.as_str().to_ascii_lowercase();
+        left_lower
+            .cmp(&right_lower)
+            .then_with(|| left.name.as_str().cmp(right.name.as_str()))
+    });
     Ok(groups)
 }
 

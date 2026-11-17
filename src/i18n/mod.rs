@@ -171,7 +171,6 @@ keys!(
     GroupAlreadyExists,
     GroupNotFound,
     GroupNotFoundHint,
-    GroupLowercaseHint,
     GroupMemberMissing,
     GroupMemberMissingHint,
     GroupMembersFailed,

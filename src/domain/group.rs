@@ -3,11 +3,11 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use super::name::{NameError, SkillName};
+use super::name::{validate, NameError, SkillName};
 
-/// 已校验的分组名；规则与 skill 名完全相同。
+/// 已校验的分组名：允许大小写字母、数字与单个连字符；大小写敏感。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GroupName(SkillName);
+pub struct GroupName(String);
 
 /// 分组名校验失败；包一层只为让 CLI 用分组专属文案。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,12 +16,13 @@ pub struct GroupNameError(pub NameError);
 impl GroupName {
     /// 解析并完成全部校验（格式、长度、Windows 保留名）。
     pub fn parse(input: &str) -> Result<Self, GroupNameError> {
-        SkillName::parse(input).map(Self).map_err(GroupNameError)
+        validate(input, true).map_err(GroupNameError)?;
+        Ok(Self(input.to_string()))
     }
 
     /// 已校验的原始值。
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 }
 

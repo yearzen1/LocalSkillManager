@@ -65,11 +65,9 @@ fn group_name_error(err: GroupNameError, display: Option<String>) -> AppError {
     match err.0 {
         NameError::Format { input } => {
             let shown = display.unwrap_or(input);
-            let err = AppError::usage(MsgKey::GroupInvalid).with_args([shown.clone()]);
-            match lowercase_alternative(&shown) {
-                Some(lowercase) => err.with_hint_args(MsgKey::GroupLowercaseHint, [lowercase]),
-                None => err.with_hint(MsgKey::GroupInvalidHint),
-            }
+            AppError::usage(MsgKey::GroupInvalid)
+                .with_args([shown])
+                .with_hint(MsgKey::GroupInvalidHint)
         }
         NameError::TooLong { len, .. } => {
             AppError::usage(MsgKey::GroupTooLong).with_args([len.to_string()])
@@ -78,17 +76,6 @@ fn group_name_error(err: GroupNameError, display: Option<String>) -> AppError {
             AppError::usage(MsgKey::GroupReserved).with_args([display.unwrap_or(input)])
         }
     }
-}
-
-/// 含大写且全小写后合法时，返回该写法供 hint 使用（Q58）；保留 `@` 前缀。
-fn lowercase_alternative(input: &str) -> Option<String> {
-    let (prefix, name) = match input.strip_prefix('@') {
-        Some(rest) => ("@", rest),
-        None => ("", input),
-    };
-    let lowercase = name.to_lowercase();
-    (lowercase != name && GroupName::parse(&lowercase).is_ok())
-        .then(|| format!("{prefix}{lowercase}"))
 }
 
 /// 展开失败：缺失引用与环都是运行时错误。

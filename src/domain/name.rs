@@ -7,10 +7,11 @@ pub const MAX_NAME_LEN: usize = 64;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SkillName(String);
 
-/// skill 名称校验失败。
+/// 名称格式不符、过长或与 Windows 保留设备名冲突。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameError {
-    /// 格式不符：只允许小写字母、数字与单个连字符，且首尾必须是字母或数字。
+    /// 格式不符：只允许字母、数字与单个连字符，且首尾必须是字母或数字。
+    /// 是否允许大写由调用方决定（skill 名不允许，组名允许）。
     Format { input: String },
     /// 超过 [`MAX_NAME_LEN`] 个字符。
     TooLong { input: String, len: usize },
@@ -21,26 +22,7 @@ pub enum NameError {
 impl SkillName {
     /// 解析并完成全部校验（格式、长度、Windows 保留名）。
     pub fn parse(input: &str) -> Result<Self, NameError> {
-        let len = input.chars().count();
-        if len > MAX_NAME_LEN {
-            return Err(NameError::TooLong {
-                input: input.to_string(),
-                len,
-            });
-        }
-
-        if !has_valid_format(input) {
-            return Err(NameError::Format {
-                input: input.to_string(),
-            });
-        }
-
-        if is_windows_reserved(input) {
-            return Err(NameError::Reserved {
-                input: input.to_string(),
-            });
-        }
-
+        validate(input, false)?;
         Ok(SkillName(input.to_string()))
     }
 
@@ -51,14 +33,40 @@ impl SkillName {
 
     /// 只校验、不构造 [`SkillName`]；目录扫描过滤时避免为丢弃的结果分配。
     pub fn is_valid(input: &str) -> bool {
-        input.chars().count() <= MAX_NAME_LEN
-            && has_valid_format(input)
-            && !is_windows_reserved(input)
+        validate(input, false).is_ok()
     }
 }
 
-/// 小写字母/数字开头结尾，连字符必须单个且不落在首尾。
-fn has_valid_format(input: &str) -> bool {
+/// 名称的共享校验：长度、字符集与 Windows 保留名。
+///
+/// `allow_uppercase` 只放宽字符集；保留名检查始终大小写不敏感，
+/// 因此组名的 `CON` 与 `con` 同样被拒绝。
+pub(crate) fn validate(input: &str, allow_uppercase: bool) -> Result<(), NameError> {
+    let len = input.chars().count();
+    if len > MAX_NAME_LEN {
+        return Err(NameError::TooLong {
+            input: input.to_string(),
+            len,
+        });
+    }
+
+    if !has_valid_format(input, allow_uppercase) {
+        return Err(NameError::Format {
+            input: input.to_string(),
+        });
+    }
+
+    if is_windows_reserved(input) {
+        return Err(NameError::Reserved {
+            input: input.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+/// 字母/数字开头结尾，连字符必须单个且不落在首尾；`allow_uppercase` 决定接受 `A-Z`。
+fn has_valid_format(input: &str, allow_uppercase: bool) -> bool {
     if input.is_empty() {
         return false;
     }
@@ -68,7 +76,8 @@ fn has_valid_format(input: &str) -> bool {
         match ch {
             '-' if previous_is_hyphen => return false,
             '-' => previous_is_hyphen = true,
-            _ if ch.is_ascii_lowercase() || ch.is_ascii_digit() => previous_is_hyphen = false,
+            ch if ch.is_ascii_lowercase() || ch.is_ascii_digit() => previous_is_hyphen = false,
+            ch if allow_uppercase && ch.is_ascii_uppercase() => previous_is_hyphen = false,
             _ => return false,
         }
     }
@@ -76,9 +85,11 @@ fn has_valid_format(input: &str) -> bool {
     !previous_is_hyphen
 }
 
-/// `con`/`prn`/`aux`/`nul` 与 `com1`~`com9`、`lpt1`~`lpt9`。
+/// `con`/`prn`/`aux`/`nul` 与 `com1`~`com9`、`lpt1`~`lpt9`；大小写不敏感。
 fn is_windows_reserved(input: &str) -> bool {
-    if matches!(input, "con" | "prn" | "aux" | "nul") {
+    let input = input.to_ascii_lowercase();
+
+    if matches!(input.as_str(), "con" | "prn" | "aux" | "nul") {
         return true;
     }
 

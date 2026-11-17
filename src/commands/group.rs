@@ -34,77 +34,84 @@ pub fn run(ctx: &Ctx, command: GroupCommand) -> Result<(), AppError> {
 
 fn list(ctx: &Ctx, json: bool, resolved: bool) -> Result<(), AppError> {
     let groups = group_store::load_groups(&ctx.env)?;
+    let expanded = if resolved {
+        Some(expand_all(ctx, &groups)?)
+    } else {
+        None
+    };
 
-    if resolved {
-        let mut expanded = Vec::with_capacity(groups.len());
-        let mut failed = 0usize;
-
-        for group in &groups {
-            match expand(&groups, &group.name) {
-                Ok(skills) => expanded.push(Some(skills)),
-                Err(err) => {
-                    failed += 1;
-                    expanded.push(None);
-                    output::emit_stderr(&error_output::render_block(&err.into(), ctx.lang));
-                }
-            }
-        }
-
-        if failed > 0 {
-            output::emit_gap();
-            return Err(AppError::runtime(MsgKey::GroupListFailed)
-                .with_args([failed.to_string()])
-                .with_hint(MsgKey::GroupListFailedHint));
-        }
-
-        if json {
-            output::emit_stdout(&format!("{}\n", render_json(&groups, Some(&expanded))));
-            return Ok(());
-        }
-
-        if groups.is_empty() {
-            output::emit_line(ctx.lang, &Msg::new(MsgKey::GroupNoGroups));
-            return Ok(());
-        }
-
-        for (group, skills) in groups.iter().zip(expanded.iter()) {
-            let members = match skills.as_ref().map(|skills| render_skills(skills)) {
-                Some(members) if !members.is_empty() => members,
-                _ => tr(ctx.lang, MsgKey::GroupEmptyMembers).to_string(),
-            };
-            output::emit_line(
-                ctx.lang,
-                &Msg::with_args(MsgKey::GroupLine, [group.name.as_str(), members.as_str()]),
-            );
-        }
+    if json {
+        output::emit_stdout(&format!("{}\n", render_json(&groups, expanded.as_deref())));
         return Ok(());
     }
 
-    if json {
-        output::emit_stdout(&format!("{}\n", render_json(&groups, None)));
-    } else if groups.is_empty() {
+    if groups.is_empty() {
         output::emit_line(ctx.lang, &Msg::new(MsgKey::GroupNoGroups));
-    } else {
-        for group in &groups {
-            let members = if group.members.is_empty() {
-                tr(ctx.lang, MsgKey::GroupEmptyMembers).to_string()
-            } else {
-                group
+        return Ok(());
+    }
+
+    let rows = render_rows(ctx, &groups, expanded.as_deref());
+    output::emit_stdout(&format!("{}\n", rows.join("\n\n")));
+    Ok(())
+}
+
+/// 展开每个分组；任一失败时先打印错误块，再返回汇总错误。
+fn expand_all(ctx: &Ctx, groups: &[Group]) -> Result<Vec<Option<Vec<SkillName>>>, AppError> {
+    let mut expanded = Vec::with_capacity(groups.len());
+    let mut failed = 0usize;
+
+    for group in groups {
+        match expand(groups, &group.name) {
+            Ok(skills) => expanded.push(Some(skills)),
+            Err(err) => {
+                failed += 1;
+                expanded.push(None);
+                output::emit_stderr(&error_output::render_block(&err.into(), ctx.lang));
+            }
+        }
+    }
+
+    if failed > 0 {
+        output::emit_gap();
+        return Err(AppError::runtime(MsgKey::GroupListFailed)
+            .with_args([failed.to_string()])
+            .with_hint(MsgKey::GroupListFailedHint));
+    }
+
+    Ok(expanded)
+}
+
+/// 每组渲染成一行；`expanded` 与 `groups` 同序，`None` 表示不展开。
+fn render_rows(
+    ctx: &Ctx,
+    groups: &[Group],
+    expanded: Option<&[Option<Vec<SkillName>>]>,
+) -> Vec<String> {
+    groups
+        .iter()
+        .enumerate()
+        .map(|(index, group)| {
+            let members = match expanded.and_then(|values| values.get(index)) {
+                Some(Some(skills)) => render_skills(skills),
+                _ => group
                     .members
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>()
-                    .join(", ")
+                    .join(", "),
+            };
+            let members = if members.is_empty() {
+                tr(ctx.lang, MsgKey::GroupEmptyMembers).to_string()
+            } else {
+                members
             };
 
-            output::emit_line(
+            output::line(
                 ctx.lang,
                 &Msg::with_args(MsgKey::GroupLine, [group.name.as_str(), members.as_str()]),
-            );
-        }
-    }
-
-    Ok(())
+            )
+        })
+        .collect()
 }
 
 fn set(ctx: &Ctx, name: &GroupName, members: &[Member], force: bool) -> Result<(), AppError> {
