@@ -70,13 +70,15 @@ lsm group add frontend conventional-commit
 lsm group list
 ```
 
-输出一行一组：
+输出一行一组，组与组之间空一行：
 
 ```text
 frontend: tdd, grill, conventional-commit
+
+common: @frontend
 ```
 
-组按组名字典序排列，成员保持定义顺序（引用的组显示为 `@common`）；没有分组时输出 `No groups found.`。
+组按组名不分大小写字典序排列，成员保持定义顺序（引用的组显示为 `@common`）；没有分组时输出 `No groups found.`。组名区分大小写，大写组名（如 `Frontend`）会原样显示。
 
 想看展开后的最终 skill 列表：
 
@@ -171,7 +173,7 @@ lsm list project
 
 - **`missing required argument '<ITEM>...'`，但命令里明明写了 `@group`**：Windows PowerShell 把 token 开头的 `@name` 当成 splatting（展开名为 `name` 的变量），`lsm group set develop @predevelop @developing` 到 lsm 手里只剩 `group set develop`。加引号即可：`lsm group set develop '@predevelop' '@developing'`；也可以用 `lsm --% group set develop @predevelop @developing` 停止解析。bash / zsh 不受影响。
 - **`group 'x' already exists`**：这是 `set` 的覆盖保护。确认要替换时加 `--force`；如果只是想加成员，改用 `group add`。
-- **`invalid group name` / `invalid skill name`**：组名和成员名都使用 skill 名规则（小写字母、数字、单个连字符，≤64 字符，不能是 Windows 保留设备名）。组名写了大写时，hint 会给出对应的全小写写法。命令在写盘前整体校验，失败时不会留下半个分组。
+- **`invalid group name` / `invalid skill name`**：组名允许大小写字母、数字与单个连字符（首尾必须是字母或数字，≤64 字符，不能是 Windows 保留设备名），区分大小写；skill 成员名仍只允许小写。命令在写盘前整体校验，失败时不会留下半个分组。
 - **`group 'x' not found`**：`pull --group`、`group remove` 或 `group delete` 引用了不存在的组。先用 `lsm group list` 确认；也可以只写唯一前缀。批量操作中该组记为一次失败，其他组继续。
 - **`group 'x' is empty`**：手改配置留下了空数组。用 `lsm group add x <skill>...` 补成员，或删除该组。
 - **某个成员 `not installed in global`**：`group set` / `group add` 在写盘前校验 skill 成员必须已安装在 global。先 `lsm add` 补上该 skill，或改成唯一前缀；命令会提示相近的名字。手改配置写入的缺失成员仍会在 `pull --group` 时逐条报错。

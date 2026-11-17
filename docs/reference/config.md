@@ -50,7 +50,7 @@ common = ["@frontend", "conventional-commit"]
 | 项 | 规则 |
 |---|---|
 | 类型 | TOML 顶层表 |
-| 键 | 分组名，必须符合 skill 名规则 |
+| 键 | 分组名，允许大小写字母、数字与单个连字符（规则见下） |
 | 值 | 字符串数组，每个元素是 skill 名或 `@组名` 引用 |
 | 成员顺序 | 保留定义顺序 |
 | 重复成员 | 读取与写入时按首次出现去重 |
@@ -60,14 +60,14 @@ common = ["@frontend", "conventional-commit"]
 | 成员前缀 | `group set/add` 写入前按「精确 → 唯一前缀」解析并存储全名（`code` → `code-review`） |
 | 组引用 | `@common` 引用另一个分组；写入时要求已定义，读取时递归展开并检测环 |
 
-组名与成员名的规则：
+组名与成员名的规则不同：
 
-- 小写字母、数字与单个连字符；
-- 首尾必须是字母或数字；
-- 最多 64 个字符；
-- 不能是 Windows 保留设备名（`con`、`prn`、`aux`、`nul`、`com1`–`com9`、`lpt1`–`lpt9`）。
+- 组名允许大小写字母、数字与单个连字符，首尾必须是字母或数字，最多 64 个字符，不能是 Windows 保留设备名（`con`、`prn`、`aux`、`nul`、`com1`–`com9`、`lpt1`–`lpt9`，大小写不敏感）；
+- 成员名（skill 名）只允许小写字母、数字与单个连字符，首尾必须是字母或数字，最多 64 个字符，不能是 Windows 保留设备名。
 
-组名输入大写时会提示对应的全小写写法（如 `Predevelop` → `predevelop`），不会自动改写。`group remove`、`group delete` 与 `pull --group` 的组名支持唯一前缀（`predev` → `predevelop`）；`group set/add` 的目标组名必须精确匹配。
+组名大小写敏感：`Frontend` 与 `frontend` 是两个不同的组。`group remove`、`group delete` 与 `pull --group` 的组名支持唯一前缀（`predev` → `predevelop`），同样区分大小写；`group set/add` 的目标组名必须精确匹配。输入的大小写没有对应组时，hint 会列出相近组名（如 `did you mean: frontend?`），不会自动改写。
+
+`group list` 文本输出一行一组，组与组之间空一行；组按不区分大小写字典序排列，成员保持定义顺序。
 
 `@ref` 的展开是深度优先、按首次出现去重；`group list --resolved` 和 `pull --group` 会做缺失引用与环检测。示例：
 

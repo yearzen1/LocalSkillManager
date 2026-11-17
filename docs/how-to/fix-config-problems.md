@@ -72,7 +72,7 @@ common = ["@frontend"]
 |---|---|---|
 | `group 'x' must be an array of skill names` | 组的值不是数组 | 写成 `x = ["tdd", "grill"]` |
 | `group 'x' members must be strings` | 数组里有数字/布尔 | 成员全部改成带引号的字符串 |
-| `invalid group name 'X'` | 组名不符合 skill 名规则 | 改成小写字母、数字和单个连字符 |
+| `invalid group name 'X'` | 组名含非法字符（如 `_`、空格、连续连字符）或是 Windows 保留名 | 改成字母（大小写均可）、数字和单个连字符，注意 `con`/`CON` 等保留名不可用 |
 | `group 'x' has invalid member 'Y'` | 成员名非法 | 改成合法 skill 名 |
 
 如果报错路径是 `config.toml` 里的 `[groups]`，说明还在迁移窗口（`groups.toml` 尚未生成）：修好旧表后执行一次 `group add` 就会迁移；也可以把旧表内容手抄进 `groups.toml` 并去掉 `[groups]` 表头。

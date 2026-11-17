@@ -304,6 +304,7 @@ pub struct Ctx {
 | v0.7.2 范围 | `upgrade` 新增 `--verbose` / `--progress`：阶段提示与下载进度条只写 stderr，默认仍完全静默；固定 20 列 ASCII 条，不探测终端 | [decisions.md](decisions.md) Q59 / [upgrade.md](impl/upgrade.md)「过程输出」 |
 | v0.8.0 范围 | `[groups]` 支持 `@组名` 引用；`group remove` 改为删成员、新增 `group delete`；`group list --resolved`、JSON `includes`；`pull --group` 递归展开并检测环 | [decisions.md](decisions.md) Q60 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「pull」 |
 | v0.9.0 范围 | 分组从 `config.toml` 的 `[groups]` 拆到同目录 `groups.toml`（顶层表）；读取回退旧表，首次写盘迁移并清理；`config` 与 `groups` 互不读写 | [decisions.md](decisions.md) Q61 / [config.md](impl/config.md)「配置文件」「分组」 |
+| v0.10.0 范围 | 组名允许大写且大小写敏感；`group list` 文本输出组间空一行、组名不区分大小写排序；删除大写转小写的 hint | [decisions.md](decisions.md) Q62 / [config.md](impl/config.md)「分组」/ [cli.md](impl/cli.md)「命令与参数」 |
 
 ## 6. 文档维护规则
 
@@ -458,4 +459,14 @@ pub struct Ctx {
 - [x] 首次写盘迁移：落 `groups.toml` 后尽力删除旧表，失败打 warning 且退 0；`groups.toml` 存在时旧表被忽略。
 - [x] `group set/add/remove/delete` 与 `pull --group` 全部改走 `infra::groups`；成功提示里的路径变成 `groups.toml`。
 - [x] `impl/config.md`、`impl.md`、`impl/storage.md`、`impl/cli.md`、`impl/quality.md`、配置参考、两份 how-to、核心概念与 `docs/README.md` 同步。
+
+### 8.12 v0.10.0 组名允许大写与列表分组空行（已实现）
+
+- [ ] `GroupName` 不再复用 `SkillName`，改用允许大写字母的独立校验；skill 名仍只允许小写。
+- [ ] 组名大小写敏感：`Frontend` 与 `frontend` 并存；`group remove/delete` 与 `pull --group` 的前缀解析不折叠大小写。
+- [ ] Windows 保留名按大小写不敏感拒绝（`CON` 与 `con` 同样拒绝）。
+- [ ] `group list` 文本输出（含 `--resolved`）在组与组之间空一行；单组、空列表与 `--json` 不变。
+- [ ] 删除「大写 → 提示全小写」的 hint；格式错误统一提示「字母（大小写均可）、数字和单个连字符」。
+- [ ] 组按不区分大小写字典序排序，同序时按原始写法。
+- [ ] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、配置参考与分组 how-to 同步。
 

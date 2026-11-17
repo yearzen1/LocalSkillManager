@@ -55,7 +55,7 @@ common = ["@frontend", "conventional-commit"]
 
 - 顶层表，键是分组名，值是成员数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
 - 成员有两种写法：`tdd` 是 skill 名；`@common` 是组引用（引用另一个分组）。因为 skill 名不允许 `@`，TOML 层面不需要转义；但 Windows PowerShell 会把 token 开头的 `@组名` 当成 splatting 展开，命令行里必须写成 `'@组名'`（或用 `--%` 停止解析），否则该参数不会传进 lsm。
-- 分组名与 skill 名共用同一套校验（小写字母/数字加单个连字符、≤64、拒绝 Windows 保留名）；大写输入在格式错误 hint 里提示对应的全小写写法（如 `Predevelop` → `predevelop`），但不会自动改写。
+- 分组名允许大小写字母、数字与单个连字符，首尾必须是字母或数字，≤64，拒绝 Windows 保留名（大小写不敏感，`CON` 与 `con` 同样拒绝）；组名大小写敏感，`Frontend` 与 `frontend` 是两个组，不做自动改写。skill 成员名仍只允许小写。
 - skill 成员在 `group set` / `group add` 写入前要求已安装在 **global**，并按「精确 → 唯一前缀」解析后写入全名（`code` → `code-review`）。
 - `@ref` 在写入前要求目标分组已定义，并按「精确 → 唯一前缀」解析；拒绝自引用与成环（`a -> b -> a`）。
 - 任一成员缺失、多候选或引用成环时整组不写盘：逐条打印错误，最后汇总退 1。缺失时若存在相近名字（子串或编辑距离，最多 3 条），hint 列出候选。
@@ -63,7 +63,7 @@ common = ["@frontend", "conventional-commit"]
 - 展开规则：深度优先，`@ref` 在原位置插入被引用组的成员，skill 按首次出现去重；顶层组展开为空时 `pull --group` 记为失败。
 - `group remove`、`group delete` 与 `pull --group` 的组名按「精确 → 唯一前缀」解析：恰好一个组匹配时用全名；多候选或零命中按该条失败，零命中时 hint 列出相近组名；`group set` / `group add` 的目标组名保持精确。
 - `group remove` 只删除成员/引用；`group delete` 删除整组，被其他组引用时默认拒绝，`--force` 才删除并同时移除这些引用。
-- `group list --json` 输出 `[{"name":...,"skills":[...],"includes":[...]}]`；`skills` 是直接 skill 成员，`includes` 是 `@ref`；`--resolved` 时 `skills` 换成展开后的列表。
+- `group list --json` 输出 `[{"name":...,"skills":[...],"includes":[...]}]`；`skills` 是直接 skill 成员，`includes` 是 `@ref`；`--resolved` 时 `skills` 换成展开后的列表。文本输出一行一组，组与组之间空一行，组按不区分大小写字典序排序（同序时按原始写法）；`--json` 不受空行影响。
 - 结构非法（值不是数组、成员不是字符串、名字不合法）→ 运行时错误退 1，提示修复或删除 `groups.toml`。
 - **惰性读取**：只有 `pull --group` 与 `group list/set/add/remove/delete` 读取 `groups.toml`；`list`、`search`、`add`、`remove`、`push`、`config`、`upgrade` 与语言解析完全不碰它，`groups.toml` 写坏不影响这些命令。
 - **迁移（Q61）**：`groups.toml` 不存在时读回退到 `config.toml` 的 `[groups]`（0.8.0 及更早的存放位置）；第一次写盘把当前生效的分组写进 `groups.toml`，并尽力删除 `config.toml` 里的旧表。删除失败只打一条 warning（`GroupLegacyLeftover`）、退出码仍为 0，旧表从此被忽略。`groups.toml` 存在时旧表完全不读，也不在写盘时合并。
@@ -322,14 +322,13 @@ lsm group delete <GROUP>... [--force]
 | `GroupJsonFlag` | Print machine-readable JSON | 输出机器可读的 JSON |
 | `GroupResolvedFlag` | Expand @group references | 展开 @group 引用 |
 | `GroupInvalid` | invalid group name '{0}' | 非法的分组名称 '{0}' |
-| `GroupInvalidHint` | group names use lowercase letters, digits and single hyphens | 分组名称只能使用小写字母、数字和单个连字符 |
+| `GroupInvalidHint` | group names use letters, digits and single hyphens | 分组名称只能使用字母（大小写均可）、数字和单个连字符 |
 | `GroupTooLong` | group name is too long: {0} > 64 characters | 分组名称过长：{0} > 64 个字符 |
 | `GroupReserved` | group name '{0}' is reserved on Windows | 分组名称 '{0}' 是 Windows 保留设备名 |
 | `GroupAlreadyExists` | group '{0}' already exists | 分组 '{0}' 已存在 |
 | `GroupNotFound` | group '{0}' not found | 找不到分组 '{0}' |
 | `GroupNotFoundHint` | run `lsm group list` to see available groups | 运行 `lsm group list` 查看可用分组 |
 | `NameSuggestion` | did you mean: {0}? | 你是不是想找：{0}？ |
-| `GroupLowercaseHint` | did you mean '{0}'? group names must be lowercase | 你是不是想用 '{0}'？分组名只能小写 |
 | `GroupMemberMissing` | skill '{0}' is not installed in global | skill '{0}' 尚未安装到 global |
 | `GroupMemberMissingHint` | run `lsm list global` to see installed skills | 运行 `lsm list global` 查看已安装的 skill |
 | `GroupMembersFailed` | {0} skill(s) are unavailable in global; the group was not written | {0} 个 skill 在 global 中不可用，未写入任何分组 |
@@ -380,8 +379,9 @@ lsm group delete <GROUP>... [--force]
 - Q55：`group list/set/add/remove/delete` 的命令形态与批量语义。
 - Q56：`group set` 覆盖已存在的组必须 `--force`；`group delete` 删除被引用的组需要 `--force`。
 - Q57：分组属于 v0.7.0。
-- Q58：`group set/add` 的成员写入前必须存在于 global 并解析前缀；组名读取支持唯一前缀；大写组名只给提示，不自动改写。
+- Q58：`group set/add` 的成员写入前必须存在于 global 并解析前缀；组名读取支持唯一前缀。
 - Q60：成员支持 `@组名` 引用；展开去重并检测环；`group remove` 删成员、`group delete` 删组；`--resolved` 与 JSON `includes`。
 - Q61：分组从 `config.toml` 的 `[groups]` 拆到同目录的 `groups.toml`（顶层表）；读取时回退旧表，首次写盘迁移并清理；版本升到 0.9.0。
+- Q62：组名允许大写且大小写敏感；`group list` 组间空一行、组名不区分大小写排序；版本升到 0.10.0。
 
 完整决策见 [decisions.md](../decisions.md)。
