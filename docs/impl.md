@@ -462,11 +462,11 @@ pub struct Ctx {
 
 ### 8.12 v0.10.0 组名允许大写与列表分组空行（已实现）
 
-- [ ] `GroupName` 不再复用 `SkillName`，改用允许大写字母的独立校验；skill 名仍只允许小写。
-- [ ] 组名大小写敏感：`Frontend` 与 `frontend` 并存；`group remove/delete` 与 `pull --group` 的前缀解析不折叠大小写。
-- [ ] Windows 保留名按大小写不敏感拒绝（`CON` 与 `con` 同样拒绝）。
-- [ ] `group list` 文本输出（含 `--resolved`）在组与组之间空一行；单组、空列表与 `--json` 不变。
-- [ ] 删除「大写 → 提示全小写」的 hint；格式错误统一提示「字母（大小写均可）、数字和单个连字符」。
-- [ ] 组按不区分大小写字典序排序，同序时按原始写法。
-- [ ] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、配置参考与分组 how-to 同步。
+- [x] `GroupName` 不再复用 `SkillName`，改用允许大写字母的独立校验；skill 名仍只允许小写。
+- [x] 组名大小写敏感：`Frontend` 与 `frontend` 并存；`group remove/delete` 与 `pull --group` 的前缀解析不折叠大小写。
+- [x] Windows 保留名按大小写不敏感拒绝（`CON` 与 `con` 同样拒绝）。
+- [x] `group list` 文本输出（含 `--resolved`）在组与组之间空一行；单组、空列表与 `--json` 不变。
+- [x] 删除「大写 → 提示全小写」的 hint；格式错误统一提示「字母（大小写均可）、数字和单个连字符」。
+- [x] 组按不区分大小写字典序排序，同序时按原始写法。
+- [x] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、配置参考与分组 how-to 同步。
 
