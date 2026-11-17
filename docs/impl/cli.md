@@ -290,7 +290,7 @@ impl AppError {
 - Q29：分层收敛与错误映射（错误枚举在 `domain`/`infra`，`AppError` 只在边界构造，渲染归 `output`）。
 - Q30 / Q31 / Q32：`upgrade` 的命令形态、原地替换（文件名不变）、网络与资产契约（见 [upgrade.md](upgrade.md)）。
 - Q33 / Q37：命令表与选项表同属 CLI 真源，改动顺序与二进制一致性由 `tests/cli.rs` 强制。
-- Q53–Q57：分组提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。Q58：v0.7.1 起成员写盘前必须存在于 global 并解析前缀，组名读取支持唯一前缀。Q60：v0.8.0 起成员支持 `@组名` 引用，`group remove` 删成员、`group delete` 删组。Q61：v0.9.0 起分组存放于 `groups.toml`（`config.toml` 只留 `lang`）。
+- Q53–Q57：分组提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。Q58：v0.7.1 起成员写盘前必须存在于 global 并解析前缀，组名读取支持唯一前缀。Q60：v0.8.0 起成员支持 `@组名` 引用，`group remove` 删成员、`group delete` 删组。Q61：v0.9.0 起分组存放于 `groups.toml`（`config.toml` 只留 `lang`）。Q62：v0.10.0 起组名允许大写且大小写敏感，`group list` 组间空一行。
 
 完整决策见 [decisions.md](../decisions.md)。
 

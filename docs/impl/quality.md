@@ -256,6 +256,11 @@ lsm group list                                 # frontend: sample
 cat "$LSM_CONFIG_DIR/groups.toml"              # 顶层 frontend = ["sample"]；未设变量时用平台默认路径
 lsm config set lang zh                         # 只改 config.toml，不动 groups.toml
 
+# v0.10.0：组名大小写与列表空行
+lsm group set Frontend sample                   # 大写组名
+lsm group set frontend sample                   # 与 Frontend 是两个组
+lsm group list                                  # 组与组之间空一行
+
 # 离线：只验子命令存在与非法参数，不联网
 lsm upgrade --help                              # 列出 --check / --force / --verbose / --progress，退出 0
 lsm upgrade --bogus                             # 退出 2
