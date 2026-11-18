@@ -277,10 +277,10 @@ lsm pull --all [--force]
 
 流程（单条）：
 
-1. **先校验 `name`**（不拼路径）：同一套 name 规则 + 拒绝 `/`、`\`、`.`、`..`。校验在 `cli::parse` 构造 `Action` 时执行，保证在命令逻辑之前失败，退出码 2：
+1. **先校验 `name`**（不拼路径）：输入只需能作为某个合法名字的开头——小写字母、数字、单个连字符，不能以连字符开头，拒绝 `/`、`\`、`.`、`..`、超长与 Windows 保留名。校验在 `cli::parse` 构造 `Action` 时执行，保证在命令逻辑之前失败，退出码 2（Q63）：
    ```
    error: invalid skill name '..'
-   hint: skill names use lowercase letters, digits and single hyphens
+   hint: skill names use lowercase letters, digits and single hyphens, and cannot start with a hyphen
    ```
 2. 源目录：`infra::paths::skills_dir(&ctx.env, Scope::Global, ctx.cwd)/<name>`，不存在则报错：
    ```
@@ -409,7 +409,7 @@ lsm push --all [--force]
 
 ### 3.7 name 前缀解析
 
-`pull` / `push` / `remove` 的 `<name>` 先按目录名精确匹配，未命中时再按前缀解析（Q50）。解析只发生在命令层：`cli::parse` 仍只做格式校验，非法格式（大写、`..`、`/`）依旧退 2。组名允许大写（Q62），但仍按原始大小写匹配，零命中时列出相近组名。
+`pull` / `push` / `remove` 的 `<name>` 先按目录名精确匹配，未命中时再按前缀解析（Q50）。输入可以是名字或它的开头部分：`clean-` 是 `clean-arch` 的前六个字符，末尾那个连字符属于名字本身（Q63）。解析只发生在命令层：`cli::parse` 仍只做格式校验，只拒绝无法作为合法名字开头的输入（大写、`..`、`/`、`a--b`、开头的连字符），依旧退 2。组名允许大写（Q62），但仍按原始大小写匹配，零命中时列出相近组名。
 
 1. 目录名精确等于输入 → 精确命中，行为与 §3.3 / §3.4 / §3.6 完全一致。
 2. 否则扫描对应作用域的 skills 目录（`infra::scan::dir_names`，跳过隐藏项、非目录与非法目录名），按字典序取以输入为前缀的名字：
@@ -420,7 +420,7 @@ lsm push --all [--force]
      hint: use a longer prefix, or run `lsm list global`
      ```
      单 name 时直接失败；多 name 时该条记为失败，其余照常执行。
-   - 0 个 → 沿用各命令的 not-found 错误（退 1）；若有相近名字，hint 换成最多 3 条候选（`did you mean: ...?`）。
+   - 0 个 → 沿用各命令的 not-found 错误（退 1）；若有相近名字，hint 换成最多 3 条候选（`did you mean: ...?`）。`clean-` 这类能作为名字开头、只是还差后半段的输入走同一条路径，不再算用法错误（Q63）。
 3. 解析结果在批量里重新去重：`pull code code-review` 只执行一次。
 4. 多 name 时收尾仍打印成功/跳过/失败计数并退 1（与 Q44 一致）。
 5. `--all` 分支不受影响。
@@ -428,8 +428,8 @@ lsm push --all [--force]
 
 组名与分组成员复用同一规则（Q58 / Q60）：
 
-- `group remove <GROUP> <ITEM>...`、`group delete <GROUP>...` 与 `pull --group <GROUP>...` 的 `<GROUP>` 先按 `groups.toml` 的键精确匹配，未命中再按唯一前缀解析；零命中时 not-found hint 用子串/编辑距离列出最多 3 个相近组名。
-- `group set` / `group add` 的 skill 成员在写盘前按同一规则解析并写入全名（`code` → `code-review`）；任一成员缺失或多候选则整组不写盘，逐条报错后汇总退 1。
+- `group remove <GROUP> <ITEM>...`、`group delete <GROUP>...` 与 `pull --group <GROUP>...` 的 `<GROUP>` 先按 `groups.toml` 的键精确匹配，未命中再按唯一前缀解析，参数可以是组名开头部分（`pre-` → `pre-develop`）；零命中时 not-found hint 用子串/编辑距离列出最多 3 个相近组名。
+- `group set` / `group add` 的 skill 成员在写盘前按同一规则解析并写入全名（`code` → `code-review`、`clean-` → `clean-arch`）；任一成员缺失或多候选则整组不写盘，逐条报错后汇总退 1。
 - `@ref` 在已定义组里按同一规则解析；写入时拒绝自引用与成环，展开时再次检测缺失引用与环。
 - `group set` / `group add` 的目标组名不做前缀解析，避免 `--force` 误覆盖相近的已有组。
 
@@ -517,5 +517,6 @@ pub fn scan_skills(dir: &Path) -> Result<Vec<SkillEntry>, FsError>;
 - Q53–Q57：`pull --group` 展开分组后复用 Q44 的批量语义；组名/成员格式随 CLI 校验，成员不要求已安装。
 - Q61：分组改存 `groups.toml`；`pull --group` 读取时优先该文件，缺失才回退 `config.toml` 的旧 `[groups]`。
 - Q58：v0.7.1 起 `group set/add` 写入前校验 global 存在性并解析唯一前缀，组名读取支持唯一前缀。
+- Q63：v0.11.0 起输入可以是名字开头部分（`clean-` → `clean-arch`），零命中按 not-found 退 1。
 
 完整决策见 [decisions.md](../decisions.md)。

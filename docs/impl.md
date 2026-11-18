@@ -305,6 +305,7 @@ pub struct Ctx {
 | v0.8.0 范围 | `[groups]` 支持 `@组名` 引用；`group remove` 改为删成员、新增 `group delete`；`group list --resolved`、JSON `includes`；`pull --group` 递归展开并检测环 | [decisions.md](decisions.md) Q60 / [config.md](impl/config.md)「分组」/ [storage.md](impl/storage.md)「pull」 |
 | v0.9.0 范围 | 分组从 `config.toml` 的 `[groups]` 拆到同目录 `groups.toml`（顶层表）；读取回退旧表，首次写盘迁移并清理；`config` 与 `groups` 互不读写 | [decisions.md](decisions.md) Q61 / [config.md](impl/config.md)「配置文件」「分组」 |
 | v0.10.0 范围 | 组名允许大写且大小写敏感；`group list` 文本输出组间空一行、组名不区分大小写排序；删除大写转小写的 hint | [decisions.md](decisions.md) Q62 / [config.md](impl/config.md)「分组」/ [cli.md](impl/cli.md)「命令与参数」 |
+| v0.11.0 范围 | 名字输入可以是名字开头部分（`clean-` → `clean-arch`）；格式校验只要求能作为合法名字开头，零命中按 not-found 退 1；`group set/add` 目标组名仍精确 | [decisions.md](decisions.md) Q63 / [cli.md](impl/cli.md)「命令与参数」/ [storage.md](impl/storage.md)「name 前缀解析」 |
 
 ## 6. 文档维护规则
 
@@ -469,4 +470,13 @@ pub struct Ctx {
 - [x] 删除「大写 → 提示全小写」的 hint；格式错误统一提示「字母（大小写均可）、数字和单个连字符」。
 - [x] 组按不区分大小写字典序排序，同序时按原始写法。
 - [x] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、配置参考与分组 how-to 同步。
+
+### 8.13 v0.11.0 名字输入允许是前缀（已实现）
+
+- [ ] `domain::name::SkillInput` / `domain::group::GroupInput` / `MemberInput` 承载命令行输入；`SkillName` / `GroupName` 仍是完整名字身份。
+- [ ] 格式校验只要求输入能作为合法名字的开头：末尾单个连字符合法（`clean-`），大写、`_`、`a--b`、开头的连字符、路径分隔符、超长与保留名仍退 2。
+- [ ] `pull` / `push` / `remove` / `group set/add/remove` / `pull --group` / `group delete` 全部走 `SkillInput` / `GroupInput` / `MemberInput`，解析仍为「精确 → 唯一前缀」。
+- [ ] 零命中走各命令既有 not-found（退 1）并给候选；`clean-` 不再报「非法名字」。
+- [ ] 格式错误 hint 补「不能以连字符开头」；`group set/add` 的目标组名保持精确。
+- [ ] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md` 与验收脚本同步。
 

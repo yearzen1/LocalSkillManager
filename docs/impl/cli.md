@@ -104,14 +104,14 @@ $ lsm --lang zh --help
 | `upgrade` | `[--check] [--force] [--verbose] [--progress]` | implemented |
 
 - `<SCOPE>`：`global` 或 `project`，大小写敏感；**可省略，省略时为 `project`**。`remove` 的最后一个参数恰好是 `global` / `project` 时按作用域处理，否则全部按 name（作用域默认 `project`）；技能名本身是 `global` / `project` 时必须显式写作用域（如 `lsm remove global project`）。
-- `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1；有相近名字时 hint 列出候选）。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`（非法格式退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
-- `<GROUP>`：分组名，允许大小写字母、数字与单个连字符（首尾必须是字母或数字），≤64，拒绝 Windows 保留名（大小写不敏感，`CON` 与 `con` 同样拒绝）；格式非法退 2。组名大小写敏感：`Frontend` 与 `frontend` 是两个组。`group remove`、`group delete` 与 `pull --group` 的组名支持「精确优先、其次唯一前缀」（同样区分大小写）；不存在的分组是运行时错误（退 1），有相近组名时 hint 列出候选（如 `did you mean: frontend?`）。`group set` / `group add` 的目标组名不做前缀解析。
-- `<ITEM>`（`group set` / `group add` / `group remove`）：成员，两种写法。`tdd` 是 skill，先精确、后唯一前缀解析；`@common` 是组引用，按已定义组解析。`set` / `add` 写入时 skill 必须已安装在 global、引用组必须已定义，任一失败整组不写盘并汇总退 1；`remove` 在本组已有成员里做同样的前缀解析，找不到时给出候选。三条命令缺 `ITEM` 时 hint 会额外提示 Windows PowerShell 的 `'@组名'` 写法（单独的 `@` 开头会被 splatting 吞掉）。
-- `<SKILL>` 格式非法仍在 `cli::parse` 退 2；`@` 后为空或组名非法同样退 2。
+- `<NAME>`（`pull` / `push` / `remove`）：先按同名目录精确匹配；未命中时再按**唯一前缀**匹配，恰好一个目录以该前缀开头就按全名执行，多个命中报运行时错误（退 1）并列出候选，零命中沿用各命令的 not-found（退 1；有相近名字时 hint 列出候选）。参数可以是名字或它的开头部分：`clean-` 是 `clean-arch` 的前六个字符，连字符属于名字本身，不是查询语法。解析发生在命令层（扫描对应作用域目录），格式校验仍在 `cli::parse`，只拒绝无法作为名字开头的输入（退 2）。规则见 [storage.md](storage.md)「name 前缀解析」。
+- `<GROUP>`：分组名，允许大小写字母、数字与单个连字符（名字本身首尾必须是字母或数字），≤64，拒绝 Windows 保留名（大小写不敏感，`CON` 与 `con` 同样拒绝）；无法作为名字开头的输入退 2。组名大小写敏感：`Frontend` 与 `frontend` 是两个组。`group remove`、`group delete` 与 `pull --group` 的组名支持「精确优先、其次唯一前缀」（同样区分大小写），参数同样可以是开头部分（`pre-` → `pre-develop`）；不存在的分组是运行时错误（退 1），有相近组名时 hint 列出候选（如 `did you mean: frontend?`）。`group set` / `group add` 的目标组名必须是完整名字，不做前缀解析。
+- `<ITEM>`（`group set` / `group add` / `group remove`）：成员，两种写法。`tdd` / `clean-` 是 skill（可以是名字开头部分），先精确、后唯一前缀解析；`@common` 是组引用，按已定义组解析，同样接受开头部分。`set` / `add` 写入时 skill 必须已安装在 global、引用组必须已定义，任一失败整组不写盘并汇总退 1；`remove` 在本组已有成员里做同样的前缀解析，找不到时给出候选。三条命令缺 `ITEM` 时 hint 会额外提示 Windows PowerShell 的 `'@组名'` 写法（单独的 `@` 开头会被 splatting 吞掉）。
+- `<SKILL>`：无法作为合法名字开头的输入（大写、`_`、`--`、开头的连字符、`.` / `..`、路径分隔符、超长、Windows 保留名）仍在 `cli::parse` 退 2；`@` 后为空或组名同样无法作为开头时退 2。末尾单个连字符是名字的一部分，不在此列。
 - `pull` 的 `--group` 可重复，与 `<NAME>...`、`--all` 三者互斥；规则见 [storage.md](storage.md)「pull」与 [config.md](config.md)「分组」。
 - `<LANG>`：`en` 或 `zh`；接受 `zh-CN` / `en-US`，落盘统一为 `zh` / `en`。
 - `upgrade` 的行为细节见 [upgrade.md](upgrade.md)。
-- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）；分组成员校验与模糊匹配属于 v0.7.1（Q58）；`upgrade` 的 `--verbose` / `--progress` 属于 v0.7.2（Q59）；组组合与 `group remove/delete` 新语义属于 v0.8.0（Q60）；分组独立为 `groups.toml` 属于 v0.9.0（Q61）；组名允许大写与 `group list` 组间空行属于 v0.10.0（Q62）。
+- `search` / `push` 与多 name 的 `pull`/`remove` 属于 v0.4.0，规则见 [storage.md](storage.md)「search」「push」与 [decisions.md](../decisions.md) Q43–Q47；`pull` 在 v0.5.0 由 `copy` 改名而来（Q48）。分组属于 v0.7.0（Q53–Q57）；分组成员校验与模糊匹配属于 v0.7.1（Q58）；`upgrade` 的 `--verbose` / `--progress` 属于 v0.7.2（Q59）；组组合与 `group remove/delete` 新语义属于 v0.8.0（Q60）；分组独立为 `groups.toml` 属于 v0.9.0（Q61）；组名允许大写与 `group list` 组间空行属于 v0.10.0（Q62）；名字输入允许是前缀（`clean-`）属于 v0.11.0（Q63）。
 
 选项：
 
@@ -290,7 +290,7 @@ impl AppError {
 - Q29：分层收敛与错误映射（错误枚举在 `domain`/`infra`，`AppError` 只在边界构造，渲染归 `output`）。
 - Q30 / Q31 / Q32：`upgrade` 的命令形态、原地替换（文件名不变）、网络与资产契约（见 [upgrade.md](upgrade.md)）。
 - Q33 / Q37：命令表与选项表同属 CLI 真源，改动顺序与二进制一致性由 `tests/cli.rs` 强制。
-- Q53–Q57：分组提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。Q58：v0.7.1 起成员写盘前必须存在于 global 并解析前缀，组名读取支持唯一前缀。Q60：v0.8.0 起成员支持 `@组名` 引用，`group remove` 删成员、`group delete` 删组。Q61：v0.9.0 起分组存放于 `groups.toml`（`config.toml` 只留 `lang`）。Q62：v0.10.0 起组名允许大写且大小写敏感，`group list` 组间空一行。
+- Q53–Q57：分组提供 `group list/set/add/remove` 与 `pull --group`；`set` 覆盖已存在的组需要 `--force`，组内成员只校验格式。Q58：v0.7.1 起成员写盘前必须存在于 global 并解析前缀，组名读取支持唯一前缀。Q60：v0.8.0 起成员支持 `@组名` 引用，`group remove` 删成员、`group delete` 删组。Q61：v0.9.0 起分组存放于 `groups.toml`（`config.toml` 只留 `lang`）。Q62：v0.10.0 起组名允许大写且大小写敏感，`group list` 组间空一行。Q63：v0.11.0 起名字输入可以是开头部分（`clean-` → `clean-arch`），零命中按 not-found 退 1。
 
 完整决策见 [decisions.md](../decisions.md)。
 

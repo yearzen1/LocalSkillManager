@@ -56,12 +56,12 @@ common = ["@frontend", "conventional-commit"]
 - 顶层表，键是分组名，值是成员数组；数组顺序即成员定义顺序，重复成员按首次出现去重。
 - 成员有两种写法：`tdd` 是 skill 名；`@common` 是组引用（引用另一个分组）。因为 skill 名不允许 `@`，TOML 层面不需要转义；但 Windows PowerShell 会把 token 开头的 `@组名` 当成 splatting 展开，命令行里必须写成 `'@组名'`（或用 `--%` 停止解析），否则该参数不会传进 lsm。
 - 分组名允许大小写字母、数字与单个连字符，首尾必须是字母或数字，≤64，拒绝 Windows 保留名（大小写不敏感，`CON` 与 `con` 同样拒绝）；组名大小写敏感，`Frontend` 与 `frontend` 是两个组，不做自动改写。skill 成员名仍只允许小写。
-- skill 成员在 `group set` / `group add` 写入前要求已安装在 **global**，并按「精确 → 唯一前缀」解析后写入全名（`code` → `code-review`）。
+- skill 成员在 `group set` / `group add` 写入前要求已安装在 **global**，并按「精确 → 唯一前缀」解析后写入全名；输入可以是名字开头部分（`code` → `code-review`、`clean-` → `clean-arch`，Q63）。
 - `@ref` 在写入前要求目标分组已定义，并按「精确 → 唯一前缀」解析；拒绝自引用与成环（`a -> b -> a`）。
 - 任一成员缺失、多候选或引用成环时整组不写盘：逐条打印错误，最后汇总退 1。缺失时若存在相近名字（子串或编辑距离，最多 3 条），hint 列出候选。
 - 直接手改 `groups.toml` 仍可写入未安装的 skill 或悬空引用；展开时（`group list --resolved`、`pull --group`）检测缺失引用与环，并逐条失败。
 - 展开规则：深度优先，`@ref` 在原位置插入被引用组的成员，skill 按首次出现去重；顶层组展开为空时 `pull --group` 记为失败。
-- `group remove`、`group delete` 与 `pull --group` 的组名按「精确 → 唯一前缀」解析：恰好一个组匹配时用全名；多候选或零命中按该条失败，零命中时 hint 列出相近组名；`group set` / `group add` 的目标组名保持精确。
+- `group remove`、`group delete` 与 `pull --group` 的组名按「精确 → 唯一前缀」解析，参数可以是组名开头部分（`pre-` → `pre-develop`）：恰好一个组匹配时用全名；多候选或零命中按该条失败，零命中时 hint 列出相近组名；`group set` / `group add` 的目标组名保持精确。
 - `group remove` 只删除成员/引用；`group delete` 删除整组，被其他组引用时默认拒绝，`--force` 才删除并同时移除这些引用。
 - `group list --json` 输出 `[{"name":...,"skills":[...],"includes":[...]}]`；`skills` 是直接 skill 成员，`includes` 是 `@ref`；`--resolved` 时 `skills` 换成展开后的列表。文本输出一行一组，组与组之间空一行，组按不区分大小写字典序排序（同序时按原始写法）；`--json` 不受空行影响。
 - 结构非法（值不是数组、成员不是字符串、名字不合法）→ 运行时错误退 1，提示修复或删除 `groups.toml`。
@@ -383,5 +383,6 @@ lsm group delete <GROUP>... [--force]
 - Q60：成员支持 `@组名` 引用；展开去重并检测环；`group remove` 删成员、`group delete` 删组；`--resolved` 与 JSON `includes`。
 - Q61：分组从 `config.toml` 的 `[groups]` 拆到同目录的 `groups.toml`（顶层表）；读取时回退旧表，首次写盘迁移并清理；版本升到 0.9.0。
 - Q62：组名允许大写且大小写敏感；`group list` 组间空一行、组名不区分大小写排序；版本升到 0.10.0。
+- Q63：名字输入可以是开头部分（`clean-` → `clean-arch`），成员/组名/引用共用同一规则；零命中按 not-found 退 1；hint 补「不能以连字符开头」；版本升到 0.11.0。
 
 完整决策见 [decisions.md](../decisions.md)。
