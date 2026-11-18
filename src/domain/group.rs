@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use super::name::{validate, NameError, SkillName};
+use super::name::{validate, validate_prefix, NameError, SkillInput, SkillName};
 
 /// 已校验的分组名：允许大小写字母、数字与单个连字符；大小写敏感。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -26,6 +26,23 @@ impl GroupName {
     }
 }
 
+/// 用户输入的组名开头部分；规则同 [`GroupName`]，另外允许结尾单个连字符。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GroupInput(String);
+
+impl GroupInput {
+    /// 解析并校验「能否作为某个合法组名的开头」。
+    pub fn parse(input: &str) -> Result<Self, GroupNameError> {
+        validate_prefix(input, true).map_err(GroupNameError)?;
+        Ok(Self(input.to_string()))
+    }
+
+    /// 用户原始输入。
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// 分组的一个成员：直接 skill，或引用另一个分组（`@name`）。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Member {
@@ -38,6 +55,30 @@ pub enum Member {
 pub enum MemberError {
     Skill(NameError),
     Group { raw: String, source: GroupNameError },
+}
+
+/// 命令行上的成员输入：可能是 skill 名/前缀，或 `@组名` 引用/前缀。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MemberInput {
+    Skill(SkillInput),
+    Group(GroupInput),
+}
+
+impl MemberInput {
+    /// `tdd-` → skill 前缀，`@common-` → 组引用前缀。
+    pub fn parse(input: &str) -> Result<Self, MemberError> {
+        match input.strip_prefix('@') {
+            Some(name) => GroupInput::parse(name)
+                .map(MemberInput::Group)
+                .map_err(|source| MemberError::Group {
+                    raw: input.to_string(),
+                    source,
+                }),
+            None => SkillInput::parse(input)
+                .map(MemberInput::Skill)
+                .map_err(MemberError::Skill),
+        }
+    }
 }
 
 impl Member {

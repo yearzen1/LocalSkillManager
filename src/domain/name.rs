@@ -37,6 +37,26 @@ impl SkillName {
     }
 }
 
+/// 用户输入的名字开头部分：可能是完整名字，也可能是还没敲完的前缀。
+///
+/// `clean-` 是 `clean-arch` 的前六个字符，连字符属于名字本身。解析在命令层
+/// 按「精确 → 唯一前缀」落到真实名字，写入/删除时用的是 [`SkillName`]。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SkillInput(String);
+
+impl SkillInput {
+    /// 解析并校验「能否作为某个合法 skill 名的开头」。
+    pub fn parse(input: &str) -> Result<Self, NameError> {
+        validate_prefix(input, false)?;
+        Ok(Self(input.to_string()))
+    }
+
+    /// 用户原始输入。
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// 名称的共享校验：长度、字符集与 Windows 保留名。
 ///
 /// `allow_uppercase` 只放宽字符集；保留名检查始终大小写不敏感，
@@ -57,6 +77,36 @@ pub(crate) fn validate(input: &str, allow_uppercase: bool) -> Result<(), NameErr
     }
 
     if is_windows_reserved(input) {
+        return Err(NameError::Reserved {
+            input: input.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+/// 名字输入（可能是前缀）的共享校验：剥掉结尾的单个连字符后按名字格式校验。
+///
+/// 前缀只可能来自合法名字，因此除「末尾连字符」外与 [`validate`] 完全一致；
+/// 保留名检查照旧，避免 `con` 之类被当成 `console` 的前缀。
+pub(crate) fn validate_prefix(input: &str, allow_uppercase: bool) -> Result<(), NameError> {
+    let len = input.chars().count();
+    if len > MAX_NAME_LEN {
+        return Err(NameError::TooLong {
+            input: input.to_string(),
+            len,
+        });
+    }
+
+    let body = input.strip_suffix('-').unwrap_or(input);
+
+    if !has_valid_format(body, allow_uppercase) {
+        return Err(NameError::Format {
+            input: input.to_string(),
+        });
+    }
+
+    if is_windows_reserved(body) {
         return Err(NameError::Reserved {
             input: input.to_string(),
         });
@@ -208,5 +258,44 @@ mod tests {
                 "{input:?}"
             );
         }
+    }
+
+    #[test]
+    fn accepts_partial_names_ending_with_a_hyphen() {
+        for input in ["a", "a-", "clean-", "code-review-"] {
+            assert_eq!(SkillInput::parse(input).unwrap().as_str(), input);
+        }
+    }
+
+    #[test]
+    fn partial_names_still_reject_invalid_shapes() {
+        for input in ["", "-", "-a", "a--b", "clean--", "A-", "a_", "../evil"] {
+            assert_eq!(
+                SkillInput::parse(input),
+                Err(NameError::Format {
+                    input: input.to_string()
+                }),
+                "{input:?}"
+            );
+        }
+
+        for input in ["con", "con-"] {
+            assert!(
+                matches!(SkillInput::parse(input), Err(NameError::Reserved { .. })),
+                "{input:?}"
+            );
+        }
+
+        let too_long = format!("{}-", "a".repeat(MAX_NAME_LEN));
+        assert!(matches!(
+            SkillInput::parse(&too_long),
+            Err(NameError::TooLong { len, .. }) if len == MAX_NAME_LEN + 1
+        ));
+    }
+
+    #[test]
+    fn skill_names_stay_strict_about_the_trailing_hyphen() {
+        assert!(SkillName::parse("clean-").is_err());
+        assert!(SkillInput::parse("clean-").is_ok());
     }
 }

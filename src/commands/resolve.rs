@@ -1,33 +1,33 @@
 //! name 解析：把 [`crate::domain::resolve`] 的结果翻成结构化错误（Q50 / Q58）。
 
-use crate::domain::group::GroupName;
+use crate::domain::group::{GroupInput, GroupName};
 use crate::domain::name::SkillName;
-use crate::domain::resolve::{self, Match, Resolution};
+use crate::domain::resolve::{self, Match};
 use crate::domain::scope::Scope;
 use crate::error::AppError;
 use crate::i18n::MsgKey;
 
-/// 解析一个 name；零命中时返回调用方给的 not-found 错误，有相近名字时把 hint 换成候选。
+/// 解析一个名字输入（可能是前缀）；零命中时返回调用方给的 not-found 错误，有相近名字时把 hint 换成候选。
 pub fn resolve_name(
-    input: &SkillName,
+    input: &str,
     available: &[String],
     scope: Scope,
     not_found: AppError,
 ) -> Result<SkillName, AppError> {
-    match resolve::resolve(input, available) {
-        Resolution::Exact(name) | Resolution::Prefix(name) => Ok(name),
-        Resolution::Ambiguous(candidates) => {
+    match resolve::match_name(input, available) {
+        Match::Found(name) => Ok(SkillName::parse(&name).expect("scanned names are valid")),
+        Match::Ambiguous(candidates) => {
             let listed = candidates.join(", ");
             Err(AppError::runtime(MsgKey::NameAmbiguous)
-                .with_args([input.as_str(), scope.label(), listed.as_str()])
+                .with_args([input, scope.label(), listed.as_str()])
                 .with_hint_args(MsgKey::NameAmbiguousHint, [scope.label()]))
         }
-        Resolution::Missing => Err(with_suggestions(not_found, input.as_str(), available)),
+        Match::Missing => Err(with_suggestions(not_found, input, available)),
     }
 }
 
-/// 解析一个组名：精确优先，其次唯一前缀；零命中时列出相近组名（Q58）。
-pub fn resolve_group(input: &GroupName, available: &[String]) -> Result<GroupName, AppError> {
+/// 解析一个组名输入（可能是前缀）：精确优先，其次唯一前缀；零命中时列出相近组名（Q58）。
+pub fn resolve_group(input: &GroupInput, available: &[String]) -> Result<GroupName, AppError> {
     match resolve::match_name(input.as_str(), available) {
         Match::Found(name) => {
             Ok(GroupName::parse(&name).expect("group names from config are already validated"))

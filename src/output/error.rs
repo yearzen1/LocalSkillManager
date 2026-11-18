@@ -61,7 +61,7 @@ mod tests {
 
         assert_eq!(
             render(&err, Lang::En),
-            "error: invalid skill name '..'\nhint: skill names use lowercase letters, digits and single hyphens\n"
+            "error: invalid skill name '..'\nhint: skill names use lowercase letters, digits and single hyphens, and cannot start with a hyphen\n"
         );
     }
 

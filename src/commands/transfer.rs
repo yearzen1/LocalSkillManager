@@ -7,9 +7,9 @@ use std::path::Path;
 
 use crate::domain::action::TransferTarget;
 use crate::domain::entry::SkillEntry;
-use crate::domain::group::{expand, GroupName};
+use crate::domain::group::{expand, GroupInput};
 use crate::domain::lang::Lang;
-use crate::domain::name::SkillName;
+use crate::domain::name::{SkillInput, SkillName};
 use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
 use crate::i18n::MsgKey;
@@ -106,7 +106,7 @@ fn transfer_groups(
     spec: &TransferSpec,
     source_dir: &Path,
     destination_dir: &Path,
-    groups: &[GroupName],
+    groups: &[GroupInput],
     force: bool,
 ) -> Result<(), AppError> {
     let definitions = groups::load_groups(&ctx.env)?;
@@ -148,7 +148,12 @@ fn transfer_groups(
         }
 
         for skill in &skills {
-            match resolve_name(skill, &available, spec.source, not_found(spec, skill)) {
+            match resolve_name(
+                skill.as_str(),
+                &available,
+                spec.source,
+                not_found(spec, skill.as_str()),
+            ) {
                 Ok(name) if seen.insert(name.clone()) => names.push(name),
                 Ok(_) => {}
                 Err(err) => {
@@ -188,14 +193,19 @@ fn transfer_many(
     spec: &TransferSpec,
     source_dir: &Path,
     destination_dir: &Path,
-    inputs: &[SkillName],
+    inputs: &[SkillInput],
     force: bool,
 ) -> Result<(), AppError> {
     let available = scan::dir_names(source_dir)?;
 
     // 单 name 保持既有输出与退出码：目标已存在仍是错误。
     if let [input] = inputs {
-        let name = resolve_name(input, &available, spec.source, not_found(spec, input))?;
+        let name = resolve_name(
+            input.as_str(),
+            &available,
+            spec.source,
+            not_found(spec, input.as_str()),
+        )?;
         return transfer_one(ctx, spec, source_dir, destination_dir, &name, force);
     }
 
@@ -205,7 +215,12 @@ fn transfer_many(
 
     // 先解析全部 name；歧义或缺失按该条失败记账，其余照常执行。
     for input in inputs {
-        match resolve_name(input, &available, spec.source, not_found(spec, input)) {
+        match resolve_name(
+            input.as_str(),
+            &available,
+            spec.source,
+            not_found(spec, input.as_str()),
+        ) {
             Ok(name) if seen.insert(name.clone()) => names.push(name),
             Ok(_) => {}
             Err(err) => {
@@ -320,10 +335,10 @@ fn report_invalid(ctx: &Ctx, spec: &TransferSpec, entry: &SkillEntry) {
 }
 
 /// 源作用域内的 not-found 错误；hint 由方向决定。
-fn not_found(spec: &TransferSpec, name: &SkillName) -> AppError {
+fn not_found(spec: &TransferSpec, name: &str) -> AppError {
     AppError::runtime(spec.not_found)
-        .with_args([name.as_str()])
-        .with_hint_args(spec.not_found_hint, [name.as_str()])
+        .with_args([name])
+        .with_hint_args(spec.not_found_hint, [name])
 }
 
 /// 复制单个 skill：`spec.source` → `spec.destination`。
@@ -338,7 +353,7 @@ fn transfer_one(
     let source = source_dir.join(name.as_str());
 
     if !fsops::is_present(&source) {
-        return Err(not_found(spec, name));
+        return Err(not_found(spec, name.as_str()));
     }
 
     ensure_valid_source(ctx.lang, spec, &source, name)?;

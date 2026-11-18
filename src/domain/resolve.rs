@@ -1,21 +1,6 @@
 //! name 解析：`pull` / `push` / `remove` 与分组共用的唯一命中规则（Q50 / Q58）。
 
-use crate::domain::name::SkillName;
-
 /// 输入 name 在某个作用域里的解析结果。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Resolution {
-    /// 目录名与输入完全一致。
-    Exact(SkillName),
-    /// 恰好一个目录以输入为前缀，解析为该全名。
-    Prefix(SkillName),
-    /// 多个目录以输入为前缀；按字典序返回候选。
-    Ambiguous(Vec<String>),
-    /// 没有任何目录以输入为前缀。
-    Missing,
-}
-
-/// 字符串层面的解析结果；组名等非 [`SkillName`] 输入复用同一规则。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Match {
     /// 精确命中，或恰好一个名字以输入为前缀。
@@ -43,19 +28,6 @@ pub fn match_name(input: &str, available: &[String]) -> Match {
         0 => Match::Missing,
         1 => Match::Found(matches.remove(0)),
         _ => Match::Ambiguous(matches),
-    }
-}
-
-/// [`SkillName`] 版本的解析；规则与 [`match_name`] 相同。
-pub fn resolve(input: &SkillName, available: &[String]) -> Resolution {
-    match match_name(input.as_str(), available) {
-        Match::Found(name) => match SkillName::parse(&name) {
-            Ok(found) if found == *input => Resolution::Exact(found),
-            Ok(found) => Resolution::Prefix(found),
-            Err(_) => Resolution::Missing,
-        },
-        Match::Ambiguous(candidates) => Resolution::Ambiguous(candidates),
-        Match::Missing => Resolution::Missing,
     }
 }
 
@@ -117,10 +89,6 @@ fn levenshtein(left: &str, right: &str) -> usize {
 mod tests {
     use super::*;
 
-    fn name(input: &str) -> SkillName {
-        SkillName::parse(input).expect("test name should be valid")
-    }
-
     fn available(inputs: &[&str]) -> Vec<String> {
         inputs.iter().map(|input| input.to_string()).collect()
     }
@@ -129,7 +97,7 @@ mod tests {
     fn exact_match_wins_over_prefix() {
         let names = available(&["a", "ab"]);
 
-        assert_eq!(resolve(&name("a"), &names), Resolution::Exact(name("a")));
+        assert_eq!(match_name("a", &names), Match::Found("a".to_string()));
     }
 
     #[test]
@@ -137,8 +105,8 @@ mod tests {
         let names = available(&["code-review", "docs"]);
 
         assert_eq!(
-            resolve(&name("code"), &names),
-            Resolution::Prefix(name("code-review"))
+            match_name("code", &names),
+            Match::Found("code-review".to_string())
         );
     }
 
@@ -147,24 +115,34 @@ mod tests {
         let names = available(&["code-review", "code-lint"]);
 
         assert_eq!(
-            resolve(&name("code"), &names),
-            Resolution::Ambiguous(vec!["code-lint".to_string(), "code-review".to_string()])
+            match_name("code", &names),
+            Match::Ambiguous(vec!["code-lint".to_string(), "code-review".to_string()])
+        );
+    }
+
+    #[test]
+    fn a_prefix_can_end_with_the_hyphen_that_belongs_to_the_name() {
+        let names = available(&["clean-arch", "grill"]);
+
+        assert_eq!(
+            match_name("clean-", &names),
+            Match::Found("clean-arch".to_string())
         );
     }
 
     #[test]
     fn no_match_is_missing() {
         assert_eq!(
-            resolve(&name("nope"), &available(&["code-review"])),
-            Resolution::Missing
+            match_name("nope", &available(&["code-review"])),
+            Match::Missing
         );
     }
 
     #[test]
     fn does_not_match_suffix_or_substring() {
         assert_eq!(
-            resolve(&name("review"), &available(&["code-review"])),
-            Resolution::Missing
+            match_name("review", &available(&["code-review"])),
+            Match::Missing
         );
     }
 

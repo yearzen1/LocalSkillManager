@@ -153,7 +153,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::GroupJsonFlag => "Print machine-readable JSON",
         MsgKey::GroupResolvedFlag => "Expand @group references",
         MsgKey::GroupInvalid => "invalid group name '{0}'",
-        MsgKey::GroupInvalidHint => "group names use letters, digits and single hyphens",
+        MsgKey::GroupInvalidHint => "group names use letters, digits and single hyphens, and cannot start with a hyphen",
         MsgKey::GroupTooLong => "group name is too long: {0} > 64 characters",
         MsgKey::GroupReserved => "group name '{0}' is reserved on Windows",
         MsgKey::GroupAlreadyExists => "group '{0}' already exists",
@@ -206,7 +206,7 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::SkillAlreadyExistsHint => "use --force to overwrite",
         MsgKey::SkillNameInvalid => "invalid skill name '{0}'",
         MsgKey::SkillNameInvalidHint => {
-            "skill names use lowercase letters, digits and single hyphens"
+            "skill names use lowercase letters, digits and single hyphens, and cannot start with a hyphen"
         }
         MsgKey::SkillNameTooLong => "skill name is too long: {0} > 64 characters",
         MsgKey::SkillNameReserved => "skill name '{0}' is reserved on Windows",

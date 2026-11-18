@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use crate::domain::lang::Lang;
-use crate::domain::name::SkillName;
+use crate::domain::name::{SkillInput, SkillName};
 use crate::domain::scope::Scope;
 use crate::error::{AppError, Msg};
 use crate::i18n::MsgKey;
@@ -16,12 +16,17 @@ use crate::Ctx;
 
 use super::resolve::resolve_name;
 
-pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Result<(), AppError> {
+pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillInput>, force: bool) -> Result<(), AppError> {
     let directory = paths::skills_dir(&ctx.env, scope, &ctx.cwd)?;
     let available = scan::dir_names(&directory)?;
 
     if let [input] = names.as_slice() {
-        let name = resolve_name(input, &available, scope, remove_not_found(input, scope))?;
+        let name = resolve_name(
+            input.as_str(),
+            &available,
+            scope,
+            remove_not_found(input.as_str(), scope),
+        )?;
         return remove_one(ctx, scope, &name, force);
     }
 
@@ -31,7 +36,12 @@ pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Resul
 
     // 先解析全部 name；歧义或缺失按该条失败记账，其余照常执行。
     for input in &names {
-        match resolve_name(input, &available, scope, remove_not_found(input, scope)) {
+        match resolve_name(
+            input.as_str(),
+            &available,
+            scope,
+            remove_not_found(input.as_str(), scope),
+        ) {
             Ok(name) if seen.insert(name.clone()) => resolved.push(name),
             Ok(_) => {}
             Err(err) => {
@@ -72,10 +82,10 @@ pub fn run(ctx: &Ctx, scope: Scope, names: Vec<SkillName>, force: bool) -> Resul
 }
 
 /// `remove` 的 not-found 错误；hint 指向 `search`（Q47）。
-fn remove_not_found(name: &SkillName, scope: Scope) -> AppError {
+fn remove_not_found(name: &str, scope: Scope) -> AppError {
     AppError::runtime(MsgKey::RemoveNotFound)
-        .with_args([name.as_str(), scope.label()])
-        .with_hint_args(MsgKey::RemoveNotFoundHint, [name.as_str(), scope.label()])
+        .with_args([name, scope.label()])
+        .with_hint_args(MsgKey::RemoveNotFoundHint, [name, scope.label()])
 }
 
 /// 删除单个 skill；多 name 时由 [`run`] 累计成功/失败。
@@ -83,7 +93,7 @@ fn remove_one(ctx: &Ctx, scope: Scope, name: &SkillName, force: bool) -> Result<
     let target = paths::skill_dir(&ctx.env, scope, &ctx.cwd, name)?;
 
     if !fsops::is_present(&target) {
-        return Err(remove_not_found(name, scope));
+        return Err(remove_not_found(name.as_str(), scope));
     }
 
     if !force {

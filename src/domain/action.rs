@@ -3,9 +3,9 @@
 use std::path::PathBuf;
 
 use super::config::ConfigKey;
-use super::group::{GroupName, Member};
+use super::group::{GroupInput, GroupName, MemberInput};
 use super::lang::Lang;
-use super::name::SkillName;
+use super::name::SkillInput;
 use super::scope::Scope;
 
 /// 一次调用的动作。
@@ -36,7 +36,7 @@ pub enum Action {
     },
     Remove {
         scope: Scope,
-        names: Vec<SkillName>,
+        names: Vec<SkillInput>,
         force: bool,
     },
     Group(GroupCommand),
@@ -52,8 +52,8 @@ pub enum Action {
 /// `pull` / `push` 的目标：一个或多个 skill、分组，或整个作用域。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransferTarget {
-    Many(Vec<SkillName>),
-    Groups(Vec<GroupName>),
+    Many(Vec<SkillInput>),
+    Groups(Vec<GroupInput>),
     All,
 }
 
@@ -66,19 +66,19 @@ pub enum GroupCommand {
     },
     Set {
         name: GroupName,
-        members: Vec<Member>,
+        members: Vec<MemberInput>,
         force: bool,
     },
     Add {
         name: GroupName,
-        members: Vec<Member>,
+        members: Vec<MemberInput>,
     },
     Remove {
-        name: GroupName,
-        members: Vec<Member>,
+        name: GroupInput,
+        members: Vec<MemberInput>,
     },
     Delete {
-        names: Vec<GroupName>,
+        names: Vec<GroupInput>,
         force: bool,
     },
 }

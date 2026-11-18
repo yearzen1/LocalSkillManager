@@ -151,7 +151,9 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::GroupJsonFlag => "输出机器可读的 JSON",
         MsgKey::GroupResolvedFlag => "展开 @group 引用",
         MsgKey::GroupInvalid => "非法的分组名称 '{0}'",
-        MsgKey::GroupInvalidHint => "分组名称只能使用字母（大小写均可）、数字和单个连字符",
+        MsgKey::GroupInvalidHint => {
+            "分组名称只能使用字母（大小写均可）、数字和单个连字符，且不能以连字符开头"
+        }
         MsgKey::GroupTooLong => "分组名称过长：{0} > 64 个字符",
         MsgKey::GroupReserved => "分组名称 '{0}' 是 Windows 保留设备名",
         MsgKey::GroupAlreadyExists => "分组 '{0}' 已存在",
@@ -197,7 +199,9 @@ pub(super) fn text(key: MsgKey) -> &'static str {
         MsgKey::SkillAlreadyExists => "skill '{0}' 已存在于 {1}",
         MsgKey::SkillAlreadyExistsHint => "使用 --force 覆盖",
         MsgKey::SkillNameInvalid => "非法的 skill 名称 '{0}'",
-        MsgKey::SkillNameInvalidHint => "skill 名称只能使用小写字母、数字和单个连字符",
+        MsgKey::SkillNameInvalidHint => {
+            "skill 名称只能使用小写字母、数字和单个连字符，且不能以连字符开头"
+        }
         MsgKey::SkillNameTooLong => "skill 名称过长：{0} > 64 个字符",
         MsgKey::SkillNameReserved => "skill 名称 '{0}' 是 Windows 保留设备名",
         MsgKey::SkillDescriptionEmpty => "skill 描述不能为空",

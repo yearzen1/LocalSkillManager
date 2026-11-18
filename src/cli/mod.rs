@@ -12,9 +12,9 @@ use clap::ArgMatches;
 
 use crate::domain::action::{Action, ConfigCommand, GroupCommand, SearchField, TransferTarget};
 use crate::domain::config::ConfigKey;
-use crate::domain::group::{GroupName, Member};
+use crate::domain::group::{GroupInput, GroupName, MemberInput};
 use crate::domain::lang::Lang;
-use crate::domain::name::SkillName;
+use crate::domain::name::SkillInput;
 use crate::domain::scope::Scope;
 use crate::error::AppError;
 use crate::i18n::MsgKey;
@@ -169,12 +169,12 @@ fn transfer_target(
 }
 
 /// 读取全部 `name` 并校验；重复 name 去重，保留首次出现的顺序。
-fn skill_names(matches: &ArgMatches) -> Result<Vec<SkillName>, AppError> {
+fn skill_names(matches: &ArgMatches) -> Result<Vec<SkillInput>, AppError> {
     skill_values(matches, "name")
 }
 
 /// 读取全部 `--group` 并校验；重复组名去重，保留首次出现的顺序。
-fn group_names(matches: &ArgMatches) -> Result<Vec<GroupName>, AppError> {
+fn group_names(matches: &ArgMatches) -> Result<Vec<GroupInput>, AppError> {
     let Ok(values) = matches.try_get_many::<String>("group") else {
         return Ok(Vec::new()); // `push` 没有 `--group`
     };
@@ -182,7 +182,7 @@ fn group_names(matches: &ArgMatches) -> Result<Vec<GroupName>, AppError> {
     let mut groups = Vec::new();
     let mut seen = HashSet::new();
     for raw in values.into_iter().flatten() {
-        let group = GroupName::parse(raw)?;
+        let group = GroupInput::parse(raw)?;
         if seen.insert(group.clone()) {
             groups.push(group);
         }
@@ -190,11 +190,11 @@ fn group_names(matches: &ArgMatches) -> Result<Vec<GroupName>, AppError> {
     Ok(groups)
 }
 
-fn skill_values(matches: &ArgMatches, id: &str) -> Result<Vec<SkillName>, AppError> {
+fn skill_values(matches: &ArgMatches, id: &str) -> Result<Vec<SkillInput>, AppError> {
     let mut names = Vec::new();
     let mut seen = HashSet::new();
     for raw in matches.get_many::<String>(id).into_iter().flatten() {
-        let name = SkillName::parse(raw)?;
+        let name = SkillInput::parse(raw)?;
         if seen.insert(name.clone()) {
             names.push(name);
         }
@@ -202,12 +202,12 @@ fn skill_values(matches: &ArgMatches, id: &str) -> Result<Vec<SkillName>, AppErr
     Ok(names)
 }
 
-/// 分组命令的 `ITEM`：skill 名或 `@组名` 引用。
-fn member_values(matches: &ArgMatches, id: &str) -> Result<Vec<Member>, AppError> {
+/// 分组命令的 `ITEM`：skill 名/前缀，或 `@组名` 引用/前缀。
+fn member_values(matches: &ArgMatches, id: &str) -> Result<Vec<MemberInput>, AppError> {
     let mut members = Vec::new();
     let mut seen = HashSet::new();
     for raw in matches.get_many::<String>(id).into_iter().flatten() {
-        let member = Member::parse(raw)?;
+        let member = MemberInput::parse(raw)?;
         if seen.insert(member.clone()) {
             members.push(member);
         }
@@ -216,7 +216,7 @@ fn member_values(matches: &ArgMatches, id: &str) -> Result<Vec<Member>, AppError
 }
 
 /// `remove` 的 scope 可省略：末尾恰好是 `global` / `project` 时当作用域（Q51）。
-fn remove_target(matches: &ArgMatches) -> Result<(Vec<SkillName>, Scope), AppError> {
+fn remove_target(matches: &ArgMatches) -> Result<(Vec<SkillInput>, Scope), AppError> {
     let mut raw: Vec<String> = matches
         .get_many::<String>("name")
         .into_iter()
@@ -241,7 +241,7 @@ fn remove_target(matches: &ArgMatches) -> Result<(Vec<SkillName>, Scope), AppErr
     let mut names = Vec::new();
     let mut seen = HashSet::new();
     for value in &raw {
-        let name = SkillName::parse(value)?;
+        let name = SkillInput::parse(value)?;
         if seen.insert(name.clone()) {
             names.push(name);
         }
@@ -280,11 +280,11 @@ fn parse_group(matches: &ArgMatches) -> Result<GroupCommand, AppError> {
             members: member_values(sub, "member")?,
         }),
         "remove" => Ok(GroupCommand::Remove {
-            name: group_value(sub, "group")?,
+            name: group_input_value(sub, "group")?,
             members: member_values(sub, "member")?,
         }),
         "delete" => Ok(GroupCommand::Delete {
-            names: group_values(sub, "group")?,
+            names: group_input_values(sub, "group")?,
             force: sub.get_flag("force"),
         }),
         other => Err(AppError::usage(MsgKey::UsageInvalidSubcommand).with_args([other])),
@@ -295,11 +295,15 @@ fn group_value(matches: &ArgMatches, id: &str) -> Result<GroupName, AppError> {
     Ok(GroupName::parse(&required(matches, id))?)
 }
 
-fn group_values(matches: &ArgMatches, id: &str) -> Result<Vec<GroupName>, AppError> {
+fn group_input_value(matches: &ArgMatches, id: &str) -> Result<GroupInput, AppError> {
+    Ok(GroupInput::parse(&required(matches, id))?)
+}
+
+fn group_input_values(matches: &ArgMatches, id: &str) -> Result<Vec<GroupInput>, AppError> {
     let mut groups = Vec::new();
     let mut seen = HashSet::new();
     for raw in matches.get_many::<String>(id).into_iter().flatten() {
-        let group = GroupName::parse(raw)?;
+        let group = GroupInput::parse(raw)?;
         if seen.insert(group.clone()) {
             groups.push(group);
         }

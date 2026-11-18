@@ -4,8 +4,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use crate::domain::action::GroupCommand;
-use crate::domain::group::{expand, find_path, Group, GroupName, Member};
-use crate::domain::name::SkillName;
+use crate::domain::group::{expand, find_path, Group, GroupInput, GroupName, Member, MemberInput};
+use crate::domain::name::{SkillInput, SkillName};
 use crate::domain::resolve as name_resolve;
 use crate::domain::resolve::Match;
 use crate::domain::scope::Scope;
@@ -114,7 +114,7 @@ fn render_rows(
         .collect()
 }
 
-fn set(ctx: &Ctx, name: &GroupName, members: &[Member], force: bool) -> Result<(), AppError> {
+fn set(ctx: &Ctx, name: &GroupName, members: &[MemberInput], force: bool) -> Result<(), AppError> {
     let groups = group_store::load_groups(&ctx.env)?;
     let members = resolve_members(ctx, name, &groups, members)?;
     let report = group_store::set_group(&ctx.env, name, &members, force)?;
@@ -123,7 +123,7 @@ fn set(ctx: &Ctx, name: &GroupName, members: &[Member], force: bool) -> Result<(
     Ok(())
 }
 
-fn add(ctx: &Ctx, name: &GroupName, members: &[Member]) -> Result<(), AppError> {
+fn add(ctx: &Ctx, name: &GroupName, members: &[MemberInput]) -> Result<(), AppError> {
     let groups = group_store::load_groups(&ctx.env)?;
     let members = resolve_members(ctx, name, &groups, members)?;
     let report = group_store::add_group(&ctx.env, name, &members)?;
@@ -132,12 +132,12 @@ fn add(ctx: &Ctx, name: &GroupName, members: &[Member]) -> Result<(), AppError> 
     Ok(())
 }
 
-/// 把成员解析成 global 中的全名或已定义组；任一失败则整批不写盘（Q60）。
+/// 把成员输入解析成 global 中的全名或已定义组；任一失败则整批不写盘（Q60）。
 fn resolve_members(
     ctx: &Ctx,
     target: &GroupName,
     groups: &[Group],
-    members: &[Member],
+    members: &[MemberInput],
 ) -> Result<Vec<Member>, AppError> {
     let directory = paths::skills_dir(&ctx.env, Scope::Global, &ctx.cwd)?;
     let available_skills = scan::dir_names(&directory)?;
@@ -149,8 +149,8 @@ fn resolve_members(
 
     for member in members {
         let result = match member {
-            Member::Skill(skill) => resolve_skill(skill, &available_skills),
-            Member::Group(reference) => {
+            MemberInput::Skill(skill) => resolve_skill(skill, &available_skills),
+            MemberInput::Group(reference) => {
                 resolve_reference(target, groups, &available_groups, reference)
             }
         };
@@ -174,7 +174,7 @@ fn resolve_members(
     .map(|()| resolved)
 }
 
-fn resolve_skill(skill: &SkillName, available: &[String]) -> Result<Member, AppError> {
+fn resolve_skill(skill: &SkillInput, available: &[String]) -> Result<Member, AppError> {
     match name_resolve::match_name(skill.as_str(), available) {
         Match::Found(name) => {
             // `scan::dir_names` 只返回合法名字，这里不会失败。
@@ -204,7 +204,7 @@ fn resolve_reference(
     target: &GroupName,
     groups: &[Group],
     available: &[String],
-    reference: &GroupName,
+    reference: &GroupInput,
 ) -> Result<Member, AppError> {
     let resolved = resolve_group(reference, available)?;
 
@@ -228,7 +228,7 @@ fn resolve_reference(
     Ok(Member::Group(resolved))
 }
 
-fn remove_members(ctx: &Ctx, name: &GroupName, members: &[Member]) -> Result<(), AppError> {
+fn remove_members(ctx: &Ctx, name: &GroupInput, members: &[MemberInput]) -> Result<(), AppError> {
     let groups = group_store::load_groups(&ctx.env)?;
     let available = group_names(&groups);
     let name = resolve_group(name, &available)?;
@@ -255,7 +255,7 @@ fn remove_members(ctx: &Ctx, name: &GroupName, members: &[Member]) -> Result<(),
 
     for member in members {
         let result = match member {
-            Member::Skill(skill) => {
+            MemberInput::Skill(skill) => {
                 match name_resolve::match_name(skill.as_str(), &available_skills) {
                     Match::Found(found) => Ok(Member::Skill(
                         SkillName::parse(&found).expect("group members are validated"),
@@ -268,7 +268,7 @@ fn remove_members(ctx: &Ctx, name: &GroupName, members: &[Member]) -> Result<(),
                     }
                 }
             }
-            Member::Group(reference) => {
+            MemberInput::Group(reference) => {
                 match name_resolve::match_name(reference.as_str(), &available_refs) {
                     Match::Found(found) => Ok(Member::Group(
                         GroupName::parse(&found).expect("group references are validated"),
@@ -336,7 +336,7 @@ fn missing_in_group(item: &str, group: &GroupName, available: &[String]) -> AppE
     }
 }
 
-fn delete(ctx: &Ctx, names: &[GroupName], force: bool) -> Result<(), AppError> {
+fn delete(ctx: &Ctx, names: &[GroupInput], force: bool) -> Result<(), AppError> {
     let groups = group_store::load_groups(&ctx.env)?;
     let available = group_names(&groups);
 
