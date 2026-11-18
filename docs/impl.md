@@ -473,10 +473,10 @@ pub struct Ctx {
 
 ### 8.13 v0.11.0 名字输入允许是前缀（已实现）
 
-- [ ] `domain::name::SkillInput` / `domain::group::GroupInput` / `MemberInput` 承载命令行输入；`SkillName` / `GroupName` 仍是完整名字身份。
-- [ ] 格式校验只要求输入能作为合法名字的开头：末尾单个连字符合法（`clean-`），大写、`_`、`a--b`、开头的连字符、路径分隔符、超长与保留名仍退 2。
-- [ ] `pull` / `push` / `remove` / `group set/add/remove` / `pull --group` / `group delete` 全部走 `SkillInput` / `GroupInput` / `MemberInput`，解析仍为「精确 → 唯一前缀」。
-- [ ] 零命中走各命令既有 not-found（退 1）并给候选；`clean-` 不再报「非法名字」。
-- [ ] 格式错误 hint 补「不能以连字符开头」；`group set/add` 的目标组名保持精确。
-- [ ] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md` 与验收脚本同步。
+- [x] `domain::name::SkillInput` / `domain::group::GroupInput` / `MemberInput` 承载命令行输入；`SkillName` / `GroupName` 仍是完整名字身份。
+- [x] 格式校验只要求输入能作为合法名字的开头：末尾单个连字符合法（`clean-`），大写、`_`、`a--b`、开头的连字符、路径分隔符、超长与保留名仍退 2。
+- [x] `pull` / `push` / `remove` / `group set/add/remove` / `pull --group` / `group delete` 全部走 `SkillInput` / `GroupInput` / `MemberInput`，解析仍为「精确 → 唯一前缀」。
+- [x] 零命中走各命令既有 not-found（退 1）并给候选；`clean-` 不再报「非法名字」。
+- [x] 格式错误 hint 补「不能以连字符开头」；`group set/add` 的目标组名保持精确。
+- [x] `impl/cli.md`、`impl/config.md`、`impl/storage.md`、`impl/quality.md` 与验收脚本同步。
 
