@@ -3887,3 +3887,139 @@ fn group_help_lists_subcommands_and_flags() {
 
     lsm().arg("group").assert().code(2);
 }
+
+#[test]
+fn group_add_accepts_a_partial_name_ending_with_a_hyphen() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "clean-arch", "C.");
+    install_global(&home, "grill", "G.");
+
+    lsm_with_home(&config, &home)
+        .args(["group", "set", "predevelop", "grill"])
+        .assert()
+        .success();
+
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "predevelop", "clean-"])
+        .assert()
+        .success();
+
+    let stored = fs::read_to_string(groups_path(&config)).unwrap();
+    assert!(
+        stored.contains(r#"predevelop = ["grill", "clean-arch"]"#),
+        "{stored}"
+    );
+}
+
+#[test]
+fn group_remove_accepts_a_partial_name_ending_with_a_hyphen() {
+    let config = TempDir::new().unwrap();
+    write_groups(&config, "predevelop = [\"grill\", \"clean-arch\"]\n");
+
+    lsm_with_config(&config)
+        .args(["group", "remove", "predevelop", "clean-"])
+        .assert()
+        .success();
+
+    let stored = fs::read_to_string(groups_path(&config)).unwrap();
+    assert!(stored.contains(r#"predevelop = ["grill"]"#), "{stored}");
+}
+
+#[test]
+fn a_group_reference_accepts_a_partial_name_ending_with_a_hyphen() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    write_groups(&config, "base-tools = [\"tdd\"]\n");
+
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "frontend", "@base-"])
+        .assert()
+        .success();
+
+    let stored = fs::read_to_string(groups_path(&config)).unwrap();
+    assert!(stored.contains(r#"frontend = ["@base-tools"]"#), "{stored}");
+}
+
+#[test]
+fn pull_accepts_a_partial_name_ending_with_a_hyphen() {
+    let home = home_dir();
+    let project = TempDir::new().unwrap();
+    install_global(&home, "clean-arch", "C.");
+
+    lsm()
+        .env("LSM_HOME", home.path())
+        .current_dir(project.path())
+        .args(["pull", "clean-"])
+        .assert()
+        .success();
+
+    assert!(project
+        .path()
+        .join(".agents/skills/clean-arch/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn remove_accepts_a_partial_name_ending_with_a_hyphen() {
+    let project = TempDir::new().unwrap();
+    install_project(&project, "clean-arch", "C.");
+
+    lsm()
+        .current_dir(project.path())
+        .args(["remove", "clean-"])
+        .assert()
+        .success();
+
+    assert!(!project.path().join(".agents/skills/clean-arch").exists());
+}
+
+#[test]
+fn group_lookup_accepts_a_partial_name_ending_with_a_hyphen() {
+    let config = TempDir::new().unwrap();
+    write_groups(&config, "pre-develop = [\"tdd\"]\n");
+
+    lsm_with_config(&config)
+        .args(["group", "delete", "pre-"])
+        .assert()
+        .success();
+
+    let stored = fs::read_to_string(groups_path(&config)).unwrap();
+    assert!(!stored.contains("pre-develop"), "{stored}");
+}
+
+#[test]
+fn partial_names_with_an_invalid_shape_still_exit_two() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "clean-arch", "C.");
+
+    for input in ["clean--", "Clean-", "clean_"] {
+        lsm_with_home(&config, &home)
+            .args(["group", "add", "predevelop", input])
+            .assert()
+            .code(2)
+            .stderr(predicate::str::contains("invalid skill name"));
+    }
+
+    // 开头的连字符要先过 clap 的参数解析，`--` 之后才能进格式校验。
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "predevelop", "--", "-clean"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid skill name"));
+}
+
+#[test]
+fn an_unmatched_partial_name_is_a_not_found_error() {
+    let config = TempDir::new().unwrap();
+    let home = home_dir();
+    install_global(&home, "clean-arch", "C.");
+
+    lsm_with_home(&config, &home)
+        .args(["group", "add", "predevelop", "nosuch-"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("invalid skill name").not())
+        .stderr(predicate::str::contains("nosuch-"));
+}
