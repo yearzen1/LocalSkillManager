@@ -194,6 +194,13 @@ skill 分组（Q53–Q57，v0.7.0）：
 128. `groups.toml` 语法坏时不回退旧表：报 `cannot parse groups file` 并指向 `groups.toml`。
 129. 旧 `[groups]` 删除失败（如 `config.toml` 只读）→ 分组已写入 `groups.toml`，stderr 打 warning，退出码仍为 0。
 130. `group set develop` / `group add develop` / `group remove develop`（不给成员）→ 退出 2，hint 含 `'@组名'`（Windows PowerShell 的 splatting 提示）；非 `group` 命令（如 `lsm add`）缺参数时 hint 仍是通用的 `lsm --help` 提示。
+131. global 只有 `clean-arch` 时 `group add predevelop clean-` → 退出 0，`groups.toml` 写入完整名字 `predevelop = ["clean-arch"]`。
+132. 已有 `predevelop = ["grill"]` 时再 `group add predevelop clean-` → `["grill", "clean-arch"]`，顺序与去重不变。
+133. `pull clean-` / `push clean-` / `remove clean-` 均按前缀解析到 `clean-arch`；`group remove predevelop clean-` 移除该成员。
+134. `group add frontend @base-`（存在 `base-tools`）→ 写入 `@base-tools`；`group delete pre-`（存在 `pre-develop`）→ 删除该组。
+135. `group add predevelop clean--` / `Clean-` / `clean_` / `-- -clean` → 退出 2，`invalid skill name`，hint 含「不能以连字符开头 / cannot start with a hyphen」。
+136. `group add predevelop nosuch-` → 退出 1，错误是 not-found 而不是 `invalid skill name`；有相近名字时 hint 列出候选。
+137. `group set predev- sample`（目标是 `set`/`add` 的组名）→ 退出 2，目标组名仍要求完整。
 
 `[planned]` 条目不计入已实现用例数；实现后删掉标记，并同步 `docs/impl/cli.md` §2.1 的状态列（当前无 `[planned]` 用例）。
 
@@ -261,6 +268,12 @@ lsm group set Frontend sample                   # 大写组名
 lsm group set frontend sample                   # 与 Frontend 是两个组
 lsm group list                                  # 组与组之间空一行
 
+# v0.11.0：名字输入可以是开头部分
+lsm group set predevelop sample
+lsm group set pre-develop sample                # 组名里带连字符
+lsm group delete pre-                           # 只是开头部分，解析到 pre-develop
+lsm pull sampl                                  # skill 名开头部分 → sample
+
 # 离线：只验子命令存在与非法参数，不联网
 lsm upgrade --help                              # 列出 --check / --force / --verbose / --progress，退出 0
 lsm upgrade --bogus                             # 退出 2
@@ -277,7 +290,7 @@ rm -f /tmp/lsm-check
 - 这一段是唯一的联网步骤，且只对**副本**执行：`upgrade` 会替换 `current_exe()`，不要对日常使用的 `lsm` 直接跑。
 - Windows 上用 `Copy-Item` 复制到临时目录后执行同样的 `--check`。
 - 发布前的 `upgrade --force` 手工验收见 [release.md](../release.md)「升级契约」：用上一版二进制执行一次，确认替换后 `--version` 正常且没有 `.old-*` 残留。
-- v0.6.x 的默认作用域、唯一前缀、`search` 字段过滤与 help 汉化由 `scripts/acceptance.sh` 第 13–16 步覆盖；v0.7.x / v0.8.0 的分组由第 19–21 步覆盖。脚本与本节的文字不一致时以脚本为准。
+- v0.6.x 的默认作用域、唯一前缀、`search` 字段过滤与 help 汉化由 `scripts/acceptance.sh` 第 13–16 步覆盖；v0.7.x / v0.8.0 的分组由第 19–21 步覆盖；v0.11.0 的前缀输入（含结尾连字符）由第 22 步覆盖。脚本与本节的文字不一致时以脚本为准。
 
 上面这串步骤的执行入口是 `scripts/acceptance.sh`：Windows 用 Git Bash 调用（`"D:/Git/bin/bash.exe" scripts/acceptance.sh`），**不要用 WSL 的 `bash`**——它会把 Linux 路径原样传给 Windows 二进制，测试会在错误目录里跑出假绿。Linux/macOS 直接 `bash scripts/acceptance.sh`。脚本与本节的步骤不一致时以脚本为准，并在同一提交内改本节。
 
